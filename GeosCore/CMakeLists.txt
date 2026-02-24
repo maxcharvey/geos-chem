@@ -23,6 +23,7 @@ add_library(GeosCore
   airs_ch4_mod.F90
   calc_met_mod.F90
   carbon_mod.F90
+  brc_mod.F90
   carbon_gases_mod.F90
   chemistry_mod.F90
   cldice_HBrHOBr_rxn.F90

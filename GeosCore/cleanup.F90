@@ -43,6 +43,7 @@ SUBROUTINE CLEANUP( Input_Opt, State_Grid, ERROR, RC )
   USE EMISSIONS_MOD,           ONLY : EMISSIONS_FINAL
   USE SFCVMR_MOD,              ONLY : FixSfcVmr_Final
   USE VDiff_Mod,               ONLY : Cleanup_Vdiff
+  USE BRC_MOD,                 ONLY : Cleanup_BrC ! (mch 24/02/26)
 #ifdef TOMAS
   USE TOMAS_MOD,               ONLY : CLEANUP_TOMAS  !sfarina, 1/16/13
 #endif
@@ -129,6 +130,7 @@ SUBROUTINE CLEANUP( Input_Opt, State_Grid, ERROR, RC )
   CALL CLEANUP_SEASALT()
   CALL CLEANUP_SULFATE()
   CALL CLEANUP_LINEAR_CHEM()
+  CALL Cleanup_BrC() ! (mch 24/02/26)
 
   CALL Cleanup_FullChem( RC )
   IF ( RC /= GC_SUCCESS ) THEN

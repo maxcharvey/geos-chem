@@ -204,10 +204,6 @@ MODULE CARBON_MOD
   REAL(fp), ALLOCATABLE :: BCCONV(:,:,:)
   REAL(fp), ALLOCATABLE :: OCCONV(:,:,:)  
 
-  ! Adding the required conversion arrays (mch 19/02/26)
-  REAL(fp), ALLOCATABLE :: FSOAS_CONV(:,:,:)
-  REAL(fp), ALLOCATABLE :: BRCSOA_CONV(:,:,:)
-
 
   REAL(fp), ALLOCATABLE :: TCOSZ(:,:)
   REAL(fp), ALLOCATABLE :: GLOB_DARO2(:,:,:,:,:) ! Diagnostic (dkh, 11/10/06)
@@ -280,10 +276,6 @@ MODULE CARBON_MOD
   INTEGER :: id_LISOPOH, id_LISOPNO3
   INTEGER :: id_SOAS,    id_SOAP
   
-  ! Adding Species ID flags for FSOAS, BRCSOA and WTC
-  ! (mch 19/02/26)
-  INTEGER :: id_FSOAS,   id_BRCSOA, id_WTC
-
 
 #ifdef APM
   REAL(fp), ALLOCATABLE :: BCCONVNEW(:,:,:)
@@ -325,6 +317,7 @@ CONTAINS
     USE State_Met_Mod,      ONLY : MetState
     USE TIME_MOD,           ONLY : ITS_A_NEW_MONTH
     USE TIME_MOD,           ONLY : GET_TS_CHEM
+    USE BRC_MOD,            ONLY : ChemBrC
 #ifdef APM
     USE APM_INIT_MOD,         ONLY : APMIDS
     USE APM_INIT_MOD,         ONLY : NBCOC,CEMITBCOC1
@@ -556,44 +549,6 @@ CONTAINS
        ENDIF
     ENDIF
     
-    ! Chemsitry for FSOAS (mch 19/02/26)
-    IF (id_FSOAS > 0) THEN
-        CALL CHEM_FSOAS( Input_Opt  = Input_Opt,                             &
-                         State_Chm  = State_Chm,                             &
-                         State_Diag = State_Diag,                            &
-                         State_Grid = State_Grid,                            &
-                         spcId      = id_FSOAS,                              &
-                         RC         = RC                                    )
-       IF ( Input_Opt%Verbose ) THEN
-          CALL DEBUG_MSG( '### CHEMCARBON: a CHEM_FSOAS' )
-       ENDIF
-    ENDIF
-
-    ! Chemsitry for BRCSOA (mch 19/02/26)
-    IF (id_BRCSOA > 0) THEN
-        CALL CHEM_BRCSOA( Input_Opt  = Input_Opt,                             &
-                          State_Chm  = State_Chm,                             &
-                          State_Diag = State_Diag,                            &
-                          State_Grid = State_Grid,                            &
-                          spcId      = id_BRCSOA,                             &
-                          RC         = RC                                    )
-       IF ( Input_Opt%Verbose ) THEN
-          CALL DEBUG_MSG( '### CHEMCARBON: a CHEM_BRCSOA' )
-       ENDIF
-    ENDIF
-
-    ! Chemistry for WTC (mch 19/02/26)
-    IF (id_WTC > 0) THEN
-        CALL CHEM_WTC( Input_Opt  = Input_Opt,                             &
-                       State_Chm  = State_Chm,                              &
-                       State_Diag = State_Diag,                             &
-                       State_Grid = State_Grid,                             &
-                       spcId      = id_WTC,                                 &
-                       RC         = RC                                     )
-       IF ( Input_Opt%Verbose ) THEN
-          CALL DEBUG_MSG( '### CHEMCARBON: a CHEM_WTC' )
-       ENDIF
-    ENDIF
 
 
 #ifdef APM
@@ -964,6 +919,17 @@ CONTAINS
          CALL DEBUG_MSG( '### CHEMCARBON: a SOA_CHEM' )
       ENDIF
 
+   ENDIF
+
+   !================================================================
+   ! Do brown carbon chemistry (BrC darkening scheme) - mch 24/02/26
+   !================================================================
+   CALL ChemBrC( Input_Opt, State_Chm, State_Diag, &
+                 State_Grid, State_Met, RC )
+   IF ( RC /= GC_SUCCESS ) THEN
+      ErrMsg = 'Error encountered in "ChemBrC"!'
+      CALL GC_Error( ErrMsg, RC, ThisLoc )
+      RETURN
    ENDIF
 
  END SUBROUTINE CHEMCARBON
@@ -1453,391 +1419,7 @@ CONTAINS
  END SUBROUTINE CHEM_OCPI
 !EOC
 
-!EOC
-!------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
-!------------------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: chem_fsoas
-!
-! !DESCRIPTION: Subroutine CHEM\_FSOAS converts FSOAS to
-!  BRCSOA and calculates the dry deposition of FSOAS.
-!\\
-!\\
-! !INTERFACE:
-!
- SUBROUTINE CHEM_FSOAS( Input_Opt,  State_Chm, State_Diag,                    &
-                       State_Grid, spcId,     RC                            )
-!
-! !USES:
-!
-   USE ErrCode_Mod
-   USE Input_Opt_Mod,  ONLY : OptInput
-   USE State_Chm_Mod,  ONLY : ChmState
-   USE State_Diag_Mod, ONLY : DgnState
-   USE State_Grid_Mod, ONLY : GrdState
-   USE TIME_MOD,       ONLY : GET_TS_CHEM
-!
-! !INPUT PARAMETERS:
-!
-   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
-   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
-   INTEGER,        INTENT(IN)    :: spcId        ! BCPO species Id
 
-!
-! !INPUT/OUTPUT PARAMETERS:
-!
-   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry state object
-   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
-!
-! !OUTPUT PARAMETERS:
-!
-   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
-!
-! !REMARKS:
-!  Drydep is now applied in mixing_mod.F90.
-!
-! !REVISION HISTORY:
-!  19 Feb 2026 - mch - Initial version
-!EOP
-!------------------------------------------------------------------------------
-!BOC
-!
-! !LOCAL VARIABLES:
-!
-   ! Scalars
-   INTEGER             :: I,      J,   L
-   REAL(fp)            :: DTCHEM, KFSOAS, FREQ, TC0, CNEW, RKT
-
-   ! Pointers
-   REAL(fp), POINTER   :: TC(:,:,:)
-!
-! !DEFINED PARAMETERS:
-!
-   REAL(fp), PARAMETER :: FSOAS_LIFE = 0.25e+0_fp
-
-   !=================================================================
-   ! CHEM_FSOAS begins here!
-   !=================================================================
-
-   ! Assume success
-   RC        =  GC_SUCCESS
-
-   ! Initialize
-   KFSOAS    =  1.e+0_fp / ( 86400e+0_fp * FSOAS_LIFE )
-   DTCHEM    =  GET_TS_CHEM()
-   FSOAS_CONV=  0e+0_fp
-   TC        => State_Chm%Species(spcId)%Conc
-
-   !=================================================================
-   ! For species with dry deposition, the loss rate of dry dep is
-   ! combined in chem loss term.
-   !
-   ! Conversion from FSOAS to BRCSOA:
-   ! e-folding time 0.25 days
-   ! ----------------------------------------
-   ! Use an e-folding time of 0.25 days 
-   !
-   ! Both aerosols are dry-deposited,     kd = Dvel/DELZ (sec-1)
-   !=================================================================
-   !$OMP PARALLEL DO                                                         &
-   !$OMP DEFAULT( SHARED                                                    )&
-   !$OMP PRIVATE( I, J, L, TC0, FREQ, RKT, CNEW                             )&
-   !$OMP COLLAPSE( 3                                                        )
-   DO L = 1, State_Grid%NZ
-   DO J = 1, State_Grid%NY
-   DO I = 1, State_Grid%NX
-
-      ! Initial FSOAS mass [kg]
-      TC0  = TC(I,J,L)
-
-      ! Zero drydep freq
-      ! ### NOTE: Remove this later, but need to make
-      ! ### sure we don't incur numerical diffs (bmy, 6/12/15)
-      FREQ = 0e+0_fp
-
-      ! Amount of FSOAS left after chemistry and drydep [kg]
-      RKT  = ( KFSOAS + FREQ ) * DTCHEM
-      CNEW = TC0 * EXP( -RKT )
-
-      ! Prevent underflow condition
-      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
-
-      ! Amount of FSOAS converted to BRCSOA [kg/timestep]
-      FSOAS_CONV(I,J,L) = ( TC0 - CNEW ) * KFSOAS / ( KFSOAS + FREQ )
-
-      !==============================================================
-      ! HISTORY (aka netCDF diagnostics)
-      !
-      ! Archive production of hydrophilic black carbon (BRCSOA) from
-      ! hydrophobic black carbon (FSOAS) [kg]
-      !
-      ! NOTE: Consider converting to area-independent units kg/m2/s.
-      !==============================================================
-
-      ! Store new concentration back into species array
-      TC(I,J,L) = CNEW
-   ENDDO
-   ENDDO
-   ENDDO
-   !$OMP END PARALLEL DO
-
-   ! Free pointer
-   TC => NULL()
-
- END SUBROUTINE CHEM_FSOAS
-
-!EOC
-
-!------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
-!------------------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: chem_brcsoa
-!
-! !DESCRIPTION: Subroutine CHEM_BRCSOA (1) adds newly-darkened BrC formed from
-!  FSOAS (stored in FSOAS_CONV) into the BRCSOA tracer, then (2) photo-bleaches
-!  BRCSOA to WTC using a first-order loss with e-folding time BRCSOA_LIFE.
-!  The amount bleached to WTC is stored in WTC_CONV for uptake in CHEM_WTC.
-!\\
-!\\
-! !INTERFACE:
-!
- SUBROUTINE CHEM_BRCSOA( Input_Opt,  State_Chm, State_Diag,                  &
-                         State_Grid, spcId,     RC                          )
-!
-! !USES:
-!
-   USE ErrCode_Mod
-   USE Input_Opt_Mod,  ONLY : OptInput
-   USE State_Chm_Mod,  ONLY : ChmState
-   USE State_Diag_Mod, ONLY : DgnState
-   USE State_Grid_Mod, ONLY : GrdState
-   USE TIME_MOD,       ONLY : GET_TS_CHEM
-!
-! !INPUT PARAMETERS:
-!
-   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
-   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
-   INTEGER,        INTENT(IN)    :: spcId        ! BRCSOA species Id
-!
-! !INPUT/OUTPUT PARAMETERS:
-!
-   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry state object
-   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
-!
-! !OUTPUT PARAMETERS:
-!
-   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
-!
-! !REMARKS:
-!  Drydep is now applied in mixing_mod.F90.
-!
-! !REVISION HISTORY:
-!  19 Feb 2026 - M.C.Harvey - Initial version
-!  19 Feb 2026 - Updated to conserve mass for FSOAS->BRCSOA->WTC chain
-!EOP
-!------------------------------------------------------------------------------
-!BOC
-!
-! !LOCAL VARIABLES:
-!
-   ! Scalars
-   INTEGER             :: I,      J,   L
-   REAL(fp)            :: DTCHEM, KBRCSOA, FREQ, TC0, CNEW, RKT, CCV
-
-   ! Pointers
-   REAL(fp), POINTER   :: TC(:,:,:)
-!
-! !DEFINED PARAMETERS:
-!
-   REAL(fp), PARAMETER :: BRCSOA_LIFE = 0.25e+0_fp
-!
-! !=================================================================
-! ! CHEM_BRCSOA begins here!
-! !=================================================================
-!
-   ! Assume success
-   RC        =  GC_SUCCESS
-
-   ! Initialize
-   KBRCSOA   =  1.e+0_fp / ( 86400e+0_fp * BRCSOA_LIFE )
-   DTCHEM    =  GET_TS_CHEM()
-
-   ! IMPORTANT: Do NOT zero FSOAS_CONV here (it was set in CHEM_FSOAS)
-   !            We *consume* it below and then zero it at the end.
-   BRCSOA_CONV  =  0e+0_fp
-
-   TC        => State_Chm%Species(spcId)%Conc
-
-   !=================================================================
-   ! Photo-bleaching from BRCSOA to WTC (first-order):
-   ! e-folding time BRCSOA_LIFE days
-   !=================================================================
-   !$OMP PARALLEL DO                                                         &
-   !$OMP DEFAULT( SHARED                                                    )&
-   !$OMP PRIVATE( I, J, L, CCV, TC0, FREQ, RKT, CNEW                         )&
-   !$OMP COLLAPSE( 3                                                        )
-   DO L = 1, State_Grid%NZ
-   DO J = 1, State_Grid%NY
-   DO I = 1, State_Grid%NX
-
-      !==============================================================
-      ! 1) Add newly formed BRCSOA from FSOAS (darkening step)
-      !==============================================================
-      CCV = FSOAS_CONV(I,J,L)
-
-      ! BRCSOA mass available to bleach this timestep [kg]
-      TC0 = TC(I,J,L) + CCV
-
-      !==============================================================
-      ! 2) Bleach BRCSOA -> WTC as first-order loss over DTCHEM
-      !==============================================================
-
-      ! Zero drydep freq (drydep handled elsewhere)
-      FREQ = 0e+0_fp
-
-      ! Remaining BRCSOA after bleaching (and drydep, if ever used) [kg]
-      RKT  = ( KBRCSOA + FREQ ) * DTCHEM
-      CNEW = TC0 * EXP( -RKT )
-
-      ! Prevent underflow condition
-      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
-
-      ! Amount bleached from BRCSOA to WTC [kg/timestep]
-      BRCSOA_CONV(I,J,L) = ( TC0 - CNEW ) * KBRCSOA / ( KBRCSOA + FREQ )
-
-      !==============================================================
-      ! HISTORY (aka netCDF diagnostics)
-      ! Archive production of WTC from BRCSOA [kg]
-      !
-      ! NOTE: You will need to define these in State_Diag_Mod:
-      !   - Archive_ProdWTCfromBRCSOA (logical)
-      !   - ProdWTCfromBRCSOA(:,:,:)  (real(fp))
-      !==============================================================
-
-      ! Store updated BRCSOA back into species array [kg]
-      TC(I,J,L) = CNEW
-
-   ENDDO
-   ENDDO
-   ENDDO
-   !$OMP END PARALLEL DO
-
-   !=================================================================
-   ! We have now consumed the FSOAS->BRCSOA conversion for this step
-   !=================================================================
-   FSOAS_CONV = 0e+0_fp
-
-   ! Free pointer
-   TC => NULL()
-
- END SUBROUTINE CHEM_BRCSOA
-!EOC
-
-
-!------------------------------------------------------------------------------
-!                  GEOS-Chem Global Chemical Transport Model                  !
-!------------------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: chem_wtc
-!
-! !DESCRIPTION: Subroutine CHEM\_WTC calculates dry deposition of
-!  WTC.
-!\\
-!\\
-! !INTERFACE:
-!
- SUBROUTINE CHEM_WTC( Input_Opt,  State_Chm, State_Diag,                    &
-                       State_Grid, spcId,     RC )
-!
-! !USES:
-!
-   USE ErrCode_Mod
-   USE Input_Opt_Mod,  ONLY : OptInput
-   USE State_Chm_Mod,  ONLY : ChmState
-   USE State_Diag_Mod, ONLY : DgnState
-   USE State_Grid_Mod, ONLY : GrdState
-   USE TIME_MOD,       ONLY : GET_TS_CHEM
-!
-! !INPUT PARAMETERS:
-!
-   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
-   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
-   INTEGER,        INTENT(IN)    :: spcId        ! OCPO species Id
-
-!
-! !INPUT/OUTPUT PARAMETERS:
-!
-   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry state object
-   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
-!
-! !OUTPUT PARAMETERS:
-!
-   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
-!
-! !REVISION HISTORY:
-!  19 Feb 2026 - mch - Initial version
-!EOP
-!------------------------------------------------------------------------------
-!BOC
-!
-! !LOCAL VARIABLES:
-!
-   ! Scalars
-   INTEGER  :: I,   J,     L
-   REAL(fp) :: TC0, CNEW, CCV
-   
-   ! Pointers
-   REAL(fp), POINTER :: TC(:,:,:)
-
-   !=================================================================
-   ! CHEM_WTC begins here!
-   !=================================================================
-
-   ! Assume success
-   RC =  GC_SUCCESS
-   TC => State_Chm%Species(spcId)%Conc
-
-   !$OMP PARALLEL DO                                                         &
-   !$OMP DEFAULT( SHARED                                                    )&
-   !$OMP PRIVATE( I, J, L, TC0, CCV, CNEW                                   )&
-   !$OMP COLLAPSE( 3                                                        )
-   DO L = 1, State_Grid%NZ
-   DO J = 1, State_Grid%NY
-   DO I = 1, State_Grid%NX
-
-      ! Initial H-philic WTC [kg]
-      TC0 = TC(I,J,L)
-
-      ! H-philic WTC that used to be H-phobic WTC [kg]
-      CCV = BRCSOA_CONV(I,J,L)
-      ! Add the amount of converted WTC to H-philic WTC
-      CNEW = TC0 + CCV
-
-      ! Prevent underflow condition
-      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
-
-      ! Store modified concentration back in species array [kg]
-      TC(I,J,L) = CNEW
-
-   ENDDO
-   ENDDO
-   ENDDO
-   !$OMP END PARALLEL DO
-
-   !=================================================================
-   ! Zero BRCSOA_CONV array for next timestep
-   !=================================================================
-   BRCSOA_CONV = 0e+0_fp
-
-   TC => NULL()
-
- END SUBROUTINE CHEM_WTC
-!EOC
 
 #ifdef TOMAS
 !-------------------------------------------------------------------------------
@@ -8147,11 +7729,6 @@ CONTAINS
    id_LISOPOH  = IND_('LISOPOH' )
    id_LISOPNO3 = IND_('LISOPNO3')
 
-   ! Adding the allocation of our new tracers (mch, 19/02/26)
-   id_FSOAS    = IND_('FSOAS'   )
-   id_BRCSOA   = IND_('BRCSOA'  )
-   id_WTC      = IND_('WTC'     )
-
    ! Some parent hydrocarbons are lumped together into 1 or more
    ! semivolatiles. Map the parent HC to lumped semivolatiles here
    ! (hotp 5/13/10)
@@ -8201,15 +7778,6 @@ CONTAINS
    ALLOCATE( OCCONV(State_Grid%NX,State_Grid%NY,State_Grid%NZ), STAT=AS )
    IF ( AS /= 0 ) CALL ALLOC_ERR( 'OCCONV' )
    OCCONV = 0e+0_fp
-   
-   ! Adding allocations for our new conv arrays (mch, 19/02/26)
-   ALLOCATE( FSOAS_CONV(State_Grid%NX,State_Grid%NY,State_Grid%NZ), STAT=AS )
-   IF ( AS /= 0 ) CALL ALLOC_ERR( 'FSOAS_CONV' )
-   FSOAS_CONV = 0e+0_fp
-
-   ALLOCATE( BRCSOA_CONV(State_Grid%NX,State_Grid%NY,State_Grid%NZ), STAT=AS )
-   IF ( AS /= 0 ) CALL ALLOC_ERR( 'BRCSOA_CONV' )
-   BRCSOA_CONV = 0e+0_fp
 
    ! semivolpoa2: for POA emissions (hotp 2/27/09)
    ! Store POG1 and POG2 separately (mps, 1/14/16)
@@ -8403,10 +7971,6 @@ CONTAINS
    !=================================================================
    IF ( ALLOCATED( BCCONV        ) ) DEALLOCATE( BCCONV        )
    IF ( ALLOCATED( OCCONV        ) ) DEALLOCATE( OCCONV        )
-
-   ! Adding dealocation for memory purposes (mch 19/02/26)
-   IF ( ALLOCATED( FSOAS_CONV    ) ) DEALLOCATE( FSOAS_CONV    )
-   IF ( ALLOCATED( BRCSOA_CONV   ) ) DEALLOCATE( BRCSOA_CONV   )
 
    IF ( ALLOCATED( TCOSZ         ) ) DEALLOCATE( TCOSZ         )
    IF ( ALLOCATED( GLOB_DARO2    ) ) DEALLOCATE( GLOB_DARO2    )

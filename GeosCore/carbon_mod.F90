@@ -928,7 +928,7 @@ CONTAINS
                  State_Grid, State_Met, RC )
    IF ( RC /= GC_SUCCESS ) THEN
       ErrMsg = 'Error encountered in "ChemBrC"!'
-      CALL GC_Error( ErrMsg, RC, ThisLoc )
+      CALL GC_Error( ErrMsg, RC, Loc )
       RETURN
    ENDIF
 

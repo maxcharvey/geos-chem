@@ -130,7 +130,7 @@ SUBROUTINE CLEANUP( Input_Opt, State_Grid, ERROR, RC )
   CALL CLEANUP_SEASALT()
   CALL CLEANUP_SULFATE()
   CALL CLEANUP_LINEAR_CHEM()
-  CALL Cleanup_BrC() ! (mch 24/02/26)
+  CALL Cleanup_BrC( RC ) ! (mch 24/02/26)
 
   CALL Cleanup_FullChem( RC )
   IF ( RC /= GC_SUCCESS ) THEN

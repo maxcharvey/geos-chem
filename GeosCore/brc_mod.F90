@@ -50,6 +50,7 @@ MODULE BRC_MOD
   PUBLIC :: Init_BrC
   PUBLIC :: Cleanup_BrC
   PUBLIC :: BRC_TAU_MODE
+  PUBLIC :: DO_BRC_CHEM
 !
 ! !PRIVATE MEMBER FUNCTIONS:
 !
@@ -97,6 +98,10 @@ MODULE BRC_MOD
   !                       no bleaching above 1 km AGL
   !                       (reproduces paper Fig. 3B/C third scenario)
   INTEGER, SAVE :: BRC_TAU_MODE = 1
+  ! Master switch for BrC chemistry
+  !   .TRUE.  = full chemistry chain runs normally
+  !   .FALSE. = all species are inert (emitted, advected, deposited only)
+  LOGICAL, SAVE :: DO_BRC_CHEM = .TRUE.
 
   ! Fixed bleaching lifetime [s] used in modes 0 and 2
   REAL(fp), PARAMETER :: TAU_FIXED = 86400.0_fp   ! 1 day
@@ -599,6 +604,13 @@ CONTAINS
    ! ChemBrC begins here!
    !=================================================================
    RC      = GC_SUCCESS
+   ErrMsg  = ''
+   ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
+
+   ! If BrC chemistry is disabled, return immediately.
+   ! All BrC species remain inert (emitted, advected, deposited only).
+   IF ( .NOT. DO_BRC_CHEM ) RETURN
+
    ErrMsg  = ''
    ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
 

@@ -49,6 +49,7 @@ MODULE BRC_MOD
   PUBLIC :: ChemBrC
   PUBLIC :: Init_BrC
   PUBLIC :: Cleanup_BrC
+  PUBLIC :: BRC_TAU_MODE
 !
 ! !PRIVATE MEMBER FUNCTIONS:
 !
@@ -88,6 +89,20 @@ MODULE BRC_MOD
 
   ! First-call flag for lazy initialisation
   LOGICAL, SAVE :: FIRST = .TRUE.
+
+  ! Bleaching-lifetime mode selector:
+  !   BRC_TAU_MODE = 1 : Full Schnitzler et al. (2022) viscosity scheme
+  !   BRC_TAU_MODE = 0 : Fixed 1-day lifetime everywhere
+  !   BRC_TAU_MODE = 2 : Fixed 1-day lifetime below 1 km AGL,
+  !                       no bleaching above 1 km AGL
+  !                       (reproduces paper Fig. 3B/C third scenario)
+  INTEGER, SAVE :: BRC_TAU_MODE = 1
+
+  ! Fixed bleaching lifetime [s] used in modes 0 and 2
+  REAL(fp), PARAMETER :: TAU_FIXED = 86400.0_fp   ! 1 day
+
+  ! Altitude threshold [m] for mode 2 (bleaching below, none above)
+  REAL(fp), PARAMETER :: Z_THRESH  = 1000.0_fp    ! 1 km AGL
 
   !=========================================================================
   ! Physical constants
@@ -407,12 +422,14 @@ CONTAINS
 !\\
 ! !INTERFACE:
 !
- FUNCTION CALC_TAU_BRC( T, AW ) RESULT( TAU )
+ FUNCTION CALC_TAU_BRC( T, AW, HEIGHT_M ) RESULT( TAU )
 !
 ! !INPUT PARAMETERS:
 !
-   REAL(fp), INTENT(IN) :: T     ! Temperature [K]
-   REAL(fp), INTENT(IN) :: AW    ! Water activity [0-1] (= RH/100)
+   REAL(fp), INTENT(IN)           :: T         ! Temperature [K]
+   REAL(fp), INTENT(IN)           :: AW        ! Water activity [0-1] (= RH/100)
+   REAL(fp), INTENT(IN), OPTIONAL :: HEIGHT_M  ! Height above ground [m]
+                                               ! (required for BRC_TAU_MODE=2)
 !
 ! !RETURN VALUE:
 !
@@ -429,6 +446,24 @@ CONTAINS
    REAL(fp) :: D_O3          ! D_O3 in BBOA [m2/s]
    REAL(fp) :: HK            ! H*sqrt(k2/[BrC]_0) [atm^-1 s^-1/2]
    REAL(fp) :: DENOM         ! Denominator of Eq. 3
+
+   !=================================================================
+   ! Mode selection for bleaching lifetime
+   !   Mode 0: fixed 1-day everywhere
+   !   Mode 1: full viscosity parameterisation (fall through below)
+   !   Mode 2: 1-day below Z_THRESH, no bleaching above
+   !=================================================================
+   IF ( BRC_TAU_MODE == 0 ) THEN
+      TAU = TAU_FIXED
+      RETURN
+   ELSEIF ( BRC_TAU_MODE == 2 ) THEN
+      IF ( PRESENT(HEIGHT_M) .AND. HEIGHT_M > Z_THRESH ) THEN
+         TAU = TAU_MAX    ! No bleaching above threshold
+      ELSE
+         TAU = TAU_FIXED  ! 1-day bleaching below threshold
+      ENDIF
+      RETURN
+   ENDIF
 
    !=================================================================
    ! Step 1: Compute BBOA viscosity and water viscosity at local T
@@ -1187,6 +1222,7 @@ CONTAINS
    REAL(fp)            :: AW_LOCAL       ! Local water activity [0-1]
    REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
    REAL(fp)            :: ETA_LOCAL      ! Local BBOA viscosity [Pa s]
+   REAL(fp)            :: HEIGHT_M       ! Height AGL at grid-cell centre [m]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1215,7 +1251,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( ETA_LOCAL                                        )&
+   !$OMP PRIVATE( ETA_LOCAL, HEIGHT_M                              )&
    !$OMP PRIVATE( KBRCSOA_LOCAL, CCV, TC0, FREQ, RKT, CNEW        )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1234,9 +1270,14 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
+      ! Height AGL at grid-cell centre [m]
+      !   = cumulative BXHEIGHT to top of level L, minus half of L
+      HEIGHT_M = SUM( State_Met%BXHEIGHT(I,J,1:L) )                &
+               - 0.5_fp * State_Met%BXHEIGHT(I,J,L)
+
       ! BrC bleaching lifetime [s] from Schnitzler parameterisation
       !   (T, RH) -> viscosity -> D_O3 -> tau_BrC
-      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL )
+      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, HEIGHT_M )
 
       ! First-order rate constant [s^-1]
       KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
@@ -1382,6 +1423,7 @@ CONTAINS
    REAL(fp)            :: T_LOCAL        ! Local temperature [K]
    REAL(fp)            :: AW_LOCAL       ! Local water activity [0-1]
    REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
+   REAL(fp)            :: HEIGHT_M       ! Height AGL at grid-cell centre [m]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1409,6 +1451,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
+   !$OMP PRIVATE( HEIGHT_M                                        )&
    !$OMP PRIVATE( KNPBRC_LOCAL, TC0, FREQ, RKT, CNEW              )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1428,8 +1471,12 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
+      ! Height AGL at grid-cell centre [m]
+      HEIGHT_M = SUM( State_Met%BXHEIGHT(I,J,1:L) )                &
+               - 0.5_fp * State_Met%BXHEIGHT(I,J,L)
+
       ! BrC bleaching lifetime [s] from Schnitzler parameterisation
-      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL )
+      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, HEIGHT_M )
 
       ! First-order rate constant [s^-1]
       KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL

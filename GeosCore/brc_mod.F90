@@ -8,7 +8,13 @@
 ! !DESCRIPTION: Module BRC\_MOD contains routines for brown carbon (BrC)
 !  aerosol chemistry, including the darkening chain:
 !
-!    FSOAS  ---(rapid darkening)---> BRCSOA ---(photobleaching)---> WTC
+!    FSOAP ---(gas-to-particle)---> FSOAS ---(rapid darkening)--->
+!    BRCSOA ---(photobleaching)---> WTC
+!
+!  In parallel, non-persistent BrC-POA (directly emitted from fires)
+!  also photo-bleaches to WTC via the same viscosity-dependent scheme:
+!
+!    NPBRCPOA ---(photobleaching)---> WTC
 !
 !  The photobleaching rate (BRCSOA -> WTC) is parameterised as a function
 !  of local temperature and relative humidity following the viscosity-
@@ -46,17 +52,23 @@ MODULE BRC_MOD
 !
 ! !PRIVATE MEMBER FUNCTIONS:
 !
+  PRIVATE :: CHEM_FSOAP
   PRIVATE :: CHEM_FSOAS
   PRIVATE :: CHEM_BRCSOA
+  PRIVATE :: CHEM_NPBRCPOA
   PRIVATE :: CHEM_WTC
   PRIVATE :: VISC_BBOA_FUNC
   PRIVATE :: VISC_WATER_FUNC
   PRIVATE :: CALC_TAU_BRC
-!
+
 ! !REVISION HISTORY:
 !  24 Feb 2026 - M. Harvey - Initial version: BrC chemistry module
 !  24 Feb 2026 - M. Harvey - Added Schnitzler et al. (2022) viscosity-
 !                             dependent photobleaching parameterisation
+!  25 Feb 2026 - M. Harvey - Added FSOAP gas-phase precursor pathway
+!  25 Feb 2026 - M. Harvey - Added development diagnostics arrays
+!  25 Feb 2026 - M. Harvey - Added NPBRCPOA (non-persistent BrC-POA)
+!  25 Feb 2026 - M. Harvey - Updated FSOAS darkening lifetime to 1 day
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -67,10 +79,12 @@ MODULE BRC_MOD
   REAL(fp), PARAMETER :: SMALLNUM = 1e-20_fp
 
   ! Conversion arrays to pass mass between chemistry steps within
-  ! a single timestep.  These are module-level so that CHEM_FSOAS
-  ! can write FSOAS_CONV and CHEM_BRCSOA can read it, etc.
+  ! a single timestep.  These are module-level so that CHEM_FSOAP
+  ! can write FSOAP_CONV and CHEM_FSOAS can read it, etc.
+  REAL(fp), ALLOCATABLE :: FSOAP_CONV(:,:,:)
   REAL(fp), ALLOCATABLE :: FSOAS_CONV(:,:,:)
   REAL(fp), ALLOCATABLE :: BRCSOA_CONV(:,:,:)
+  REAL(fp), ALLOCATABLE :: NPBRC_CONV(:,:,:)
 
   ! First-call flag for lazy initialisation
   LOGICAL, SAVE :: FIRST = .TRUE.
@@ -193,16 +207,27 @@ MODULE BRC_MOD
   REAL(fp), PARAMETER :: C_FACTOR     = 0.39346934_fp
 
   ! Maximum allowed lifetime [s] (~3.2 years; effectively no whitening)
-  REAL(fp), PARAMETER :: TAU_MAX      = 1.0e+8_fp
+  ! Changed value to be 1e10 s (317 years) for testing
+  REAL(fp), PARAMETER :: TAU_MAX      = 1.0e+10_fp
 
   ! Minimum allowed lifetime [s] (~1 minute; numerical floor)
-  REAL(fp), PARAMETER :: TAU_MIN      = 60.0_fp
+  ! Changed value to be 1 hour for testing 
+  REAL(fp), PARAMETER :: TAU_MIN      = 3600.0_fp
 
   ! Maximum viscosity [Pa s] (glass transition cutoff; SI Fig. S9)
   !   Viscosities above 10^12 Pa s correspond to a glass state and
   !   are not modelled well by VFT (Fig. 2B caption)
   REAL(fp), PARAMETER :: ETA_MAX      = 1.0e+12_fp
+  
+  !=======================================================================
+  !Conversion parameters 
+  !=======================================================================
 
+  ! OM:OC ratio for biomass burning organic aerosol
+  !   Typical range 1.6-2.1 for fresh BBOA
+  !   (Aiken et al. 2008, Environ. Sci. Technol. 42, 4478;
+  !    Turpin & Lim 2001, Aerosol Sci. Technol. 35, 602)
+  REAL(fp), PARAMETER :: OMOC_BBOA = 1.8_fp
 CONTAINS
 !EOC
 !------------------------------------------------------------------------------
@@ -304,17 +329,18 @@ CONTAINS
 
    ! Clamp water activity to avoid division by zero
    AW_SAFE = MAX( AW, 0.0_fp )
-   AW_SAFE = MIN( AW_SAFE, 0.99_fp )
+   ! Altering for testing to match the Schnitzler et al. (2022) range
+   AW_SAFE = MIN( AW_SAFE, 0.90_fp )
 
    ! BBOA mass fraction from kappa-Koehler (SI Eq. S4)
    !   w_s = (1 + kappa * a_w / (1 - a_w))^(-1)
-   W_BBOA = 1.0_fp / ( 1.0_fp                                    &
+   W_BBOA = 1.0_fp / ( 1.0_fp                                     &
           + KAPPA * AW_SAFE / ( 1.0_fp - AW_SAFE ) )
 
    ! BBOA mole fraction (SI Eq. S3)
    !   chi = (w/MW_BBOA) / (w/MW_BBOA + (1-w)/MW_H2O)
    CHI_BBOA = ( W_BBOA / MW_BBOA )                                &
-            / ( W_BBOA / MW_BBOA                                   &
+            / ( W_BBOA / MW_BBOA                                  &
               + ( 1.0_fp - W_BBOA ) / MW_H2O )
 
    ! Arrhenius mixing rule (SI Eq. S2)
@@ -478,6 +504,16 @@ CONTAINS
 ! !DESCRIPTION: Subroutine ChemBrC is the top-level driver for brown carbon
 !  chemistry.  It looks up species indices at runtime using Ind\_() so that
 !  the code does nothing if BrC species are not defined in the simulation.
+!
+!  The full chain is:
+!    Step 0: FSOAP -> FSOAS   (gas-to-particle, tau ~ 1 day)
+!    Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 1 day)
+!    Step 2: BRCSOA -> WTC    (viscosity-dependent photobleaching)
+!    Step 2b: NPBRCPOA -> WTC (viscosity-dependent photobleaching)
+!    Step 3: WTC receives bleached mass from BRCSOA and NPBRCPOA
+!
+!  FSOAP and NPBRCPOA are optional: if not defined in the simulation,
+!  their steps are skipped and the remaining chain operates as before.
 !\\
 !\\
 ! !INTERFACE:
@@ -513,13 +549,15 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  24 Feb 2026 - M. Harvey - Initial version
+!  25 Feb 2026 - M. Harvey - Added FSOAP step (optional)
 !EOP
 !------------------------------------------------------------------------------
 !BOC
 !
 ! !LOCAL VARIABLES:
 !
-   INTEGER            :: id_FSOAS, id_BRCSOA, id_WTC
+   INTEGER            :: id_FSOAP, id_FSOAS, id_BRCSOA, id_WTC
+   INTEGER            :: id_NPBRCPOA
    CHARACTER(LEN=255) :: ErrMsg, ThisLoc
 
    !=================================================================
@@ -531,11 +569,15 @@ CONTAINS
 
    !-----------------------------------------------------------------
    ! Look up species IDs - exit gracefully if not defined
+   ! FSOAP and NPBRCPOA are optional; FSOAS, BRCSOA, WTC are required
    !-----------------------------------------------------------------
-   id_FSOAS  = Ind_('FSOAS' )
-   id_BRCSOA = Ind_('BRCSOA')
-   id_WTC    = Ind_('WTC'   )
+   id_FSOAP    = Ind_('FSOAP'   )
+   id_FSOAS    = Ind_('FSOAS'   )
+   id_BRCSOA   = Ind_('BRCSOA'  )
+   id_WTC      = Ind_('WTC'     )
+   id_NPBRCPOA = Ind_('NPBRCPOA')
 
+   ! Required species: if any missing, return silently
    IF ( id_FSOAS  <= 0 ) RETURN
    IF ( id_BRCSOA <= 0 ) RETURN
    IF ( id_WTC    <= 0 ) RETURN
@@ -554,7 +596,31 @@ CONTAINS
    ENDIF
 
    !-----------------------------------------------------------------
+   ! Step 0 (optional): FSOAP -> FSOAS  (gas-to-particle, tau ~ 1 d)
+   !   Only runs if FSOAP is defined in the simulation.
+   !   If FSOAP is not defined, FSOAS receives mass from direct
+   !   emissions only (backward-compatible).
+   !-----------------------------------------------------------------
+   IF ( id_FSOAP > 0 ) THEN
+
+      CALL CHEM_FSOAP( Input_Opt,  State_Chm, State_Diag, &
+                       State_Grid, id_FSOAP,  RC          )
+
+      IF ( RC /= GC_SUCCESS ) THEN
+         ErrMsg = 'Error encountered in "CHEM_FSOAP"!'
+         CALL GC_Error( ErrMsg, RC, ThisLoc )
+         RETURN
+      ENDIF
+
+      IF ( Input_Opt%Verbose ) THEN
+         CALL DEBUG_MSG( '### CHEMBRC: after CHEM_FSOAP' )
+      ENDIF
+
+   ENDIF
+
+   !-----------------------------------------------------------------
    ! Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 0.25 day)
+   !   Also receives condensed mass from FSOAP (if present)
    !-----------------------------------------------------------------
    CALL CHEM_FSOAS( Input_Opt,  State_Chm, State_Diag, &
                     State_Grid, id_FSOAS,  RC          )
@@ -587,7 +653,31 @@ CONTAINS
    ENDIF
 
    !-----------------------------------------------------------------
+   ! Step 2b (optional): NPBRCPOA -> WTC  (viscosity-dependent)
+   !   Non-persistent BrC-POA bleaches to WTC using the same
+   !   Schnitzler et al. (2022) parameterisation as BRCSOA.
+   !   Only runs if NPBRCPOA is defined in the simulation.
+   !-----------------------------------------------------------------
+   IF ( id_NPBRCPOA > 0 ) THEN
+
+      CALL CHEM_NPBRCPOA( Input_Opt,  State_Chm, State_Diag,  &
+                          State_Grid, State_Met, id_NPBRCPOA, RC )
+
+      IF ( RC /= GC_SUCCESS ) THEN
+         ErrMsg = 'Error encountered in "CHEM_NPBRCPOA"!'
+         CALL GC_Error( ErrMsg, RC, ThisLoc )
+         RETURN
+      ENDIF
+
+      IF ( Input_Opt%Verbose ) THEN
+         CALL DEBUG_MSG( '### CHEMBRC: after CHEM_NPBRCPOA' )
+      ENDIF
+
+   ENDIF
+
+   !-----------------------------------------------------------------
    ! Step 3: Receive bleached mass into WTC
+   !         (from both BRCSOA and NPBRCPOA)
    !-----------------------------------------------------------------
    CALL CHEM_WTC( Input_Opt,  State_Chm, State_Diag, &
                   State_Grid, id_WTC,    RC          )
@@ -612,7 +702,7 @@ CONTAINS
 ! !IROUTINE: init_brc
 !
 ! !DESCRIPTION: Subroutine Init\_BrC allocates and zeroes the module-level
-!  conversion arrays used to pass mass between the BrC chemistry steps.
+!  conversion arrays and diagnostic arrays used by the BrC chemistry.
 !\\
 !\\
 ! !INTERFACE:
@@ -634,30 +724,50 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  24 Feb 2026 - M. Harvey - Initial version
+!  25 Feb 2026 - M. Harvey - Added FSOAP_CONV and diagnostic arrays
 !EOP
 !------------------------------------------------------------------------------
 !BOC
+!
+! !LOCAL VARIABLES:
+!
+   INTEGER :: NX, NY, NZ
 
    !=================================================================
    ! Init_BrC begins here!
    !=================================================================
    RC = GC_SUCCESS
+   NX = State_Grid%NX
+   NY = State_Grid%NY
+   NZ = State_Grid%NZ
+
+   !-----------------------------------------------------------------
+   ! Conversion arrays
+   !-----------------------------------------------------------------
+
+   ! Allocate FSOAP_CONV (gas-to-particle conversion)
+   ALLOCATE( FSOAP_CONV( NX, NY, NZ ), STAT=RC )
+   CALL GC_CheckVar( 'brc_mod.F90:FSOAP_CONV', 0, RC )
+   IF ( RC /= GC_SUCCESS ) RETURN
+   FSOAP_CONV = 0e+0_fp
 
    ! Allocate FSOAS_CONV
-   ALLOCATE( FSOAS_CONV( State_Grid%NX,                            &
-                          State_Grid%NY,                            &
-                          State_Grid%NZ ), STAT=RC )
+   ALLOCATE( FSOAS_CONV( NX, NY, NZ ), STAT=RC )
    CALL GC_CheckVar( 'brc_mod.F90:FSOAS_CONV', 0, RC )
    IF ( RC /= GC_SUCCESS ) RETURN
    FSOAS_CONV = 0e+0_fp
 
    ! Allocate BRCSOA_CONV
-   ALLOCATE( BRCSOA_CONV( State_Grid%NX,                           &
-                           State_Grid%NY,                           &
-                           State_Grid%NZ ), STAT=RC )
+   ALLOCATE( BRCSOA_CONV( NX, NY, NZ ), STAT=RC )
    CALL GC_CheckVar( 'brc_mod.F90:BRCSOA_CONV', 0, RC )
    IF ( RC /= GC_SUCCESS ) RETURN
    BRCSOA_CONV = 0e+0_fp
+
+   ! Allocate NPBRC_CONV (NPBRCPOA -> WTC conversion)
+   ALLOCATE( NPBRC_CONV( NX, NY, NZ ), STAT=RC )
+   CALL GC_CheckVar( 'brc_mod.F90:NPBRC_CONV', 0, RC )
+   IF ( RC /= GC_SUCCESS ) RETURN
+   NPBRC_CONV = 0e+0_fp
 
  END SUBROUTINE Init_BrC
 !EOC
@@ -685,6 +795,7 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  24 Feb 2026 - M. Harvey - Initial version
+!  25 Feb 2026 - M. Harvey - Added FSOAP_CONV and diagnostic arrays
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -693,6 +804,13 @@ CONTAINS
    ! Cleanup_BrC begins here!
    !=================================================================
    RC = GC_SUCCESS
+
+   ! Conversion arrays
+   IF ( ALLOCATED( FSOAP_CONV ) ) THEN
+      DEALLOCATE( FSOAP_CONV, STAT=RC )
+      CALL GC_CheckVar( 'brc_mod.F90:FSOAP_CONV', 2, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
+   ENDIF
 
    IF ( ALLOCATED( FSOAS_CONV ) ) THEN
       DEALLOCATE( FSOAS_CONV, STAT=RC )
@@ -706,7 +824,146 @@ CONTAINS
       IF ( RC /= GC_SUCCESS ) RETURN
    ENDIF
 
+   IF ( ALLOCATED( NPBRC_CONV ) ) THEN
+      DEALLOCATE( NPBRC_CONV, STAT=RC )
+      CALL GC_CheckVar( 'brc_mod.F90:NPBRC_CONV', 2, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
+   ENDIF
+
  END SUBROUTINE Cleanup_BrC
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: chem_fsoap
+!
+! !DESCRIPTION: Subroutine CHEM\_FSOAP converts the gas-phase fire SOA
+!  precursor FSOAP to particle-phase FSOAS via a first-order process
+!  with e-folding time FSOAP\_LIFE days.
+!
+!  This mimics the standard GEOS-Chem treatment of fire SOA precursor
+!  gases (Pai et al. 2020) where gaseous SVOCs condense to form SOA
+!  with a ~1 day timescale.
+!
+!  The converted mass is stored in FSOAP\_CONV for uptake by CHEM\_FSOAS.
+!\\
+!\\
+! !INTERFACE:
+!
+ SUBROUTINE CHEM_FSOAP( Input_Opt,  State_Chm, State_Diag, &
+                        State_Grid, spcId,     RC          )
+!
+! !USES:
+!
+   USE ErrCode_Mod
+   USE Input_Opt_Mod,  ONLY : OptInput
+   USE State_Chm_Mod,  ONLY : ChmState
+   USE State_Diag_Mod, ONLY : DgnState
+   USE State_Grid_Mod, ONLY : GrdState
+   USE TIME_MOD,       ONLY : GET_TS_CHEM
+!
+! !INPUT PARAMETERS:
+!
+   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
+   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
+   INTEGER,        INTENT(IN)    :: spcId        ! FSOAP species Id
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry State object
+   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
+!
+! !OUTPUT PARAMETERS:
+!
+   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
+!
+! !REMARKS:
+!  Drydep is applied in mixing_mod.F90 (gas-phase dry dep for FSOAP).
+!  The 1-day lifetime is consistent with Pai et al. (2020) fire SOA
+!  precursor aging timescale used in standard GEOS-Chem.
+!
+! !REVISION HISTORY:
+!  25 Feb 2026 - M. Harvey - Initial version
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+!
+! !LOCAL VARIABLES:
+!
+   ! Scalars
+   INTEGER             :: I,      J,   L
+   REAL(fp)            :: DTCHEM, KFSOAP, FREQ, TC0, CNEW, RKT
+
+   ! Pointers
+   REAL(fp), POINTER   :: TC(:,:,:)
+!
+! !DEFINED PARAMETERS:
+!
+   ! E-folding lifetime for FSOAP gas-to-particle conversion [days]
+   !   Consistent with Pai et al. (2020) fire SOA precursor aging
+   REAL(fp), PARAMETER :: FSOAP_LIFE = 1.0e+0_fp
+
+   !=================================================================
+   ! CHEM_FSOAP begins here!
+   !=================================================================
+
+   ! Assume success
+   RC         = GC_SUCCESS
+
+   ! Initialize
+   KFSOAP     = 1.e+0_fp / ( 86400e+0_fp * FSOAP_LIFE )
+   DTCHEM     = GET_TS_CHEM()
+   FSOAP_CONV = 0e+0_fp
+   TC         => State_Chm%Species(spcId)%Conc
+
+   !=================================================================
+   ! Gas-to-particle conversion from FSOAP to FSOAS:
+   !   First-order loss with e-folding time FSOAP_LIFE days
+   !=================================================================
+   !$OMP PARALLEL DO                                                &
+   !$OMP DEFAULT( SHARED                                           )&
+   !$OMP PRIVATE( I, J, L, TC0, FREQ, RKT, CNEW                   )&
+   !$OMP COLLAPSE( 3                                               )
+   DO L = 1, State_Grid%NZ
+   DO J = 1, State_Grid%NY
+   DO I = 1, State_Grid%NX
+
+      ! Initial FSOAP mass [kg]
+      TC0  = TC(I,J,L)
+
+      ! Zero drydep freq (drydep handled in mixing_mod.F90)
+      FREQ = 0e+0_fp
+
+      ! Amount of FSOAP left after chemistry [kg]
+      RKT  = ( KFSOAP + FREQ ) * DTCHEM
+      CNEW = TC0 * EXP( -RKT )
+
+      ! Prevent underflow condition
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+
+      ! Amount of FSOAP converted to FSOAS [kg/timestep]
+      FSOAP_CONV(I,J,L) = ( TC0 - CNEW )                          &
+                         * KFSOAP / ( KFSOAP + FREQ )
+
+      ! Store diagnostic: FSOAP->FSOAS flux [kg/timestep]
+      IF ( State_Diag%Archive_BrCFluxFSOAP2FSOAS ) THEN
+         State_Diag%BrCFluxFSOAP2FSOAS(I,J,L) = FSOAP_CONV(I,J,L)
+      ENDIF 
+
+      ! Store new concentration back into species array
+      TC(I,J,L) = CNEW
+
+   ENDDO
+   ENDDO
+   ENDDO
+   !$OMP END PARALLEL DO
+
+   ! Free pointer
+   TC => NULL()
+
+ END SUBROUTINE CHEM_FSOAP
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -717,6 +974,8 @@ CONTAINS
 !
 ! !DESCRIPTION: Subroutine CHEM\_FSOAS converts FSOAS to BRCSOA via a
 !  first-order darkening process with e-folding time FSOAS\_LIFE days.
+!  It also receives any condensed mass from the gas-phase precursor
+!  FSOAP (stored in FSOAP\_CONV).
 !  The converted mass is stored in the module array FSOAS\_CONV for
 !  uptake by CHEM\_BRCSOA.
 !\\
@@ -756,6 +1015,7 @@ CONTAINS
 ! !REVISION HISTORY:
 !  19 Feb 2026 - M. Harvey - Initial version
 !  24 Feb 2026 - M. Harvey - Moved to brc_mod.F90
+!  25 Feb 2026 - M. Harvey - Added FSOAP_CONV intake and diagnostics
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -772,7 +1032,9 @@ CONTAINS
 ! !DEFINED PARAMETERS:
 !
    ! E-folding lifetime for FSOAS darkening [days]
-   REAL(fp), PARAMETER :: FSOAS_LIFE = 0.25e+0_fp
+   !   Updated from 0.25 d to 1.0 d based on Wong et al. (2019)
+   !   and Hems et al. (2021) review of BrC darkening timescales
+   REAL(fp), PARAMETER :: FSOAS_LIFE = 1.0e+0_fp
 
    !=================================================================
    ! CHEM_FSOAS begins here!
@@ -790,6 +1052,7 @@ CONTAINS
    !=================================================================
    ! Conversion from FSOAS to BRCSOA:
    !   First-order loss with e-folding time FSOAS_LIFE days
+   !   Also receive condensed mass from FSOAP (if any)
    !=================================================================
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
@@ -799,8 +1062,8 @@ CONTAINS
    DO J = 1, State_Grid%NY
    DO I = 1, State_Grid%NX
 
-      ! Initial FSOAS mass [kg]
-      TC0  = TC(I,J,L)
+      ! Initial FSOAS mass [kg] + any condensed mass from FSOAP
+      TC0  = TC(I,J,L) + FSOAP_CONV(I,J,L)
 
       ! Zero drydep freq (drydep handled in mixing_mod.F90)
       FREQ = 0e+0_fp
@@ -816,6 +1079,11 @@ CONTAINS
       FSOAS_CONV(I,J,L) = ( TC0 - CNEW )                          &
                          * KFSOAS / ( KFSOAS + FREQ )
 
+      ! Store diagnostic: FSOAS->BRCSOA flux [kg/timestep]
+      IF ( State_Diag%Archive_BrCFluxFSOAS2BRC ) THEN
+         State_Diag%BrCFluxFSOAS2BRC(I,J,L) = FSOAS_CONV(I,J,L)
+      ENDIF 
+
       ! Store new concentration back into species array
       TC(I,J,L) = CNEW
 
@@ -823,6 +1091,11 @@ CONTAINS
    ENDDO
    ENDDO
    !$OMP END PARALLEL DO
+
+   !=================================================================
+   ! Zero FSOAP_CONV -- we have consumed it
+   !=================================================================
+   FSOAP_CONV = 0e+0_fp
 
    ! Free pointer
    TC => NULL()
@@ -897,6 +1170,7 @@ CONTAINS
 !  24 Feb 2026 - M. Harvey - Moved to brc_mod.F90; replaced fixed rate
 !                             with T/RH-dependent Schnitzler et al. (2022)
 !                             viscosity parameterisation
+!  25 Feb 2026 - M. Harvey - Added development diagnostics
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -912,6 +1186,7 @@ CONTAINS
    REAL(fp)            :: T_LOCAL        ! Local temperature [K]
    REAL(fp)            :: AW_LOCAL       ! Local water activity [0-1]
    REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
+   REAL(fp)            :: ETA_LOCAL      ! Local BBOA viscosity [Pa s]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -940,6 +1215,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
+   !$OMP PRIVATE( ETA_LOCAL                                        )&
    !$OMP PRIVATE( KBRCSOA_LOCAL, CCV, TC0, FREQ, RKT, CNEW        )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -954,7 +1230,7 @@ CONTAINS
       T_LOCAL = State_Met%T(I,J,L)
 
       ! Local water activity [0-1]
-      AW_LOCAL = State_Met%RH(I,J,L) 
+      AW_LOCAL = State_Met%RH(I,J,L) / 100.0_fp
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
@@ -965,10 +1241,28 @@ CONTAINS
       ! First-order rate constant [s^-1]
       KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
 
+      ! Local BBOA viscosity [Pa s] for diagnostics
+      ETA_LOCAL = VISC_BBOA_FUNC( T_LOCAL, AW_LOCAL )
+
+      !==============================================================
+      ! Store development diagnostics
+      !==============================================================
+      IF ( State_Diag%Archive_BrCTauBleach ) THEN
+         State_Diag%BrCTauBleach(I,J,L) = TAU_LOCAL
+      ENDIF
+
+      IF ( State_Diag%Archive_BrCKBleach ) THEN
+         State_Diag%BrCKBleach(I,J,L) = KBRCSOA_LOCAL
+      ENDIF
+
+      IF ( State_Diag%Archive_BrCEtaBBOA ) THEN
+         State_Diag%BrCEtaBBOA(I,J,L) = ETA_LOCAL
+      ENDIF      
+
       !==============================================================
       ! 1) Add newly formed BRCSOA from FSOAS (darkening step)
       !==============================================================
-      CCV = FSOAS_CONV(I,J,L)
+      CCV = FSOAS_CONV(I,J,L) / OMOC_BBOA  ! Convert from FSOAS mass to BRCSOA mass using OMOC_BBOA
 
       ! BRCSOA mass available to bleach this timestep [kg]
       TC0 = TC(I,J,L) + CCV
@@ -990,6 +1284,11 @@ CONTAINS
       ! Amount bleached from BRCSOA to WTC [kg/timestep]
       BRCSOA_CONV(I,J,L) = ( TC0 - CNEW )                         &
                           * KBRCSOA_LOCAL / ( KBRCSOA_LOCAL + FREQ )
+
+      ! Store diagnostic: BRCSOA->WTC flux [kg/timestep]
+      IF ( State_Diag%Archive_BrCFluxBRC2WTC ) THEN
+         State_Diag%BrCFluxBRC2WTC(I,J,L) = BRCSOA_CONV(I,J,L)
+      ENDIF 
 
       ! Store updated BRCSOA back into species array [kg]
       TC(I,J,L) = CNEW
@@ -1014,10 +1313,176 @@ CONTAINS
 !------------------------------------------------------------------------------
 !BOP
 !
+! !IROUTINE: chem_npbrcpoa
+!
+! !DESCRIPTION: Subroutine CHEM\_NPBRCPOA photo-bleaches non-persistent
+!  BrC-POA to WTC using the same viscosity-dependent parameterisation of
+!  Schnitzler et al. (2022) as used for BRCSOA.
+!
+!  NPBRCPOA represents the fraction of fire primary organic aerosol that
+!  contains low-MW BrC chromophores (e.g. methoxyphenols, nitrophenols,
+!  lignin fragments) that are susceptible to O3 bleaching.  Unlike
+!  DBRCPOA (persistent/dark BrC), NPBRCPOA bleaches on timescales
+!  governed by local environmental conditions.
+!
+!  The bleached mass is stored in NPBRC\_CONV for uptake by CHEM\_WTC.
+!\\ 
+!\\
+! !INTERFACE:
+!
+ SUBROUTINE CHEM_NPBRCPOA( Input_Opt,  State_Chm, State_Diag,  &
+                           State_Grid, State_Met, spcId, RC     )
+!
+! !USES:
+!
+   USE ErrCode_Mod
+   USE Input_Opt_Mod,  ONLY : OptInput
+   USE State_Chm_Mod,  ONLY : ChmState
+   USE State_Diag_Mod, ONLY : DgnState
+   USE State_Grid_Mod, ONLY : GrdState
+   USE State_Met_Mod,  ONLY : MetState
+   USE TIME_MOD,       ONLY : GET_TS_CHEM
+!
+! !INPUT PARAMETERS:
+!
+   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
+   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
+   TYPE(MetState), INTENT(IN)    :: State_Met    ! Meteorology State object
+   INTEGER,        INTENT(IN)    :: spcId        ! NPBRCPOA species Id
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry State object
+   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
+!
+! !OUTPUT PARAMETERS:
+!
+   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
+!
+! !REMARKS:
+!  Drydep is applied in mixing_mod.F90.
+!  The bleaching lifetime uses the same Schnitzler et al. (2022)
+!  viscosity-dependent parameterisation as CHEM_BRCSOA.
+!  NPBRCPOA is directly emitted from fires (no darkening precursor).
+!
+! !REVISION HISTORY:
+!  25 Feb 2026 - M. Harvey - Initial version
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+!
+! !LOCAL VARIABLES:
+!
+   ! Scalars
+   INTEGER             :: I, J, L
+   REAL(fp)            :: DTCHEM
+   REAL(fp)            :: KNPBRC_LOCAL   ! Local bleaching rate [s^-1]
+   REAL(fp)            :: FREQ           ! Drydep freq (zero here)
+   REAL(fp)            :: TC0, CNEW, RKT
+   REAL(fp)            :: T_LOCAL        ! Local temperature [K]
+   REAL(fp)            :: AW_LOCAL       ! Local water activity [0-1]
+   REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
+
+   ! Pointers
+   REAL(fp), POINTER   :: TC(:,:,:)
+
+   !=================================================================
+   ! CHEM_NPBRCPOA begins here!
+   !=================================================================
+
+   ! Assume success
+   RC          = GC_SUCCESS
+
+   ! Chemistry timestep [s]
+   DTCHEM      = GET_TS_CHEM()
+
+   ! Zero the conversion array for this timestep
+   NPBRC_CONV  = 0e+0_fp
+
+   TC          => State_Chm%Species(spcId)%Conc
+
+   !=================================================================
+   ! Photo-bleaching from NPBRCPOA to WTC
+   ! Uses the same viscosity-dependent Schnitzler et al. (2022)
+   ! parameterisation as BRCSOA -> WTC
+   !=================================================================
+   !$OMP PARALLEL DO                                                &
+   !$OMP DEFAULT( SHARED                                           )&
+   !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
+   !$OMP PRIVATE( KNPBRC_LOCAL, TC0, FREQ, RKT, CNEW              )&
+   !$OMP COLLAPSE( 3                                               )
+   DO L = 1, State_Grid%NZ
+   DO J = 1, State_Grid%NY
+   DO I = 1, State_Grid%NX
+
+      !==============================================================
+      ! Compute local bleaching rate from T and RH
+      ! (identical calculation to CHEM_BRCSOA)
+      !==============================================================
+
+      ! Local temperature [K]
+      T_LOCAL = State_Met%T(I,J,L)
+
+      ! Local water activity [0-1]
+      AW_LOCAL = State_Met%RH(I,J,L) / 100.0_fp
+      AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
+      AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
+
+      ! BrC bleaching lifetime [s] from Schnitzler parameterisation
+      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL )
+
+      ! First-order rate constant [s^-1]
+      KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL
+
+      !==============================================================
+      ! Bleach NPBRCPOA -> WTC as first-order loss over DTCHEM
+      !==============================================================
+
+      ! Current NPBRCPOA mass [kg]
+      TC0 = TC(I,J,L)
+
+      ! Zero drydep freq (drydep handled in mixing_mod.F90)
+      FREQ = 0e+0_fp
+
+      ! Remaining NPBRCPOA after bleaching [kg]
+      RKT  = ( KNPBRC_LOCAL + FREQ ) * DTCHEM
+      CNEW = TC0 * EXP( -RKT )
+
+      ! Prevent underflow condition
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+
+      ! Amount bleached from NPBRCPOA to WTC [kg/timestep]
+      NPBRC_CONV(I,J,L) = ( TC0 - CNEW )                          &
+                         * KNPBRC_LOCAL / ( KNPBRC_LOCAL + FREQ )
+
+      ! Store diagnostic: NPBRCPOA->WTC flux [kg/timestep]
+      IF ( State_Diag%Archive_BrCFluxNPBRC2WTC ) THEN
+         State_Diag%BrCFluxNPBRC2WTC(I,J,L) = NPBRC_CONV(I,J,L)
+      ENDIF 
+
+      ! Store updated NPBRCPOA back into species array [kg]
+      TC(I,J,L) = CNEW
+
+   ENDDO
+   ENDDO
+   ENDDO
+   !$OMP END PARALLEL DO
+
+   ! Free pointer
+   TC => NULL()
+
+ END SUBROUTINE CHEM_NPBRCPOA
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
 ! !IROUTINE: chem_wtc
 !
 ! !DESCRIPTION: Subroutine CHEM\_WTC receives the bleached mass from
-!  BRCSOA (stored in BRCSOA\_CONV) and adds it to the WTC tracer.
+!  BRCSOA (stored in BRCSOA\_CONV) and from NPBRCPOA (stored in
+!  NPBRC\_CONV, if present) and adds them to the WTC tracer.
 !\\
 !\\
 ! !INTERFACE:
@@ -1087,6 +1552,9 @@ CONTAINS
       ! Bleached mass arriving from BRCSOA [kg]
       CCV = BRCSOA_CONV(I,J,L)
 
+      ! Also add bleached mass arriving from NPBRCPOA [kg]
+      CCV = CCV + NPBRC_CONV(I,J,L)
+
       ! Add converted mass to WTC
       CNEW = TC0 + CCV
 
@@ -1102,9 +1570,10 @@ CONTAINS
    !$OMP END PARALLEL DO
 
    !=================================================================
-   ! Zero BRCSOA_CONV array for next timestep
+   ! Zero conversion arrays for next timestep
    !=================================================================
    BRCSOA_CONV = 0e+0_fp
+   NPBRC_CONV  = 0e+0_fp
 
    ! Free pointer
    TC => NULL()

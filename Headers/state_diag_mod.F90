@@ -734,6 +734,29 @@ MODULE State_Diag_Mod
 
      REAL(f4),           POINTER :: ProdOCPIfromOCPO(:,:,:)
      LOGICAL                     :: Archive_ProdOCPIfromOCPO
+     
+     !%%%%% Brown carbon aerosol diagnostics %%%%%
+
+     REAL(f4),           POINTER :: BrCTauBleach(:,:,:)
+     LOGICAL                     :: Archive_BrCTauBleach
+
+     REAL(f4),           POINTER :: BrCKBleach(:,:,:)
+     LOGICAL                     :: Archive_BrCKBleach
+
+     REAL(f4),           POINTER :: BrCEtaBBOA(:,:,:)
+     LOGICAL                     :: Archive_BrCEtaBBOA
+
+     REAL(f4),           POINTER :: BrCFluxFSOAP2FSOAS(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxFSOAP2FSOAS
+
+     REAL(f4),           POINTER :: BrCFluxFSOAS2BRC(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxFSOAS2BRC
+        
+     REAL(f4),           POINTER :: BrCFluxBRC2WTC(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxBRC2WTC
+
+     REAL(f4),           POINTER :: BrCFluxNPBRC2WTC(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxNPBRC2WTC
 
      !%%%%%  Sulfur aerosols prod & loss %%%%%
      REAL(f4),           POINTER :: ProdSO2fromDMSandOH(:,:,:)
@@ -2179,6 +2202,29 @@ CONTAINS
 
     State_Diag%ProdOCPIfromOCPO                    => NULL()
     State_Diag%Archive_ProdOCPIfromOCPO            = .FALSE.
+
+    !%%%%% Brown carbon aerosol diagnostics %%%%%
+
+    State_Diag%BrCTauBleach                       => NULL()
+    State_Diag%Archive_BrCTauBleach               = .FALSE.
+
+    State_Diag%BrCKBleach                         => NULL()
+    State_Diag%Archive_BrCKBleach                 = .FALSE.
+
+    State_Diag%BrCEtaBBOA                         => NULL()
+    State_Diag%Archive_BrCEtaBBOA                 = .FALSE.
+
+    State_Diag%BrCFluxFSOAP2FSOAS                 => NULL()
+    State_Diag%Archive_BrCFluxFSOAP2FSOAS         = .FALSE.
+
+    State_Diag%BrCFluxFSOAS2BRC                   => NULL()
+    State_Diag%Archive_BrCFluxFSOAS2BRC           = .FALSE.
+
+    State_Diag%BrCFluxBRC2WTC                     => NULL()
+    State_Diag%Archive_BrCFluxBRC2WTC             = .FALSE.
+
+    State_Diag%BrCFluxNPBRC2WTC                   => NULL()
+    State_Diag%Archive_BrCFluxNPBRC2WTC           = .FALSE.
 
     !%%%%% Aerosol prod and loss diagnostics %%%%%
 
@@ -9087,6 +9133,160 @@ CONTAINS
           CALL GC_Error( errMsg, RC, thisLoc )
           RETURN
        ENDIF
+        
+       !--------------------------------------------------------------------
+       ! BrC bleaching rate constant [s^-1]
+       !--------------------------------------------------------------------
+       diagID = 'BrCKBleach'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCKBleach,                          &
+            archiveData    = State_Diag%Archive_BrCKBleach,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF                           
+
+       !--------------------------------------------------------------------
+       ! BBOA viscosity (for BrC calcualtion) 
+       !--------------------------------------------------------------------
+       diagID = 'BrCEtaBBOA'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCEtaBBOA,                          &
+            archiveData    = State_Diag%Archive_BrCEtaBBOA,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF 
+
+       !--------------------------------------------------------------------
+       ! BrC bleaching lifetime [s]
+       !--------------------------------------------------------------------
+       diagID = 'BrCTauBleach'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCTauBleach,                        &
+            archiveData    = State_Diag%Archive_BrCTauBleach,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! FSOAP --> FSOAS flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxFSOAP2FSOAS'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxFSOAP2FSOAS,                  &
+            archiveData    = State_Diag%Archive_BrCFluxFSOAP2FSOAS,          &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF 
+
+       !--------------------------------------------------------------------
+       ! FSOAS --> BRCSOA Flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxFSOAS2BRC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxFSOAS2BRC,                    &
+            archiveData    = State_Diag%Archive_BrCFluxFSOAS2BRC,            &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF        
+
+       !--------------------------------------------------------------------
+       ! BRCSOA --> WTC Flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxBRC2WTC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxBRC2WTC,                      &
+            archiveData    = State_Diag%Archive_BrCFluxBRC2WTC,              &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF 
+
+       !--------------------------------------------------------------------
+       ! NPBRCPOA --> WTC Flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxNPBRC2WTC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxNPBRC2WTC,                    &
+            archiveData    = State_Diag%Archive_BrCFluxNPBRC2WTC,            &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF 
 
        !--------------------------------------------------------------------
        ! Production of SO4 from aqueous oxidation of H2O2 in cloud
@@ -13189,7 +13389,7 @@ CONTAINS
     IF ( RC /= GC_SUCCESS ) RETURN
 
     CALL Finalize( diagId   = 'ProdOCPIfromOCPO',                            &
-                   Ptr2Data = State_Diag%ProdBCPIfromBCPO,                   &
+                   Ptr2Data = State_Diag%ProdOCPIfromOCPO,                   &
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
@@ -14185,6 +14385,40 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'BrCTauBleach',                                &
+                   Ptr2Data = State_Diag%BrCTauBleach,                       &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCKBleach',                                  &
+                   Ptr2Data = State_Diag%BrCKBleach,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCEtaBBOA',                                  &
+                   Ptr2Data = State_Diag%BrCEtaBBOA,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxFSOAP2FSOAS',                          &
+                   Ptr2Data = State_Diag%BrCFluxFSOAP2FSOAS,                 &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxFSOAS2BRC',                            &
+                   Ptr2Data = State_Diag%BrCFluxFSOAS2BRC,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxBRC2WTC',                              &
+                   Ptr2Data = State_Diag%BrCFluxBRC2WTC,                     &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxNPBRC2WTC',                            &
+                   Ptr2Data = State_Diag%BrCFluxNPBRC2WTC,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
 
 #ifdef MODEL_GEOS
     !=======================================================================
@@ -16713,6 +16947,40 @@ CONTAINS
        IF ( isUnits   ) Units = 'ug m-3'
        IF ( isRank    ) Rank  =  3
 
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCTAUBLEACH' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC photobleaching lifetime'
+       IF ( isUnits   ) Units = 's'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCKBLEACH' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC photobleaching rate constant'
+       IF ( isUnits   ) Units = 's-1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCETABBOA' ) THEN
+       IF ( isDesc    ) Desc  = 'BBOA viscosity'
+       IF ( isUnits   ) Units = 'Pa s'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAP2FSOAS' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from FSOAP to FSOAS'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAS2BRC' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from FSOAS to BRCSOA'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXBRC2WTC' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from BRCSOA to WTC'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXNPBRC2WTC' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to WTC'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
    ELSE
 
        !--------------------------------------------------------------------

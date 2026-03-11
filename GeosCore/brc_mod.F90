@@ -49,8 +49,6 @@ MODULE BRC_MOD
   PUBLIC :: ChemBrC
   PUBLIC :: Init_BrC
   PUBLIC :: Cleanup_BrC
-  PUBLIC :: BRC_TAU_MODE
-  PUBLIC :: DO_BRC_CHEM
 !
 ! !PRIVATE MEMBER FUNCTIONS:
 !
@@ -71,6 +69,8 @@ MODULE BRC_MOD
 !  25 Feb 2026 - M. Harvey - Added development diagnostics arrays
 !  25 Feb 2026 - M. Harvey - Added NPBRCPOA (non-persistent BrC-POA)
 !  25 Feb 2026 - M. Harvey - Updated FSOAS darkening lifetime to 1 day
+!  11 Mar 2026 - M. Harvey - Replaced fixed P_O3_ATM with local O3 from
+!                             State_Chm; CALC_TAU_BRC now takes P_O3 arg
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -91,29 +91,12 @@ MODULE BRC_MOD
   ! First-call flag for lazy initialisation
   LOGICAL, SAVE :: FIRST = .TRUE.
 
-  ! Bleaching-lifetime mode selector:
-  !   BRC_TAU_MODE = 1 : Full Schnitzler et al. (2022) viscosity scheme
-  !   BRC_TAU_MODE = 0 : Fixed 1-day lifetime everywhere
-  !   BRC_TAU_MODE = 2 : Fixed 1-day lifetime below 1 km AGL,
-  !                       no bleaching above 1 km AGL
-  !                       (reproduces paper Fig. 3B/C third scenario)
-  INTEGER, SAVE :: BRC_TAU_MODE = 1
-  ! Master switch for BrC chemistry
-  !   .TRUE.  = full chemistry chain runs normally
-  !   .FALSE. = all species are inert (emitted, advected, deposited only)
-  LOGICAL, SAVE :: DO_BRC_CHEM = .TRUE.
-
-  ! Fixed bleaching lifetime [s] used in modes 0 and 2
-  REAL(fp), PARAMETER :: TAU_FIXED = 86400.0_fp   ! 1 day
-
-  ! Altitude threshold [m] for mode 2 (bleaching below, none above)
-  REAL(fp), PARAMETER :: Z_THRESH  = 1000.0_fp    ! 1 km AGL
-
   !=========================================================================
   ! Physical constants
   !=========================================================================
   REAL(fp), PARAMETER :: PI      = 3.14159265358979_fp
   REAL(fp), PARAMETER :: KB      = 1.380649e-23_fp   ! Boltzmann [J/K]
+  REAL(fp), PARAMETER :: HPA2ATM = 1.0_fp / 1013.25_fp ! hPa -> atm
 
   !=========================================================================
   ! Parameters for Schnitzler et al. (2022) viscosity parameterisation
@@ -128,6 +111,12 @@ MODULE BRC_MOD
 
   ! MW_H2O: molecular weight of water [g/mol]
   REAL(fp), PARAMETER :: MW_H2O  = 18.015_fp
+
+  ! MW_O3: molecular weight of ozone [g/mol]
+  REAL(fp), PARAMETER :: MW_O3   = 48.0_fp
+
+  ! MW_AIR: mean molecular weight of dry air [g/mol]
+  REAL(fp), PARAMETER :: MW_AIR  = 28.97_fp
 
   !--- Hygroscopicity ---
   ! KAPPA: mass-based hygroscopicity parameter (SI Eq. S4)
@@ -418,6 +407,7 @@ CONTAINS
 !    Hk(T) = H * sqrt(k2/[BrC]_0) from SI Fig. S7 linear fit
 !    D_O3  = D_O3_water * (eta_water / eta_BBOA)^xi   [SI Eq. S12]
 !    D_O3_water = k_B*T / (6*pi*eta_water*R_O3)       [Stokes-Einstein]
+!    P_O3  = local ozone partial pressure [atm] (passed by caller)
 !
 !  The viscosity dependence means:
 !    - Near surface (warm, humid): tau ~ hours to 1 day
@@ -427,14 +417,13 @@ CONTAINS
 !\\
 ! !INTERFACE:
 !
- FUNCTION CALC_TAU_BRC( T, AW, HEIGHT_M ) RESULT( TAU )
+ FUNCTION CALC_TAU_BRC( T, AW, P_O3 ) RESULT( TAU )
 !
 ! !INPUT PARAMETERS:
 !
-   REAL(fp), INTENT(IN)           :: T         ! Temperature [K]
-   REAL(fp), INTENT(IN)           :: AW        ! Water activity [0-1] (= RH/100)
-   REAL(fp), INTENT(IN), OPTIONAL :: HEIGHT_M  ! Height above ground [m]
-                                               ! (required for BRC_TAU_MODE=2)
+   REAL(fp), INTENT(IN) :: T     ! Temperature [K]
+   REAL(fp), INTENT(IN) :: AW    ! Water activity [0-1] (= RH/100)
+   REAL(fp), INTENT(IN) :: P_O3  ! Local O3 partial pressure [atm]
 !
 ! !RETURN VALUE:
 !
@@ -451,24 +440,6 @@ CONTAINS
    REAL(fp) :: D_O3          ! D_O3 in BBOA [m2/s]
    REAL(fp) :: HK            ! H*sqrt(k2/[BrC]_0) [atm^-1 s^-1/2]
    REAL(fp) :: DENOM         ! Denominator of Eq. 3
-
-   !=================================================================
-   ! Mode selection for bleaching lifetime
-   !   Mode 0: fixed 1-day everywhere
-   !   Mode 1: full viscosity parameterisation (fall through below)
-   !   Mode 2: 1-day below Z_THRESH, no bleaching above
-   !=================================================================
-   IF ( BRC_TAU_MODE == 0 ) THEN
-      TAU = TAU_FIXED
-      RETURN
-   ELSEIF ( BRC_TAU_MODE == 2 ) THEN
-      IF ( PRESENT(HEIGHT_M) .AND. HEIGHT_M > Z_THRESH ) THEN
-         TAU = TAU_MAX    ! No bleaching above threshold
-      ELSE
-         TAU = TAU_FIXED  ! 1-day bleaching below threshold
-      ENDIF
-      RETURN
-   ENDIF
 
    !=================================================================
    ! Step 1: Compute BBOA viscosity and water viscosity at local T
@@ -520,7 +491,7 @@ CONTAINS
    HK = MAX( HK, 1.0e-10_fp )   ! Safety floor
 
    ! Denominator: 3 * Hk * P_O3 * sqrt(D_O3)
-   DENOM = 3.0_fp * HK * P_O3_ATM * SQRT( D_O3 )
+   DENOM = 3.0_fp * HK * P_O3 * SQRT( D_O3 )
 
    IF ( DENOM < 1.0e-30_fp ) THEN
       TAU = TAU_MAX
@@ -604,13 +575,6 @@ CONTAINS
    ! ChemBrC begins here!
    !=================================================================
    RC      = GC_SUCCESS
-   ErrMsg  = ''
-   ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
-
-   ! If BrC chemistry is disabled, return immediately.
-   ! All BrC species remain inert (emitted, advected, deposited only).
-   IF ( .NOT. DO_BRC_CHEM ) RETURN
-
    ErrMsg  = ''
    ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
 
@@ -1186,6 +1150,7 @@ CONTAINS
    USE ErrCode_Mod
    USE Input_Opt_Mod,  ONLY : OptInput
    USE State_Chm_Mod,  ONLY : ChmState
+   USE State_Chm_Mod,  ONLY : Ind_
    USE State_Diag_Mod, ONLY : DgnState
    USE State_Grid_Mod, ONLY : GrdState
    USE State_Met_Mod,  ONLY : MetState
@@ -1226,6 +1191,7 @@ CONTAINS
 !
    ! Scalars
    INTEGER             :: I, J, L
+   INTEGER             :: id_O3          ! O3 species index
    REAL(fp)            :: DTCHEM
    REAL(fp)            :: KBRCSOA_LOCAL  ! Local bleaching rate [s^-1]
    REAL(fp)            :: FREQ           ! Drydep freq (zero here)
@@ -1234,7 +1200,8 @@ CONTAINS
    REAL(fp)            :: AW_LOCAL       ! Local water activity [0-1]
    REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
    REAL(fp)            :: ETA_LOCAL      ! Local BBOA viscosity [Pa s]
-   REAL(fp)            :: HEIGHT_M       ! Height AGL at grid-cell centre [m]
+   REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
+   REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1255,6 +1222,10 @@ CONTAINS
 
    TC          => State_Chm%Species(spcId)%Conc
 
+   ! Look up O3 species index for local partial pressure
+   ! Falls back to global constant P_O3_ATM (35 ppb) if O3 not found
+   id_O3 = Ind_('O3')
+
    !=================================================================
    ! Photo-bleaching from BRCSOA to WTC
    ! Rate constant varies with local T and RH following the
@@ -1263,7 +1234,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( ETA_LOCAL, HEIGHT_M                              )&
+   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3                      )&
    !$OMP PRIVATE( KBRCSOA_LOCAL, CCV, TC0, FREQ, RKT, CNEW        )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1282,14 +1253,27 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
-      ! Height AGL at grid-cell centre [m]
-      !   = cumulative BXHEIGHT to top of level L, minus half of L
-      HEIGHT_M = SUM( State_Met%BXHEIGHT(I,J,1:L) )                &
-               - 0.5_fp * State_Met%BXHEIGHT(I,J,L)
-
       ! BrC bleaching lifetime [s] from Schnitzler parameterisation
       !   (T, RH) -> viscosity -> D_O3 -> tau_BrC
-      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, HEIGHT_M )
+      ! Use local O3 partial pressure if available, else fall back
+      ! to globally averaged 35 ppb (Schnitzler et al. default)
+      IF ( id_O3 > 0 ) THEN
+         ! O3 mixing ratio [mol/mol] from species mass [kg] and
+         ! grid-box air mass [kg]:
+         !   X_O3 = (m_O3/MW_O3) / (m_air/MW_AIR)
+         X_O3 = ( State_Chm%Species(id_O3)%Conc(I,J,L) * MW_AIR ) &
+              / ( State_Met%AD(I,J,L) * MW_O3 )
+         X_O3 = MAX( X_O3, 0.0_fp )
+
+         ! Convert to partial pressure [atm]:
+         !   P_O3 = X_O3 * P_local [atm]
+         P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
+         P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
+      ELSE
+         P_O3_LOCAL = P_O3_ATM
+      ENDIF
+
+      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
 
       ! First-order rate constant [s^-1]
       KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
@@ -1391,6 +1375,7 @@ CONTAINS
    USE ErrCode_Mod
    USE Input_Opt_Mod,  ONLY : OptInput
    USE State_Chm_Mod,  ONLY : ChmState
+   USE State_Chm_Mod,  ONLY : Ind_
    USE State_Diag_Mod, ONLY : DgnState
    USE State_Grid_Mod, ONLY : GrdState
    USE State_Met_Mod,  ONLY : MetState
@@ -1428,6 +1413,7 @@ CONTAINS
 !
    ! Scalars
    INTEGER             :: I, J, L
+   INTEGER             :: id_O3          ! O3 species index
    REAL(fp)            :: DTCHEM
    REAL(fp)            :: KNPBRC_LOCAL   ! Local bleaching rate [s^-1]
    REAL(fp)            :: FREQ           ! Drydep freq (zero here)
@@ -1435,7 +1421,8 @@ CONTAINS
    REAL(fp)            :: T_LOCAL        ! Local temperature [K]
    REAL(fp)            :: AW_LOCAL       ! Local water activity [0-1]
    REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
-   REAL(fp)            :: HEIGHT_M       ! Height AGL at grid-cell centre [m]
+   REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
+   REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1455,6 +1442,10 @@ CONTAINS
 
    TC          => State_Chm%Species(spcId)%Conc
 
+   ! Look up O3 species index for local partial pressure
+   ! Falls back to global constant P_O3_ATM (35 ppb) if O3 not found
+   id_O3 = Ind_('O3')
+
    !=================================================================
    ! Photo-bleaching from NPBRCPOA to WTC
    ! Uses the same viscosity-dependent Schnitzler et al. (2022)
@@ -1463,7 +1454,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( HEIGHT_M                                        )&
+   !$OMP PRIVATE( P_O3_LOCAL, X_O3                                 )&
    !$OMP PRIVATE( KNPBRC_LOCAL, TC0, FREQ, RKT, CNEW              )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1483,12 +1474,19 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
-      ! Height AGL at grid-cell centre [m]
-      HEIGHT_M = SUM( State_Met%BXHEIGHT(I,J,1:L) )                &
-               - 0.5_fp * State_Met%BXHEIGHT(I,J,L)
+      ! Local O3 partial pressure [atm]
+      IF ( id_O3 > 0 ) THEN
+         X_O3 = ( State_Chm%Species(id_O3)%Conc(I,J,L) * MW_AIR ) &
+              / ( State_Met%AD(I,J,L) * MW_O3 )
+         X_O3 = MAX( X_O3, 0.0_fp )
+         P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
+         P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
+      ELSE
+         P_O3_LOCAL = P_O3_ATM
+      ENDIF
 
       ! BrC bleaching lifetime [s] from Schnitzler parameterisation
-      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, HEIGHT_M )
+      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
 
       ! First-order rate constant [s^-1]
       KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL

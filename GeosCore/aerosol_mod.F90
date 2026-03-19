@@ -93,6 +93,9 @@ MODULE AEROSOL_MOD
   INTEGER :: id_SOAS,    id_SALACL,  id_HMS,     id_SOAGX
   INTEGER :: id_SOAIE,   id_INDIOL,  id_LVOCOA
 
+  ! BrC species IDs (M. Harvey, 19 Mar 2026)
+  INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
   ! a new hygroscopic species) requires manual update of this mapping
@@ -534,6 +537,72 @@ CONTAINS
           State_Chm%AerMass%OCPI(I,J,L)    = MAX( State_Chm%AerMass%OCPI(I,J,L), 1e-35_fp )
           State_Chm%AerMass%BCPO(I,J,L)    = MAX( State_Chm%AerMass%BCPO(I,J,L), 1e-35_fp )
           State_Chm%AerMass%OCPO(I,J,L)    = MAX( State_Chm%AerMass%OCPO(I,J,L), 1e-35_fp )
+
+          !===========================================================
+          ! B R O W N   C A R B O N   S U R F A C E   A R E A
+          !
+          ! Add BrC tracer mass to OCPI (hydrophilic) and OCPO
+          ! (hydrophobic) AerMass fields. This ensures BrC species
+          ! contribute to TAREA (het-chem surface area) and ODAER
+          ! (optical depth) through the standard WAERSL/DAERSL
+          ! pipeline in RDAER, with no changes needed downstream.
+          !
+          ! All BrC species are transported in kgC (MW = 12.01).
+          ! We apply the same OM:OC ratios as the standard OC
+          ! species to convert to kg_OM/m3:
+          !   OCFPOA  (~1.4) for hydrophobic (DBRCPOA)
+          !   OCFOPOA (~2.1) for hydrophilic (BRCSOA, WTC, NPBRCPOA)
+          !
+          ! Hydrophilic (-> OCPI -> WAERSL(3) -> wet surface area):
+          !   BRCSOA   - secondary BrC from darkened fire SOA
+          !   WTC      - whitened carbon, bleached and aged
+          !   NPBRCPOA - non-persistent BrC POA (replaces BB OC)
+          !
+          ! Hydrophobic (-> OCPO -> DAERSL(2) -> dry surface area):
+          !   DBRCPOA  - persistent dark BrC, freshly emitted
+          !
+          ! (M. Harvey, 19 Mar 2026)
+          !===========================================================
+
+          !--- Hydrophilic: add to OCPI [kg_OM/m3] ---
+
+          ! BRCSOA: secondary BrC from darkened fire SOA
+          IF ( id_BRC_SOA > 0 ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_BRC_SOA)%Conc(I,J,L)                      &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! WTC: whitened (bleached) carbon, aged
+          IF ( id_BRC_WTC > 0 ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_BRC_WTC)%Conc(I,J,L)                      &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! NPBRCPOA: non-persistent BrC POA (replaces BB OC)
+          IF ( id_BRC_NPBRC > 0 ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_BRC_NPBRC)%Conc(I,J,L)                    &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          !--- Hydrophobic: add to OCPO [kg_OM/m3] ---
+
+          ! DBRCPOA: persistent dark BrC, freshly emitted
+          IF ( id_BRC_DBRC > 0 ) THEN
+             State_Chm%AerMass%OCPO(I,J,L) =                       &
+                State_Chm%AerMass%OCPO(I,J,L)                      &
+                + Spc(id_BRC_DBRC)%Conc(I,J,L)                     &
+                * State_Chm%AerMass%OCFPOA(I,J)                    &
+                / AIRVOL(I,J,L)
+          ENDIF
 
        ENDIF ! LCARB
 
@@ -1386,6 +1455,7 @@ CONTAINS
        !$OMP END PARALLEL DO
 
     ENDIF
+
 
     !=================================================================
     ! S E A S A L T   A E R O S O L S
@@ -2497,6 +2567,12 @@ CONTAINS
        id_SOAIE      = Ind_( 'SOAIE'   )
        id_INDIOL     = Ind_( 'INDIOL'  )
        id_LVOCOA     = Ind_( 'LVOCOA'  )
+
+       ! BrC species IDs (M. Harvey, 19 Mar 2026)
+       id_BRC_WTC    = Ind_( 'WTC'     )
+       id_BRC_SOA    = Ind_( 'BRCSOA'  )
+       id_BRC_DBRC   = Ind_( 'DBRCPOA' )
+       id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
        
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )

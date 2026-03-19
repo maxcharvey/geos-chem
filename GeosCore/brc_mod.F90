@@ -71,6 +71,11 @@ MODULE BRC_MOD
 !  25 Feb 2026 - M. Harvey - Updated FSOAS darkening lifetime to 1 day
 !  11 Mar 2026 - M. Harvey - Replaced fixed P_O3_ATM with local O3 from
 !                             State_Chm; CALC_TAU_BRC now takes P_O3 arg
+!  19 Mar 2026 - M. Harvey - TAU_MIN changed from 3600 s to 21600 s (6 h)
+!  19 Mar 2026 - M. Harvey - Added 25% stop-loss floor (FRAC_PERM) to
+!                             BRCSOA and NPBRCPOA bleaching
+!  19 Mar 2026 - M. Harvey - Added BLEACH_SCHEME runtime switch (0-4)
+!                             for selecting bleaching parameterisation
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -219,9 +224,10 @@ MODULE BRC_MOD
   ! Changed value to be 1e10 s (317 years) for testing
   REAL(fp), PARAMETER :: TAU_MAX      = 1.0e+10_fp
 
-  ! Minimum allowed lifetime [s] (~1 minute; numerical floor)
-  ! Changed value to be 1 hour for testing 
-  REAL(fp), PARAMETER :: TAU_MIN      = 3600.0_fp
+  ! Minimum allowed lifetime [s]
+  ! Set to 6 hours based on observational constraints on fastest
+  ! plausible bleaching in warm, humid boundary layer conditions
+  REAL(fp), PARAMETER :: TAU_MIN      = 21600.0_fp
 
   ! Maximum viscosity [Pa s] (glass transition cutoff; SI Fig. S9)
   !   Viscosities above 10^12 Pa s correspond to a glass state and
@@ -237,6 +243,36 @@ MODULE BRC_MOD
   !   (Aiken et al. 2008, Environ. Sci. Technol. 42, 4478;
   !    Turpin & Lim 2001, Aerosol Sci. Technol. 35, 602)
   REAL(fp), PARAMETER :: OMOC_BBOA = 1.8_fp
+
+  !=========================================================================
+  ! Stop-loss parameter for BrC photobleaching
+  !=========================================================================
+
+  ! FRAC_PERM: fraction of BRCSOA/NPBRCPOA mass shielded from bleaching
+  !   Schnitzler et al. (2022) Fig. 1A shows relative absorption never
+  !   falls below ~50% of initial value.  A 25% mass stop-loss is a
+  !   conservative representation: only 75% of the mass at each timestep
+  !   is exposed to bleaching; 25% is treated as a residual that
+  !   bleaches increasingly slowly.
+  REAL(fp), PARAMETER :: FRAC_PERM = 0.25_fp
+
+  !=========================================================================
+  ! Bleaching scheme selector
+  !=========================================================================
+
+  ! BLEACH_SCHEME: selects the photobleaching parameterisation
+  !   0 = No bleaching (BRCSOA/NPBRCPOA persist indefinitely)
+  !   1 = Fixed 1-day lifetime everywhere
+  !   2 = Fixed 1-day lifetime below 1 km AGL only
+  !   3 = Viscosity-dependent (Schnitzler et al. 2022), fixed 35 ppb O3
+  !   4 = Viscosity-dependent (Schnitzler et al. 2022), local O3 (default)
+  INTEGER, PARAMETER :: BLEACH_SCHEME = 4
+
+  ! Fixed bleaching lifetime [s] for schemes 1 and 2
+  REAL(fp), PARAMETER :: TAU_1DAY = 86400.0_fp
+
+  ! Altitude threshold [m] for scheme 2 (bleach below this height AGL)
+  REAL(fp), PARAMETER :: ALT_THRESH = 1000.0_fp
 CONTAINS
 !EOC
 !------------------------------------------------------------------------------
@@ -1202,6 +1238,7 @@ CONTAINS
    REAL(fp)            :: ETA_LOCAL      ! Local BBOA viscosity [Pa s]
    REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
    REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
+   REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1234,7 +1271,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3                      )&
+   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3, ALT_TOP             )&
    !$OMP PRIVATE( KBRCSOA_LOCAL, CCV, TC0, FREQ, RKT, CNEW        )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1242,38 +1279,59 @@ CONTAINS
    DO I = 1, State_Grid%NX
 
       !==============================================================
-      ! Compute local bleaching rate from T and RH
+      ! Compute local bleaching rate
+      ! Scheme is selected by BLEACH_SCHEME module parameter
       !==============================================================
 
-      ! Local temperature [K]
+      ! Local temperature [K] -- always needed for diagnostics
       T_LOCAL = State_Met%T(I,J,L)
 
-      ! Local water activity [0-1]
+      ! Local water activity [0-1] -- always needed for diagnostics
       AW_LOCAL = State_Met%RH(I,J,L) / 100.0_fp
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
-      ! BrC bleaching lifetime [s] from Schnitzler parameterisation
-      !   (T, RH) -> viscosity -> D_O3 -> tau_BrC
-      ! Use local O3 partial pressure if available, else fall back
-      ! to globally averaged 35 ppb (Schnitzler et al. default)
-      IF ( id_O3 > 0 ) THEN
-         ! O3 mixing ratio [mol/mol] from species mass [kg] and
-         ! grid-box air mass [kg]:
-         !   X_O3 = (m_O3/MW_O3) / (m_air/MW_AIR)
-         X_O3 = ( State_Chm%Species(id_O3)%Conc(I,J,L) * MW_AIR ) &
-              / ( State_Met%AD(I,J,L) * MW_O3 )
-         X_O3 = MAX( X_O3, 0.0_fp )
+      ! Determine bleaching lifetime based on selected scheme
+      SELECT CASE ( BLEACH_SCHEME )
 
-         ! Convert to partial pressure [atm]:
-         !   P_O3 = X_O3 * P_local [atm]
-         P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
-         P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
-      ELSE
-         P_O3_LOCAL = P_O3_ATM
-      ENDIF
+      CASE ( 0 )
+         !--- No bleaching ---
+         TAU_LOCAL = TAU_MAX
 
-      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
+      CASE ( 1 )
+         !--- Fixed 1-day lifetime everywhere ---
+         TAU_LOCAL = TAU_1DAY
+
+      CASE ( 2 )
+         !--- Fixed 1-day below 1 km AGL, no bleaching above ---
+         ALT_TOP = SUM( State_Met%BXHEIGHT(I,J,1:L) )
+         IF ( ALT_TOP <= ALT_THRESH ) THEN
+            TAU_LOCAL = TAU_1DAY
+         ELSE
+            TAU_LOCAL = TAU_MAX
+         ENDIF
+
+      CASE ( 3 )
+         !--- Viscosity-dependent, fixed 35 ppb O3 ---
+         TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_ATM )
+
+      CASE ( 4 )
+         !--- Viscosity-dependent, local O3 (default) ---
+         IF ( id_O3 > 0 ) THEN
+            X_O3 = ( State_Chm%Species(id_O3)%Conc(I,J,L) * MW_AIR ) &
+                 / ( State_Met%AD(I,J,L) * MW_O3 )
+            X_O3 = MAX( X_O3, 0.0_fp )
+            P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
+            P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
+         ELSE
+            P_O3_LOCAL = P_O3_ATM
+         ENDIF
+         TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
+
+      CASE DEFAULT
+         TAU_LOCAL = TAU_MAX
+
+      END SELECT
 
       ! First-order rate constant [s^-1]
       KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
@@ -1312,8 +1370,11 @@ CONTAINS
       FREQ = 0e+0_fp
 
       ! Remaining BRCSOA after bleaching [kg]
+      ! Apply stop-loss: only (1 - FRAC_PERM) of mass is exposed to
+      ! bleaching; FRAC_PERM is shielded (Schnitzler et al. 2022 Fig 1A)
       RKT  = ( KBRCSOA_LOCAL + FREQ ) * DTCHEM
-      CNEW = TC0 * EXP( -RKT )
+      CNEW = FRAC_PERM * TC0                                          &
+           + ( 1.0_fp - FRAC_PERM ) * TC0 * EXP( -RKT )
 
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
@@ -1423,6 +1484,7 @@ CONTAINS
    REAL(fp)            :: TAU_LOCAL      ! Local bleaching lifetime [s]
    REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
    REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
+   REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1454,7 +1516,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( P_O3_LOCAL, X_O3                                 )&
+   !$OMP PRIVATE( P_O3_LOCAL, X_O3, ALT_TOP                        )&
    !$OMP PRIVATE( KNPBRC_LOCAL, TC0, FREQ, RKT, CNEW              )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1462,8 +1524,9 @@ CONTAINS
    DO I = 1, State_Grid%NX
 
       !==============================================================
-      ! Compute local bleaching rate from T and RH
-      ! (identical calculation to CHEM_BRCSOA)
+      ! Compute local bleaching rate
+      ! Scheme is selected by BLEACH_SCHEME module parameter
+      ! (identical scheme selection to CHEM_BRCSOA)
       !==============================================================
 
       ! Local temperature [K]
@@ -1474,19 +1537,47 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
-      ! Local O3 partial pressure [atm]
-      IF ( id_O3 > 0 ) THEN
-         X_O3 = ( State_Chm%Species(id_O3)%Conc(I,J,L) * MW_AIR ) &
-              / ( State_Met%AD(I,J,L) * MW_O3 )
-         X_O3 = MAX( X_O3, 0.0_fp )
-         P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
-         P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
-      ELSE
-         P_O3_LOCAL = P_O3_ATM
-      ENDIF
+      ! Determine bleaching lifetime based on selected scheme
+      SELECT CASE ( BLEACH_SCHEME )
 
-      ! BrC bleaching lifetime [s] from Schnitzler parameterisation
-      TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
+      CASE ( 0 )
+         !--- No bleaching ---
+         TAU_LOCAL = TAU_MAX
+
+      CASE ( 1 )
+         !--- Fixed 1-day lifetime everywhere ---
+         TAU_LOCAL = TAU_1DAY
+
+      CASE ( 2 )
+         !--- Fixed 1-day below 1 km AGL, no bleaching above ---
+         ALT_TOP = SUM( State_Met%BXHEIGHT(I,J,1:L) )
+         IF ( ALT_TOP <= ALT_THRESH ) THEN
+            TAU_LOCAL = TAU_1DAY
+         ELSE
+            TAU_LOCAL = TAU_MAX
+         ENDIF
+
+      CASE ( 3 )
+         !--- Viscosity-dependent, fixed 35 ppb O3 ---
+         TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_ATM )
+
+      CASE ( 4 )
+         !--- Viscosity-dependent, local O3 (default) ---
+         IF ( id_O3 > 0 ) THEN
+            X_O3 = ( State_Chm%Species(id_O3)%Conc(I,J,L) * MW_AIR ) &
+                 / ( State_Met%AD(I,J,L) * MW_O3 )
+            X_O3 = MAX( X_O3, 0.0_fp )
+            P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
+            P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
+         ELSE
+            P_O3_LOCAL = P_O3_ATM
+         ENDIF
+         TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
+
+      CASE DEFAULT
+         TAU_LOCAL = TAU_MAX
+
+      END SELECT
 
       ! First-order rate constant [s^-1]
       KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL
@@ -1502,8 +1593,11 @@ CONTAINS
       FREQ = 0e+0_fp
 
       ! Remaining NPBRCPOA after bleaching [kg]
+      ! Apply stop-loss: only (1 - FRAC_PERM) of mass is exposed to
+      ! bleaching; FRAC_PERM is shielded (Schnitzler et al. 2022 Fig 1A)
       RKT  = ( KNPBRC_LOCAL + FREQ ) * DTCHEM
-      CNEW = TC0 * EXP( -RKT )
+      CNEW = FRAC_PERM * TC0                                          &
+           + ( 1.0_fp - FRAC_PERM ) * TC0 * EXP( -RKT )
 
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp

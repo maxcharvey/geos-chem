@@ -40,6 +40,8 @@ MODULE AEROSOL_MOD
   ! Logical flags
   LOGICAL,  PUBLIC  :: IS_OCPI
   LOGICAL,  PUBLIC  :: IS_OCPO
+  LOGICAL,  PUBLIC  :: IS_FFOCPI
+  LOGICAL,  PUBLIC  :: IS_FFOCPO
   LOGICAL,  PUBLIC  :: IS_BC
   LOGICAL,  PUBLIC  :: IS_SO4
   LOGICAL,  PUBLIC  :: IS_HMS
@@ -95,6 +97,9 @@ MODULE AEROSOL_MOD
 
   ! BrC species IDs (M. Harvey, 19 Mar 2026)
   INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+
+  ! FF-OC species IDs
+  INTEGER :: id_FFOCPI, id_FFOCPO
 
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
@@ -600,6 +605,22 @@ CONTAINS
              State_Chm%AerMass%OCPO(I,J,L) =                       &
                 State_Chm%AerMass%OCPO(I,J,L)                      &
                 + Spc(id_BRC_DBRC)%Conc(I,J,L)                     &
+                * State_Chm%AerMass%OCFPOA(I,J)                    &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          !--- FF-OC: add to OCPI/OCPO AerMass (same OM:OC ratios) ---
+          IF ( IS_FFOCPI ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_FFOCPI)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+          IF ( IS_FFOCPO ) THEN
+             State_Chm%AerMass%OCPO(I,J,L) =                       &
+                State_Chm%AerMass%OCPO(I,J,L)                      &
+                + Spc(id_FFOCPO)%Conc(I,J,L)                       &
                 * State_Chm%AerMass%OCFPOA(I,J)                    &
                 / AIRVOL(I,J,L)
           ENDIF
@@ -2573,10 +2594,16 @@ CONTAINS
        id_BRC_SOA    = Ind_( 'BRCSOA'  )
        id_BRC_DBRC   = Ind_( 'DBRCPOA' )
        id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
-       
+
+       ! FF-OC species IDs
+       id_FFOCPI     = Ind_( 'FFOCPI'  )
+       id_FFOCPO     = Ind_( 'FFOCPO'  )
+
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )
        IS_OCPO       = ( id_OCPO     > 0                                    )
+       IS_FFOCPI     = ( id_FFOCPI   > 0                                    )
+       IS_FFOCPO     = ( id_FFOCPO   > 0                                    )
        IS_BC         = ( id_BCPI     > 0 .and. id_BCPO    > 0               )
        IS_SO4        = ( id_SO4      > 0                                    )
        IS_HMS        = ( id_HMS      > 0                                    )

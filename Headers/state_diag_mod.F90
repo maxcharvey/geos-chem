@@ -734,7 +734,10 @@ MODULE State_Diag_Mod
 
      REAL(f4),           POINTER :: ProdOCPIfromOCPO(:,:,:)
      LOGICAL                     :: Archive_ProdOCPIfromOCPO
-     
+
+     REAL(f4),           POINTER :: ProdFFOCPIfromFFOCPO(:,:,:)
+     LOGICAL                     :: Archive_ProdFFOCPIfromFFOCPO
+
      !%%%%% Brown carbon aerosol diagnostics %%%%%
 
      REAL(f4),           POINTER :: BrCTauBleach(:,:,:)
@@ -2202,6 +2205,9 @@ CONTAINS
 
     State_Diag%ProdOCPIfromOCPO                    => NULL()
     State_Diag%Archive_ProdOCPIfromOCPO            = .FALSE.
+
+    State_Diag%ProdFFOCPIfromFFOCPO                => NULL()
+    State_Diag%Archive_ProdFFOCPIfromFFOCPO        = .FALSE.
 
     !%%%%% Brown carbon aerosol diagnostics %%%%%
 
@@ -9133,7 +9139,29 @@ CONTAINS
           CALL GC_Error( errMsg, RC, thisLoc )
           RETURN
        ENDIF
-        
+
+       !--------------------------------------------------------------------
+       ! Production of Hydrophilic FF-OC (FFOCPI) from Hydrophobic FF-OC (FFOCPO)
+       !--------------------------------------------------------------------
+       diagID = 'ProdFFOCPIfromFFOCPO'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%ProdFFOCPIfromFFOCPO,                &
+            archiveData    = State_Diag%Archive_ProdFFOCPIfromFFOCPO,        &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
        !--------------------------------------------------------------------
        ! BrC bleaching rate constant [s^-1]
        !--------------------------------------------------------------------
@@ -13390,6 +13418,11 @@ CONTAINS
 
     CALL Finalize( diagId   = 'ProdOCPIfromOCPO',                            &
                    Ptr2Data = State_Diag%ProdOCPIfromOCPO,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'ProdFFOCPIfromFFOCPO',                        &
+                   Ptr2Data = State_Diag%ProdFFOCPIfromFFOCPO,               &
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 

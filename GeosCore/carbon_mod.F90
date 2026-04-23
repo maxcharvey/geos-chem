@@ -202,7 +202,8 @@ MODULE CARBON_MOD
   REAL(fp)              :: DELTAHCSAVE(MNOX,MHC)
 
   REAL(fp), ALLOCATABLE :: BCCONV(:,:,:)
-  REAL(fp), ALLOCATABLE :: OCCONV(:,:,:)  
+  REAL(fp), ALLOCATABLE :: OCCONV(:,:,:)
+  REAL(fp), ALLOCATABLE :: FFOCCONV(:,:,:)
 
 
   REAL(fp), ALLOCATABLE :: TCOSZ(:,:)
@@ -268,6 +269,7 @@ MODULE CARBON_MOD
   INTEGER :: id_MTPO,    id_NAP,    id_NK01,   id_NH4,    id_NO
   INTEGER :: id_NO3,     id_OCIL01, id_OCOB01, id_O3,     id_OH
   INTEGER :: id_OCPO,    id_OCPI,   id_OPOA1,  id_OPOG1,  id_OPOA2
+  INTEGER :: id_FFOCPI,  id_FFOCPO
   INTEGER :: id_OPOG2,   id_POA1,   id_POA2,   id_POG1,   id_POG2
   INTEGER :: id_TOLU,    id_TSOA0,  id_TSOA1
   INTEGER :: id_TSOA2,   id_TSOA3,  id_TSOG0,  id_TSOG1,  id_TSOG2
@@ -548,7 +550,25 @@ CONTAINS
           CALL DEBUG_MSG( '### CHEMCARBON: a CHEM_OCPI' )
        ENDIF
     ENDIF
-    
+
+    ! Chemistry for FF-OC tracers (hydrophobic → hydrophilic aging)
+    IF ( id_FFOCPO > 0 ) THEN
+       CALL CHEM_FFOCPO( Input_Opt  = Input_Opt,                             &
+                         State_Chm  = State_Chm,                             &
+                         State_Diag = State_Diag,                            &
+                         State_Grid = State_Grid,                            &
+                         spcId      = id_FFOCPO,                             &
+                         RC         = RC                                    )
+    ENDIF
+
+    IF ( id_FFOCPI > 0 ) THEN
+       CALL CHEM_FFOCPI( Input_Opt  = Input_Opt,                             &
+                         State_Chm  = State_Chm,                             &
+                         State_Diag = State_Diag,                            &
+                         State_Grid = State_Grid,                            &
+                         spcId      = id_FFOCPI,                             &
+                         RC         = RC                                    )
+    ENDIF
 
 
 #ifdef APM
@@ -1417,6 +1437,187 @@ CONTAINS
    TC => NULL()
 
  END SUBROUTINE CHEM_OCPI
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: chem_ffocpo
+!
+! !DESCRIPTION: Subroutine CHEM\_FFOCPO converts hydrophobic FF-OC (FFOCPO)
+!  to hydrophilic FF-OC (FFOCPI) with the same 1.15-day e-folding lifetime
+!  as OCPO.
+!\\
+!\\
+! !INTERFACE:
+!
+ SUBROUTINE CHEM_FFOCPO( Input_Opt,  State_Chm, State_Diag,                  &
+                         State_Grid, spcId,     RC                          )
+!
+! !USES:
+!
+   USE ErrCode_Mod
+   USE Input_Opt_Mod,  ONLY : OptInput
+   USE State_Chm_Mod,  ONLY : ChmState
+   USE State_Diag_Mod, ONLY : DgnState
+   USE State_Grid_Mod, ONLY : GrdState
+   USE TIME_MOD,       ONLY : GET_TS_CHEM
+!
+! !INPUT PARAMETERS:
+!
+   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
+   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
+   INTEGER,        INTENT(IN)    :: spcId        ! FFOCPO species Id
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry state object
+   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
+!
+! !OUTPUT PARAMETERS:
+!
+   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
+!
+! !REVISION HISTORY:
+!  23 Apr 2026 - M. Harvey - Initial version (mirrors CHEM_OCPO)
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+!
+! !LOCAL VARIABLES:
+!
+   INTEGER              :: I,      J,   L
+   REAL(fp)             :: DTCHEM, KOC, TC0, CNEW, RKT, FREQ
+   REAL(fp),  POINTER   :: TC(:,:,:)
+!
+! !DEFINED PARAMETERS:
+!
+   REAL(fp),  PARAMETER :: OC_LIFE = 1.15e+0_fp
+
+   !=================================================================
+   ! CHEM_FFOCPO begins here!
+   !=================================================================
+
+   RC        =  GC_SUCCESS
+   KOC       =  1.e+0_fp / ( 86400e+0_fp * OC_LIFE )
+   DTCHEM    =  GET_TS_CHEM()
+   FFOCCONV  =  0e+0_fp
+   TC        => State_Chm%Species(spcId)%Conc
+
+   !$OMP PARALLEL DO                                                         &
+   !$OMP DEFAULT( SHARED                                                    )&
+   !$OMP PRIVATE( I, J, L, TC0, FREQ, RKT, CNEW                             )&
+   !$OMP COLLAPSE( 3                                                        )
+   DO L = 1, State_Grid%NZ
+   DO J = 1, State_Grid%NY
+   DO I = 1, State_Grid%NX
+
+      TC0  = TC(I,J,L)
+      FREQ = 0e+0_fp
+      RKT  = ( KOC + FREQ ) * DTCHEM
+      CNEW = TC0 * EXP( -RKT )
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+
+      FFOCCONV(I,J,L) = ( TC0 - CNEW ) * KOC / ( KOC + FREQ )
+
+      IF ( State_Diag%Archive_ProdFFOCPIfromFFOCPO ) THEN
+         State_Diag%ProdFFOCPIfromFFOCPO(I,J,L) = FFOCCONV(I,J,L)
+      ENDIF
+
+      TC(I,J,L) = CNEW
+
+   ENDDO
+   ENDDO
+   ENDDO
+   !$OMP END PARALLEL DO
+
+   TC => NULL()
+
+ END SUBROUTINE CHEM_FFOCPO
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: chem_ffocpi
+!
+! !DESCRIPTION: Subroutine CHEM\_FFOCPI adds the converted FFOCPO mass
+!  (stored in FFOCCONV) to FFOCPI.
+!\\
+!\\
+! !INTERFACE:
+!
+ SUBROUTINE CHEM_FFOCPI( Input_Opt,  State_Chm, State_Diag,                  &
+                         State_Grid, spcId,     RC                          )
+!
+! !USES:
+!
+   USE ErrCode_Mod
+   USE Input_Opt_Mod,  ONLY : OptInput
+   USE State_Chm_Mod,  ONLY : ChmState
+   USE State_Diag_Mod, ONLY : DgnState
+   USE State_Grid_Mod, ONLY : GrdState
+   USE TIME_MOD,       ONLY : GET_TS_CHEM
+!
+! !INPUT PARAMETERS:
+!
+   TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
+   TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
+   INTEGER,        INTENT(IN)    :: spcId        ! FFOCPI species Id
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+   TYPE(ChmState), INTENT(INOUT) :: State_Chm    ! Chemistry state object
+   TYPE(DgnState), INTENT(INOUT) :: State_Diag   ! Diagnostics State object
+!
+! !OUTPUT PARAMETERS:
+!
+   INTEGER,        INTENT(OUT)   :: RC           ! Success or failure?
+!
+! !REVISION HISTORY:
+!  23 Apr 2026 - M. Harvey - Initial version (mirrors CHEM_OCPI)
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+!
+! !LOCAL VARIABLES:
+!
+   INTEGER  :: I,   J,     L
+   REAL(fp) :: TC0, CNEW, CCV
+   REAL(fp), POINTER :: TC(:,:,:)
+
+   !=================================================================
+   ! CHEM_FFOCPI begins here!
+   !=================================================================
+
+   RC =  GC_SUCCESS
+   TC => State_Chm%Species(spcId)%Conc
+
+   !$OMP PARALLEL DO                                                         &
+   !$OMP DEFAULT( SHARED                                                    )&
+   !$OMP PRIVATE( I, J, L, TC0, CCV, CNEW                                   )&
+   !$OMP COLLAPSE( 3                                                        )
+   DO L = 1, State_Grid%NZ
+   DO J = 1, State_Grid%NY
+   DO I = 1, State_Grid%NX
+
+      TC0  = TC(I,J,L)
+      CCV  = FFOCCONV(I,J,L)
+      CNEW = TC0 + CCV
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+      TC(I,J,L) = CNEW
+
+   ENDDO
+   ENDDO
+   ENDDO
+   !$OMP END PARALLEL DO
+
+   FFOCCONV = 0e+0_fp
+   TC => NULL()
+
+ END SUBROUTINE CHEM_FFOCPI
 !EOC
 
 
@@ -7698,6 +7899,8 @@ CONTAINS
    id_OH       = IND_('OH'      )
    id_OCPO     = IND_('OCPO'    )
    id_OCPI     = IND_('OCPI'    )
+   id_FFOCPI   = IND_('FFOCPI'  )
+   id_FFOCPO   = IND_('FFOCPO'  )
    id_OPOA1    = IND_('OPOA1'   )
    id_OPOG1    = IND_('OPOG1'   )
    id_OPOA2    = IND_('OPOA2'   )
@@ -7778,6 +7981,10 @@ CONTAINS
    ALLOCATE( OCCONV(State_Grid%NX,State_Grid%NY,State_Grid%NZ), STAT=AS )
    IF ( AS /= 0 ) CALL ALLOC_ERR( 'OCCONV' )
    OCCONV = 0e+0_fp
+
+   ALLOCATE( FFOCCONV(State_Grid%NX,State_Grid%NY,State_Grid%NZ), STAT=AS )
+   IF ( AS /= 0 ) CALL ALLOC_ERR( 'FFOCCONV' )
+   FFOCCONV = 0e+0_fp
 
    ! semivolpoa2: for POA emissions (hotp 2/27/09)
    ! Store POG1 and POG2 separately (mps, 1/14/16)

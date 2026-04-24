@@ -398,6 +398,12 @@ operations:
       - TMB
       - TOLU
       - XYLE
+      - FSOAS
+      - BRCSOA
+      - WTC
+      - DBRCPOA
+      - FSOAP
+      - NPBRCPOA
 
   wet_deposition:
     activate: true

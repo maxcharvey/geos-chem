@@ -2863,7 +2863,7 @@ CONTAINS
     ! info but ref index is similar e.g. Scarchilli et al. (2005)
     !(DAR 05/2015)
     SPECFIL = (/ "so4.dat  ", "soot.dat ", "org.dat  ", "ssa.dat  ",         &
-                 "ssc.dat  ", "brc.dat  ", "h2so4.dat", "h2so4.dat",        &
+                 "ssc.dat  ", "org.dat  ", "h2so4.dat", "h2so4.dat",        &
                  "dust.dat "                                               /)
 
     ! Loop over the array of filenames

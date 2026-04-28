@@ -43,7 +43,8 @@ MODULE CMN_SIZE_MOD
   INTEGER, PARAMETER :: NDUST = 7
 
   ! Number of aerosols undergoing hygroscopic growth
-  INTEGER, PARAMETER :: NRHAER = 5
+  ! +1 for BrC (M. Harvey, Apr 2026)
+  INTEGER, PARAMETER :: NRHAER = 6
 
   ! Number of stratospheric aerosols (SDE 04/17/13)
   INTEGER, PARAMETER :: NSTRATAER = 2

@@ -63,6 +63,8 @@ MODULE AerMass_Container_Mod
      ! ISOAAQ      : Isoprene SOA (aqueous formation)   [kg/m3]
      ! SOAS        : Simple SOA                         [kg/m3]
      ! FRAC_SNA    :
+     ! BRCPI       : Hydrophilic BrC aerosol (BRCSOA+NPBRCPOA) [kg/m3]
+     ! BRCPO       : Hydrophobic BrC aerosol (DBRCPOA)         [kg/m3]
      ! DAERSL      : Mass of hydrophobic aerosol (Mian Chin)
      ! WAERSL      : Mass of hydrophilic aerosol (Mian Chin)
      !========================================================================
@@ -95,6 +97,8 @@ MODULE AerMass_Container_Mod
      REAL(fp), POINTER :: ISOAAQ     (:,:,:)
      REAL(fp), POINTER :: SOAS       (:,:,:)
      REAL(fp), POINTER :: FRAC_SNA   (:,:,:,:)
+     REAL(fp), POINTER :: BRCPI      (:,:,:)
+     REAL(fp), POINTER :: BRCPO      (:,:,:)
      REAL(fp), POINTER :: DAERSL     (:,:,:,:)
      REAL(fp), POINTER :: WAERSL     (:,:,:,:)
 
@@ -443,8 +447,28 @@ CONTAINS
     ENDIF
     Aer%FRAC_SNA = 0.0_fp
 
-    ! Mass of hydrophobic aerosol from Mian Chin
-    ALLOCATE( Aer%DAERSL( NX, NY, NZ, 2 ), STAT=RC )
+    ! Hydrophilic BrC (BRCSOA + NPBRCPOA) [kg/m3]
+    ALLOCATE( Aer%BRCPI( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'BRCPI', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array BRCPI!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%BRCPI = 0.0_fp
+
+    ! Hydrophobic BrC (DBRCPOA) [kg/m3]
+    ALLOCATE( Aer%BRCPO( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'BRCPO', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array BRCPO!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%BRCPO = 0.0_fp
+
+    ! Mass of hydrophobic aerosol from Mian Chin (+1 for BRCPO)
+    ALLOCATE( Aer%DAERSL( NX, NY, NZ, 3 ), STAT=RC )
     CALL GC_CheckVar( 'DAERSL', 0, RC )
     IF ( RC /= GC_SUCCESS ) THEN
        errMsg = 'Error allocating array DAERSL!'
@@ -704,6 +728,20 @@ CONTAINS
        CALL GC_CheckVar( 'Aer%FRAC_SNA', 2, RC )
        IF ( RC /= GC_SUCCESS ) RETURN
        Aer%FRAC_SNA => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%BRCPI ) ) THEN
+       DEALLOCATE( Aer%BRCPI, STAT=RC )
+       CALL GC_CheckVar( 'Aer%BRCPI', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%BRCPI => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%BRCPO ) ) THEN
+       DEALLOCATE( Aer%BRCPO, STAT=RC )
+       CALL GC_CheckVar( 'Aer%BRCPO', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%BRCPO => NULL()
     ENDIF
 
     IF ( ASSOCIATED( Aer%DAERSL ) ) THEN

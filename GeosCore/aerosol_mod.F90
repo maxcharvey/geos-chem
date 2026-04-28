@@ -95,12 +95,13 @@ MODULE AEROSOL_MOD
 
   ! BrC species IDs (M. Harvey, 19 Mar 2026)
   INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_FSOAS  ! darkened fire SOA precursor piggybacks SOAS optics
 
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
   ! a new hygroscopic species) requires manual update of this mapping
   ! (ewl, 1/23/17)
-  INTEGER :: Map_NRHAER(5)
+  INTEGER :: Map_NRHAER(6)
 
   
 CONTAINS
@@ -539,43 +540,57 @@ CONTAINS
           State_Chm%AerMass%OCPO(I,J,L)    = MAX( State_Chm%AerMass%OCPO(I,J,L), 1e-35_fp )
 
           !===========================================================
-          ! B R O W N   C A R B O N   S U R F A C E   A R E A
+          ! B R O W N   C A R B O N   A E R O S O L   M A S S
           !
-          ! Add BrC tracer mass to OCPI (hydrophilic) and OCPO
-          ! (hydrophobic) AerMass fields. This ensures BrC species
-          ! contribute to TAREA (het-chem surface area) and ODAER
-          ! (optical depth) through the standard WAERSL/DAERSL
-          ! pipeline in RDAER, with no changes needed downstream.
+          ! BrC species now route to dedicated BRCPI/BRCPO AerMass
+          ! fields (WAERSL(6)/DAERSL(3)) and use brc.dat optics,
+          ! giving a separate AOD bin (N=6) in RDAER.
           !
           ! All BrC species are transported in kgC (MW = 12.01).
-          ! We apply the same OM:OC ratios as the standard OC
-          ! species to convert to kg_OM/m3:
+          ! OM:OC ratios same as standard OC:
+          !   OCFOPOA (~2.1) for hydrophilic (BRCSOA, NPBRCPOA)
           !   OCFPOA  (~1.4) for hydrophobic (DBRCPOA)
-          !   OCFOPOA (~2.1) for hydrophilic (BRCSOA, WTC, NPBRCPOA)
           !
-          ! Hydrophilic (-> OCPI -> WAERSL(3) -> wet surface area):
+          ! Hydrophilic (-> BRCPI -> WAERSL(6) -> brc.dat):
           !   BRCSOA   - secondary BrC from darkened fire SOA
-          !   WTC      - whitened carbon, bleached and aged
           !   NPBRCPOA - non-persistent BrC POA (replaces BB OC)
           !
-          ! Hydrophobic (-> OCPO -> DAERSL(2) -> dry surface area):
+          ! Still via OCPI (-> WAERSL(3) -> org.dat):
+          !   WTC      - bleached/aged, treated as transparent OC
+          !
+          ! Hydrophobic (-> BRCPO -> DAERSL(3) -> brc.dat):
           !   DBRCPOA  - persistent dark BrC, freshly emitted
           !
-          ! (M. Harvey, 19 Mar 2026)
+          ! (M. Harvey, Apr 2026)
           !===========================================================
 
-          !--- Hydrophilic: add to OCPI [kg_OM/m3] ---
+          ! Zero BRCPI/BRCPO before accumulation
+          State_Chm%AerMass%BRCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%BRCPO(I,J,L) = 0.0_fp
+
+          !--- Hydrophilic BrC: BRCPI [kg_OM/m3] ---
 
           ! BRCSOA: secondary BrC from darkened fire SOA
           IF ( id_BRC_SOA > 0 ) THEN
-             State_Chm%AerMass%OCPI(I,J,L) =                       &
-                State_Chm%AerMass%OCPI(I,J,L)                      &
+             State_Chm%AerMass%BRCPI(I,J,L) =                      &
+                State_Chm%AerMass%BRCPI(I,J,L)                     &
                 + Spc(id_BRC_SOA)%Conc(I,J,L)                      &
                 * State_Chm%AerMass%OCFOPOA(I,J)                   &
                 / AIRVOL(I,J,L)
           ENDIF
 
-          ! WTC: whitened (bleached) carbon, aged
+          ! NPBRCPOA: non-persistent BrC POA (replaces BB OC)
+          IF ( id_BRC_NPBRC > 0 ) THEN
+             State_Chm%AerMass%BRCPI(I,J,L) =                      &
+                State_Chm%AerMass%BRCPI(I,J,L)                     &
+                + Spc(id_BRC_NPBRC)%Conc(I,J,L)                    &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          !--- WTC still goes to OCPI (treated as transparent OC) ---
+
+          ! WTC: bleached carbon, aged
           IF ( id_BRC_WTC > 0 ) THEN
              State_Chm%AerMass%OCPI(I,J,L) =                       &
                 State_Chm%AerMass%OCPI(I,J,L)                      &
@@ -584,22 +599,12 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          ! NPBRCPOA: non-persistent BrC POA (replaces BB OC)
-          IF ( id_BRC_NPBRC > 0 ) THEN
-             State_Chm%AerMass%OCPI(I,J,L) =                       &
-                State_Chm%AerMass%OCPI(I,J,L)                      &
-                + Spc(id_BRC_NPBRC)%Conc(I,J,L)                    &
-                * State_Chm%AerMass%OCFOPOA(I,J)                   &
-                / AIRVOL(I,J,L)
-          ENDIF
-
-          !--- Hydrophobic: add to OCPO [kg_OM/m3] ---
+          !--- Hydrophobic BrC: BRCPO [kg_OM/m3] ---
 
           ! DBRCPOA: persistent dark BrC, freshly emitted
           IF ( id_BRC_DBRC > 0 ) THEN
-             State_Chm%AerMass%OCPO(I,J,L) =                       &
-                State_Chm%AerMass%OCPO(I,J,L)                      &
-                + Spc(id_BRC_DBRC)%Conc(I,J,L)                     &
+             State_Chm%AerMass%BRCPO(I,J,L) =                      &
+                Spc(id_BRC_DBRC)%Conc(I,J,L)                       &
                 * State_Chm%AerMass%OCFPOA(I,J)                    &
                 / AIRVOL(I,J,L)
           ENDIF
@@ -742,6 +747,11 @@ CONTAINS
 
           ! Simple SOA [kg/m3]
           State_Chm%AerMass%SOAS(I,J,L) = Spc(id_SOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
+
+          ! FSOAS (darkened fire SOA): already kg_OM, piggybacks org.dat via SOAS
+          IF ( id_FSOAS > 0 ) &
+             State_Chm%AerMass%SOAS(I,J,L) = State_Chm%AerMass%SOAS(I,J,L) &
+                  + Spc(id_FSOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
 
        ENDIF
 
@@ -978,14 +988,16 @@ CONTAINS
       ! Parameterized dry effective radius for SNA and OM
       !===========================================================
       IF ( State_Chm%AerMass%SO4_NH4_NIT(I,J,L) > 0e+0_fp ) THEN
-         ! dry SNA and OM mass, in unit of ug/m3
+         ! dry SNA and OM mass, in unit of ug/m3 (include BRCPI for PDER)
          State_Chm%AerMass%SNAOM(I,J,L) = ( State_Chm%AerMass%SO4_NH4_NIT(I,J,L) + &
                                             State_Chm%AerMass%OCPO(I,J,L) + &
-                                            State_Chm%AerMass%OCPISOA(I,J,L) ) * 1.0e+9_fp
+                                            State_Chm%AerMass%OCPISOA(I,J,L) + &
+                                            State_Chm%AerMass%BRCPI(I,J,L) ) * 1.0e+9_fp
 
-         ! ratio between OM and SNA, unitless
+         ! ratio between OM and SNA, unitless (include BRCPI)
          State_Chm%AerMass%R_OMSNA(I,J,L) = ( State_Chm%AerMass%OCPO(I,J,L) + &
-                                              State_Chm%AerMass%OCPISOA(I,J,L) ) / &
+                                              State_Chm%AerMass%OCPISOA(I,J,L) + &
+                                              State_Chm%AerMass%BRCPI(I,J,L) ) / &
                                               State_Chm%AerMass%SO4_NH4_NIT(I,J,L)
 
          ! Parameterized dry effective radius, in unit of um
@@ -1443,11 +1455,17 @@ CONTAINS
           ! Hydrophilic OC [kg/m3]
           State_Chm%AerMass%WAERSL(I,J,L,3) = State_Chm%AerMass%OCPISOA(I,J,L)
 
+          ! Hydrophilic BrC (BRCSOA + NPBRCPOA) [kg/m3]
+          State_Chm%AerMass%WAERSL(I,J,L,6) = State_Chm%AerMass%BRCPI(I,J,L)
+
           ! Hydrophobic BC (a.k.a EC) [kg/m3]
           State_Chm%AerMass%DAERSL(I,J,L,1) = State_Chm%AerMass%BCPO(I,J,L)
 
           ! Hydrophobic OC [kg/m3]
           State_Chm%AerMass%DAERSL(I,J,L,2) = State_Chm%AerMass%OCPO(I,J,L)
+
+          ! Hydrophobic BrC (DBRCPOA) [kg/m3]
+          State_Chm%AerMass%DAERSL(I,J,L,3) = State_Chm%AerMass%BRCPO(I,J,L)
 
        ENDDO
        ENDDO
@@ -1530,6 +1548,12 @@ CONTAINS
     ENDIF
     MSDENS(4) = State_Chm%SpcData(id_SALA)%Info%Density
     MSDENS(5) = State_Chm%SpcData(id_SALC)%Info%Density
+    ! BrC uses BRCSOA density (same as OCPI initially; brc.dat = copy of org.dat)
+    IF ( id_BRC_SOA > 0 ) THEN
+       MSDENS(6) = State_Chm%SpcData(id_BRC_SOA)%Info%Density
+    ELSE
+       MSDENS(6) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
 
     ! These default values unused (actively retrieved from ucx_mod)
     MSDENS(NRHAER+1) = 1700.0d0 ! SSA/STS
@@ -1903,6 +1927,15 @@ CONTAINS
                                    ( MSDENS(N) * State_Chm%AerMass%PDER(I,J,L) * 1.0D-6 )
                 ENDIF
 
+                ! Add BRCPO (hydrophobic BrC, DAERSL(3)) to BrC bin
+                ! DBRCPOA uses RW(1) dry radius, like BCPO (M. Harvey, Apr 2026)
+                IF ( N == 6 ) THEN
+                   ODAER(I,J,L,IWV,N) = ODAER(I,J,L,IWV,N) + &
+                                   0.75d0 * BXHEIGHT(I,J,L) * &
+                                   State_Chm%AerMass%DAERSL(I,J,L,3) * QW(1) / &
+                                   ( MSDENS(N) * REAA(1,N,State_Chm%Phot%DRg) * 1.0D-6 )
+                ENDIF
+
              ELSE
 
                 !--------------------------------------------------------
@@ -2085,6 +2118,18 @@ CONTAINS
                                             ( WTAREA(I,J,L,N+NDUST)   +   &
                                               DRYAREA )
                 ENDIF !Hydrophobic aerosol surface area
+
+                ! Hydrophobic BrC (BRCPO, DAERSL(3)) contributes to BrC bin (N=6)
+                IF ( N.eq.6 ) THEN
+                   DRYAREA = 3.D0 * State_Chm%AerMass%DAERSL(I,J,L,3) / ( RW(1) * &
+                             1.0D-4 * MSDENS(N) )
+                   TAREA(I,J,L,N+NDUST) = WTAREA(I,J,L,N+NDUST) + DRYAREA
+                   ERADIUS(I,J,L,NDUST+N) = ( WERADIUS(I,J,L,NDUST+N) *   &
+                                              WTAREA(I,J,L,N+NDUST)   +   &
+                                              RW(1) * 1.0D-4 * DRYAREA )/ &
+                                            ( WTAREA(I,J,L,N+NDUST)   +   &
+                                              DRYAREA )
+                ENDIF !Hydrophobic BrC surface area
 
                 !----------------------------------------------------
                 ! Netcdf diagnostics computed here:
@@ -2573,6 +2618,7 @@ CONTAINS
        id_BRC_SOA    = Ind_( 'BRCSOA'  )
        id_BRC_DBRC   = Ind_( 'DBRCPOA' )
        id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
+       id_FSOAS      = Ind_( 'FSOAS'   )
        
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )
@@ -2620,9 +2666,11 @@ CONTAINS
                 Map_NRHAER(N) = 4
              CASE ( 'SALC' )
                 Map_NRHAER(N) = 5
+             CASE ( 'BRCSOA' )
+                Map_NRHAER(N) = 6
              CASE DEFAULT
                 ErrMsg = 'WARNING: aerosol diagnostics not defined' // &
-                         ' for NRHAER greater than 5!'
+                         ' for NRHAER greater than 6!'
                 CALL GC_ERROR( ErrMsg, RC, 'Init_Aerosol in aerosol_mod.F90' )
                 SpcInfo => NULL()
                 RETURN
@@ -2759,7 +2807,7 @@ CONTAINS
     CHARACTER(LEN=255) :: ThisLoc
 
     ! String arrays
-    CHARACTER(LEN=30)  :: SPECFIL(8)
+    CHARACTER(LEN=30)  :: SPECFIL(9)
 
     ! Pointers
     REAL*8, POINTER :: WVAA  (:,:)
@@ -2815,7 +2863,8 @@ CONTAINS
     ! info but ref index is similar e.g. Scarchilli et al. (2005)
     !(DAR 05/2015)
     SPECFIL = (/ "so4.dat  ", "soot.dat ", "org.dat  ", "ssa.dat  ",         &
-                 "ssc.dat  ", "h2so4.dat", "h2so4.dat", "dust.dat "        /)
+                 "ssc.dat  ", "brc.dat  ", "h2so4.dat", "h2so4.dat",        &
+                 "dust.dat "                                               /)
 
     ! Loop over the array of filenames
     DO k = 1, State_Chm%Phot%NSPAA

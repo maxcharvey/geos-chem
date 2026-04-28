@@ -5021,3 +5021,91 @@ XYLE:
   FullName: Xylene
   Is_Gas: true
   MW_g: 106.18
+BRCSOA:
+  Formula: CO
+  FullName: Brown Carbon formed from Secondary Organic Aerosols released from biomass burning
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_HygroGrowth: true
+  Is_WetDep: true
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  BackgroundVV: 1.0e-18
+DBRCPOA:
+  Formula: CO
+  FullName: Optically Dark Brown OA emitted directly from biomass burning - based off OCPO
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [0.5, 0.5, 0.5]
+  WD_RainoutEff: [0.0, 0.0, 0.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  BackgroundVV: 1.0e-18
+FSOAP:
+  Formula: CO
+  FullName: Fire SOA gas-phase precursor
+  Is_Gas: true
+  MW_g: 150
+  BackgroundVV: 1.0e-20
+FSOAS:
+  Formula: CO
+  FullName: Fire SOA Simple - Simple representation of Fire Secondary Organic Aerosol
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  MW_g: 150
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [0.8, 0.0, 0.8]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  BackgroundVV: 1.0e-18
+NPBRCPOA:
+  Formula: CO
+  FullName: Non-persistent brown carbon primary organic aerosol - based off OCPI
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  BackgroundVV: 1.0e-18
+WTC:
+  Formula: CO
+  FullName: Optically White Carbon Organic Aerosol formed from photobleaching of BRCSOA - based off OCPI
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  BackgroundVV: 1.0e-18

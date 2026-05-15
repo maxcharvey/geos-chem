@@ -37,7 +37,7 @@ MODULE CMN_FJX_MOD
 
   INTEGER, PARAMETER :: X_    = 123    ! Max # X-section data in FJX_spec.dat
 
-  INTEGER, PARAMETER :: A_    = 56     ! # aerosol/cloud Mie sets
+  INTEGER, PARAMETER :: A_    = 63     ! # aerosol/cloud Mie sets (+7 for BrC entries 57-63)
 
 #ifdef MODEL_GEOS
 !!!INTEGER, PARAMETER :: N_ = 601
@@ -252,7 +252,7 @@ CONTAINS
     JTAUMX = ( N_ - 4*JXL_ ) / 2  ! Maximum number of divisions ( i.e., may
                                   ! not get to ATAUMN)
 
-    AN_       = 37  ! # of separate aerosols per layer; Including PSCs
+    AN_       = 42  ! # of separate aerosols per layer; Including PSCs (3+7+NRH*NRHAER+2)
     W_        = 18  ! # of wavelength bins
 
     ! Initialize RNAMES to empty string (ckeller,12/29/17)

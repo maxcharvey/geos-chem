@@ -314,7 +314,7 @@ CONTAINS
           ENDDO ! M (Aerosol)
 
           ! Other aerosol (from new optics LUT)
-          DO M=1,5
+          DO M=1,NRHAER
 
              DO IR=1,5
                 IDXAER=10+(M-1)*NRH+IR

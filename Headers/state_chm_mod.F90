@@ -1797,7 +1797,8 @@ CONTAINS
                     'KhetiSLABrNO3HCl ', 'KhetiSLAHOClHCl  ',             &
                     'KhetiSLAHOClHBr  ', 'KhetiSLAHOBrHCl  ',             &
                     'KhetiSLAHOBrHBr  ', '                 ',             &
-                    '                 ', '                 '            /)
+                    '                 ', '                 ',             &
+                    '                 '                                  /)
 
        ! Allocate and register each field individually
        nKHLSA = 11

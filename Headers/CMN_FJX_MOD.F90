@@ -252,7 +252,7 @@ CONTAINS
     JTAUMX = ( N_ - 4*JXL_ ) / 2  ! Maximum number of divisions ( i.e., may
                                   ! not get to ATAUMN)
 
-    AN_       = 42  ! # of separate aerosols per layer; Including PSCs (3+7+NRH*NRHAER+2)
+    AN_       = 52  ! # of separate aerosols per layer; Including PSCs (3+7+NRH*NRHAER+2)
     W_        = 18  ! # of wavelength bins
 
     ! Initialize RNAMES to empty string (ckeller,12/29/17)

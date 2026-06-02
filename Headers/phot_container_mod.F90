@@ -209,7 +209,7 @@ CONTAINS
     ! Constants
     Phot%IND999 = 5     ! Index in RAA & QAA of 999 nm
     Phot%NWVAA  = 41    ! # LUT wavelengths   (RRTMG)
-    Phot%NSPAA  = 9     ! # LUT species (+1 for brc.dat) (RRTMG)
+    Phot%NSPAA  = 11    ! # LUT species (NRHAER+NSTRATAER+1dust) (RRTMG)
     Phot%NRAA   = 7     ! # LUT aerosol sizes (RRTMG)   
     Phot%NWVAA0 = 11    ! # non-RRTMG wavelengths
     Phot%NALBD  = 2     ! ??                     

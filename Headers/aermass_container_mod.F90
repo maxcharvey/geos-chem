@@ -97,8 +97,10 @@ MODULE AerMass_Container_Mod
      REAL(fp), POINTER :: ISOAAQ     (:,:,:)
      REAL(fp), POINTER :: SOAS       (:,:,:)
      REAL(fp), POINTER :: FRAC_SNA   (:,:,:,:)
-     REAL(fp), POINTER :: BRCPI      (:,:,:)
-     REAL(fp), POINTER :: BRCPO      (:,:,:)
+     REAL(fp), POINTER :: BRCPI      (:,:,:)  ! BRCSOA only [kg_OM/m3]
+     REAL(fp), POINTER :: BRCPO      (:,:,:)  ! DBRCPOA [kg_OM/m3]
+     REAL(fp), POINTER :: NPBRC      (:,:,:)  ! NPBRCPOA [kg_OM/m3]
+     REAL(fp), POINTER :: WTCPI      (:,:,:)  ! WTC [kg_OM/m3]
      REAL(fp), POINTER :: DAERSL     (:,:,:,:)
      REAL(fp), POINTER :: WAERSL     (:,:,:,:)
 
@@ -447,7 +449,7 @@ CONTAINS
     ENDIF
     Aer%FRAC_SNA = 0.0_fp
 
-    ! Hydrophilic BrC (BRCSOA + NPBRCPOA) [kg/m3]
+    ! Hydrophilic BrC: BRCSOA (bin N=6) [kg_OM/m3]
     ALLOCATE( Aer%BRCPI( NX, NY, NZ ), STAT=RC )
     CALL GC_CheckVar( 'BRCPI', 0, RC )
     IF ( RC /= GC_SUCCESS ) THEN
@@ -457,7 +459,7 @@ CONTAINS
     ENDIF
     Aer%BRCPI = 0.0_fp
 
-    ! Hydrophobic BrC (DBRCPOA) [kg/m3]
+    ! Hydrophobic BrC: DBRCPOA (DAERSL(3), add-on to N=6) [kg_OM/m3]
     ALLOCATE( Aer%BRCPO( NX, NY, NZ ), STAT=RC )
     CALL GC_CheckVar( 'BRCPO', 0, RC )
     IF ( RC /= GC_SUCCESS ) THEN
@@ -466,6 +468,26 @@ CONTAINS
        RETURN
     ENDIF
     Aer%BRCPO = 0.0_fp
+
+    ! Hydrophilic BrC: NPBRCPOA (bin N=7) [kg_OM/m3]
+    ALLOCATE( Aer%NPBRC( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'NPBRC', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array NPBRC!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%NPBRC = 0.0_fp
+
+    ! Hydrophilic WTC: bleached BrC (bin N=8) [kg_OM/m3]
+    ALLOCATE( Aer%WTCPI( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'WTCPI', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array WTCPI!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%WTCPI = 0.0_fp
 
     ! Mass of hydrophobic aerosol from Mian Chin (+1 for BRCPO)
     ALLOCATE( Aer%DAERSL( NX, NY, NZ, 3 ), STAT=RC )
@@ -742,6 +764,20 @@ CONTAINS
        CALL GC_CheckVar( 'Aer%BRCPO', 2, RC )
        IF ( RC /= GC_SUCCESS ) RETURN
        Aer%BRCPO => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%NPBRC ) ) THEN
+       DEALLOCATE( Aer%NPBRC, STAT=RC )
+       CALL GC_CheckVar( 'Aer%NPBRC', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%NPBRC => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%WTCPI ) ) THEN
+       DEALLOCATE( Aer%WTCPI, STAT=RC )
+       CALL GC_CheckVar( 'Aer%WTCPI', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%WTCPI => NULL()
     ENDIF
 
     IF ( ASSOCIATED( Aer%DAERSL ) ) THEN

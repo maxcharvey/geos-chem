@@ -838,7 +838,7 @@ CONTAINS
     MIEDX => State_Chm%Phot%MIEDX
 
     ! Taken from aerosol_mod.F
-    IND = (/22,29,36,43,50,57/)
+    IND = (/22,29,36,43,50,57,57,36/)  ! N=7 NPBRCPOA reuses brc.dat(57); N=8 WTC reuses org.dat(36)
 
     DO I=1,AN_
        MIEDX(I) = 0

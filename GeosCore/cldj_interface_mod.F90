@@ -809,11 +809,58 @@ CONTAINS
                    R_interp_factor = RAA_eff / RAA(K_rhx)
                    Q_interp_factor = QAA_eff / QAA(ind_1000,K_rhx)
 
-                   ! Set concentration, converting [dry kg/m3] -> [wet g/m2]
-                   ! BRCPO = hydrophobic (no hygroscopic growth); BRCPI = hydrophilic
+                   ! Set concentration: BRCPO=DBRCPOA dry; BRCPI=BRCSOA hygroscopic
                    AERSP(L,S_rhx) = ( State_Chm%AerMass%BRCPO(I,J,L)                &
                         + ( State_Chm%AerMass%BRCPI(I,J,L)                          &
                         * dry_to_wet_factor * Q_interp_factor / R_interp_factor ) ) &
+                        * 1.d3 * BoxHt
+
+                   !----------------------------------------------------
+                   ! NPBRCPOA (N=7, brc.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   !----------------------------------------------------
+                   S_rh0 = 3 + NDUST + NRH*(7-1) + 1
+                   S_rhx = S_rh0 + RH_ind - 1
+                   K_rh0 = NDXAER(L,S_rh0)
+                   K_rhx = NDXAER(L,S_rhx)
+                   IF ( RH_ind == NRH ) THEN
+                      RAA_eff = RAA(K_rhx)
+                      QAA_eff = QAA(ind_1000,K_rhx)
+                   ELSE
+                      FRAC = ( State_Met%RH(I,J,L) - RH_lut(RH_ind) ) &
+                           / ( RH_lut(RH_ind+1) - RH_lut(RH_ind) )
+                      RAA_eff = RAA(K_rhx) + FRAC * ( RAA(K_rhx+1) - RAA(K_rhx) )
+                      QAA_eff = QAA(ind_1000,K_rhx) &
+                           + FRAC * ( QAA(ind_1000,K_rhx+1) - QAA(ind_1000,K_rhx) )
+                   ENDIF
+                   dry_to_wet_factor = ( RAA_eff / RAA(K_rh0) )**3
+                   R_interp_factor = RAA_eff / RAA(K_rhx)
+                   Q_interp_factor = QAA_eff / QAA(ind_1000,K_rhx)
+                   AERSP(L,S_rhx) = ( State_Chm%AerMass%NPBRC(I,J,L)               &
+                        * dry_to_wet_factor * Q_interp_factor / R_interp_factor )   &
+                        * 1.d3 * BoxHt
+
+                   !----------------------------------------------------
+                   ! WTC (N=8, org.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   !----------------------------------------------------
+                   S_rh0 = 3 + NDUST + NRH*(8-1) + 1
+                   S_rhx = S_rh0 + RH_ind - 1
+                   K_rh0 = NDXAER(L,S_rh0)
+                   K_rhx = NDXAER(L,S_rhx)
+                   IF ( RH_ind == NRH ) THEN
+                      RAA_eff = RAA(K_rhx)
+                      QAA_eff = QAA(ind_1000,K_rhx)
+                   ELSE
+                      FRAC = ( State_Met%RH(I,J,L) - RH_lut(RH_ind) ) &
+                           / ( RH_lut(RH_ind+1) - RH_lut(RH_ind) )
+                      RAA_eff = RAA(K_rhx) + FRAC * ( RAA(K_rhx+1) - RAA(K_rhx) )
+                      QAA_eff = QAA(ind_1000,K_rhx) &
+                           + FRAC * ( QAA(ind_1000,K_rhx+1) - QAA(ind_1000,K_rhx) )
+                   ENDIF
+                   dry_to_wet_factor = ( RAA_eff / RAA(K_rh0) )**3
+                   R_interp_factor = RAA_eff / RAA(K_rhx)
+                   Q_interp_factor = QAA_eff / QAA(ind_1000,K_rhx)
+                   AERSP(L,S_rhx) = ( State_Chm%AerMass%WTCPI(I,J,L)               &
+                        * dry_to_wet_factor * Q_interp_factor / R_interp_factor )   &
                         * 1.d3 * BoxHt
 
                 ENDIF

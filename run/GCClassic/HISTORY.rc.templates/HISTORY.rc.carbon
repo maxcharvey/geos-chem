@@ -42,6 +42,7 @@ COLLECTIONS: 'Restart',
              'StateMet',
              'StateMetLevEdge',
              #'BoundaryConditions',
+             'BrCDiagnostics',
 ::
 ###############################################################################
 ### The rest of this file consists of collection definitions.               ###
@@ -424,4 +425,23 @@ COLLECTIONS: 'Restart',
   BoundaryConditions.duration:   00000001 000000
   BoundaryConditions.mode:       'instantaneous'
   BoundaryConditions.fields:     'SpeciesBC_?ADV?             ',
+::
+#==============================================================================
+# %%%%% THE BrCDiagnostics COLLECTION %%%%%
+#
+# BrC species production rates and photobleaching parameters
+#
+# Available for my simulations only (mch Feb 2026)
+#==============================================================================
+  BrCDiagnostics.template:   '%y4%m2%d2_%h2%n2z.nc4',
+  BrCDiagnostics.frequency:  00000100 000000
+  BrCDiagnostics.duration:   00000100 000000
+  BrCDiagnostics.mode:       'time-averaged'
+  BrCDiagnostics.fields:     'BrCTauBleach              ',
+                             'BrCKBleach                ',
+                             'BrCEtaBBOA                ',
+                             'BrCFluxFSOAP2FSOAS        ',
+                             'BrCFluxFSOAS2BRC          ',
+                             'BrCFluxBRC2WTC            ',
+                             'BrCFluxNPBRC2WTC          ',
 ::

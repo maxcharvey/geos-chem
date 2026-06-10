@@ -1929,13 +1929,10 @@ CONTAINS
                                    ( MSDENS(N) * State_Chm%AerMass%PDER(I,J,L) * 1.0D-6 )
                 ENDIF
 
-                ! Add BRCPO (DBRCPOA hydrophobic, DAERSL(3)) to N=6 ODAER
-                ! Uses dry radius REAA(1,6,...); also captured in BrCDryAOD diagnostic
+                ! BRCPO (DBRCPOA hydrophobic, DAERSL(3)): archived in BrCDryAOD
+                ! only. NOT added to ODAER(N=6) so AODHyg_BRCSOA stays
+                ! hygroscopic-only (see maxcharvey/geos-chem#6)
                 IF ( N == 6 ) THEN
-                   ODAER(I,J,L,IWV,N) = ODAER(I,J,L,IWV,N) + &
-                                   0.75d0 * BXHEIGHT(I,J,L) * &
-                                   State_Chm%AerMass%DAERSL(I,J,L,3) * QW(1) / &
-                                   ( MSDENS(N) * REAA(1,N,State_Chm%Phot%DRg) * 1.0D-6 )
                    IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) THEN
                       State_Diag%BrCDryAODWL1(I,J,L) = &
                          0.75d0 * BXHEIGHT(I,J,L) * &

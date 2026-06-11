@@ -1932,20 +1932,29 @@ CONTAINS
                 ! BRCPO (DBRCPOA hydrophobic, DAERSL(3)): archived in BrCDryAOD
                 ! only. NOT added to ODAER(N=6) so AODHyg_BRCSOA stays
                 ! hygroscopic-only (see maxcharvey/geos-chem#6)
+                !
+                ! NOTE: IsWL1/2/3 are not set in this loop (only in the AODHyg
+                ! loop below), so gate on the current LUT wavelength index IWV
+                ! matching the requested AOD wavelength IWVSELECT(1,W) instead.
+                ! IWVSELECT is always dimensioned (2,3); unconfigured columns
+                ! are 0 and never equal IWV (>=1). (M. Harvey, Jun 2026)
                 IF ( N == 6 ) THEN
-                   IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) THEN
+                   IF ( State_Diag%Archive_BrCDryAODWL1 .AND. &
+                        IWV == IWVSELECT(1,1) ) THEN
                       State_Diag%BrCDryAODWL1(I,J,L) = &
                          0.75d0 * BXHEIGHT(I,J,L) * &
                          State_Chm%AerMass%DAERSL(I,J,L,3) * QW(1) / &
                          ( MSDENS(N) * REAA(1,N,State_Chm%Phot%DRg) * 1.0D-6 )
                    ENDIF
-                   IF ( State_Diag%Archive_BrCDryAODWL2 .AND. IsWL2 ) THEN
+                   IF ( State_Diag%Archive_BrCDryAODWL2 .AND. &
+                        IWV == IWVSELECT(1,2) ) THEN
                       State_Diag%BrCDryAODWL2(I,J,L) = &
                          0.75d0 * BXHEIGHT(I,J,L) * &
                          State_Chm%AerMass%DAERSL(I,J,L,3) * QW(1) / &
                          ( MSDENS(N) * REAA(1,N,State_Chm%Phot%DRg) * 1.0D-6 )
                    ENDIF
-                   IF ( State_Diag%Archive_BrCDryAODWL3 .AND. IsWL3 ) THEN
+                   IF ( State_Diag%Archive_BrCDryAODWL3 .AND. &
+                        IWV == IWVSELECT(1,3) ) THEN
                       State_Diag%BrCDryAODWL3(I,J,L) = &
                          0.75d0 * BXHEIGHT(I,J,L) * &
                          State_Chm%AerMass%DAERSL(I,J,L,3) * QW(1) / &

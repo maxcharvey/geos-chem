@@ -101,7 +101,7 @@ MODULE AEROSOL_MOD
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
   ! a new hygroscopic species) requires manual update of this mapping
   ! (ewl, 1/23/17)
-  INTEGER :: Map_NRHAER(8)
+  INTEGER :: Map_NRHAER(9)
 
   
 CONTAINS
@@ -546,9 +546,11 @@ CONTAINS
           !   BRCPI  -> WAERSL(6), brc.dat  (BRCSOA, N=6)
           !   NPBRC  -> WAERSL(7), brc.dat  (NPBRCPOA, N=7)
           !   WTCPI  -> WAERSL(8), org.dat  (WTC, N=8)
+          !   FSOAS  -> WAERSL(9), brc.dat  (FSOAS, N=9)
           !   BRCPO  -> DAERSL(3), add-on to N=6 (DBRCPOA, hydrophobic)
           !
-          ! All BrC species transported in kgC (MW=12.01).
+          ! All BrC species transported in kgC (MW=12.01), except
+          ! FSOAS which is transported as kg_OM (MW=150, no OM:OC).
           ! OM:OC: OCFOPOA (~2.1) hydrophilic; OCFPOA (~1.4) hydrophobic.
           ! (M. Harvey, May 2026)
           !===========================================================
@@ -558,6 +560,7 @@ CONTAINS
           State_Chm%AerMass%BRCPO(I,J,L) = 0.0_fp
           State_Chm%AerMass%NPBRC(I,J,L) = 0.0_fp
           State_Chm%AerMass%WTCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%FSOAS(I,J,L) = 0.0_fp
 
           ! BRCSOA -> BRCPI (bin N=6, brc.dat)
           IF ( id_BRC_SOA > 0 ) THEN
@@ -581,6 +584,12 @@ CONTAINS
                 Spc(id_BRC_WTC)%Conc(I,J,L)                        &
                 * State_Chm%AerMass%OCFOPOA(I,J)                   &
                 / AIRVOL(I,J,L)
+          ENDIF
+
+          ! FSOAS -> FSOAS (bin N=9, brc.dat; already kg_OM, no OM:OC)
+          IF ( id_FSOAS > 0 ) THEN
+             State_Chm%AerMass%FSOAS(I,J,L) =                      &
+                Spc(id_FSOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
           ENDIF
 
           ! DBRCPOA -> BRCPO (DAERSL(3), hydrophobic add-on to N=6)
@@ -730,10 +739,8 @@ CONTAINS
           ! Simple SOA [kg/m3]
           State_Chm%AerMass%SOAS(I,J,L) = Spc(id_SOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
 
-          ! FSOAS (darkened fire SOA): already kg_OM, piggybacks org.dat via SOAS
-          IF ( id_FSOAS > 0 ) &
-             State_Chm%AerMass%SOAS(I,J,L) = State_Chm%AerMass%SOAS(I,J,L) &
-                  + Spc(id_FSOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
+          ! FSOAS now has its own bin N=9 (see BrC section above);
+          ! no longer folded into SOAS (maxcharvey/geos-chem#7)
 
        ENDIF
 
@@ -917,6 +924,14 @@ CONTAINS
              State_Chm%AerMass%PM25(I,J,L)                    +              &
              ( State_Chm%AerMass%SOAS(I,J,L) * ORG_GROWTH )
 
+          ! FSOAS (own bin N=9): keep in PM2.5 now that it is
+          ! no longer carried inside SOAS (maxcharvey/geos-chem#7)
+          IF ( id_FSOAS > 0 ) THEN
+             State_Chm%AerMass%PM25(I,J,L)                    =              &
+                State_Chm%AerMass%PM25(I,J,L)                 +              &
+                ( State_Chm%AerMass%FSOAS(I,J,L) * ORG_GROWTH )
+          ENDIF
+
        ELSE IF ( Is_ComplexSOA ) THEN
           State_Chm%AerMass%PM25(I,J,L)                       =              &
              State_Chm%AerMass%PM25(I,J,L)                    +              &
@@ -976,14 +991,16 @@ CONTAINS
                                             State_Chm%AerMass%OCPISOA(I,J,L) + &
                                             State_Chm%AerMass%BRCPI(I,J,L) + &
                                             State_Chm%AerMass%NPBRC(I,J,L) + &
-                                            State_Chm%AerMass%WTCPI(I,J,L) ) * 1.0e+9_fp
+                                            State_Chm%AerMass%WTCPI(I,J,L) + &
+                                            State_Chm%AerMass%FSOAS(I,J,L) ) * 1.0e+9_fp
 
          ! ratio between OM and SNA, unitless (include all BrC hygroscopic bins)
          State_Chm%AerMass%R_OMSNA(I,J,L) = ( State_Chm%AerMass%OCPO(I,J,L) + &
                                               State_Chm%AerMass%OCPISOA(I,J,L) + &
                                               State_Chm%AerMass%BRCPI(I,J,L) + &
                                               State_Chm%AerMass%NPBRC(I,J,L) + &
-                                              State_Chm%AerMass%WTCPI(I,J,L) ) / &
+                                              State_Chm%AerMass%WTCPI(I,J,L) + &
+                                              State_Chm%AerMass%FSOAS(I,J,L) ) / &
                                               State_Chm%AerMass%SO4_NH4_NIT(I,J,L)
 
          ! Parameterized dry effective radius, in unit of um
@@ -1450,6 +1467,9 @@ CONTAINS
           ! WTC (N=8, org.dat) [kg_OM/m3]
           State_Chm%AerMass%WAERSL(I,J,L,8) = State_Chm%AerMass%WTCPI(I,J,L)
 
+          ! FSOAS (N=9, brc.dat) [kg_OM/m3]
+          State_Chm%AerMass%WAERSL(I,J,L,9) = State_Chm%AerMass%FSOAS(I,J,L)
+
           ! Hydrophobic BC (a.k.a EC) [kg/m3]
           State_Chm%AerMass%DAERSL(I,J,L,1) = State_Chm%AerMass%BCPO(I,J,L)
 
@@ -1555,6 +1575,11 @@ CONTAINS
        MSDENS(8) = State_Chm%SpcData(id_BRC_WTC)%Info%Density
     ELSE
        MSDENS(8) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
+    IF ( id_FSOAS > 0 ) THEN
+       MSDENS(9) = State_Chm%SpcData(id_FSOAS)%Info%Density
+    ELSE
+       MSDENS(9) = State_Chm%SpcData(id_OCPI)%Info%Density
     ENDIF
 
     ! These default values unused (actively retrieved from ucx_mod)
@@ -2698,9 +2723,11 @@ CONTAINS
                 Map_NRHAER(N) = 7
              CASE ( 'WTC' )
                 Map_NRHAER(N) = 8
+             CASE ( 'FSOAS' )
+                Map_NRHAER(N) = 9
              CASE DEFAULT
                 ErrMsg = 'WARNING: aerosol diagnostics not defined' // &
-                         ' for NRHAER greater than 8!'
+                         ' for NRHAER greater than 9!'
                 CALL GC_ERROR( ErrMsg, RC, 'Init_Aerosol in aerosol_mod.F90' )
                 SpcInfo => NULL()
                 RETURN
@@ -2837,7 +2864,7 @@ CONTAINS
     CHARACTER(LEN=255) :: ThisLoc
 
     ! String arrays
-    CHARACTER(LEN=30)  :: SPECFIL(11)
+    CHARACTER(LEN=30)  :: SPECFIL(12)
 
     ! Pointers
     REAL*8, POINTER :: WVAA  (:,:)
@@ -2894,7 +2921,7 @@ CONTAINS
     !(DAR 05/2015)
     SPECFIL = (/ "so4.dat  ", "soot.dat ", "org.dat  ", "ssa.dat  ",  &
                  "ssc.dat  ", "brc.dat  ", "brc.dat  ", "org.dat  ",  &
-                 "h2so4.dat", "h2so4.dat", "dust.dat "               /)
+                 "brc.dat  ", "h2so4.dat", "h2so4.dat", "dust.dat "  /)
 
     ! Loop over the array of filenames
     DO k = 1, State_Chm%Phot%NSPAA

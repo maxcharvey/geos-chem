@@ -44,7 +44,8 @@ MODULE CMN_SIZE_MOD
 
   ! Number of aerosols undergoing hygroscopic growth
   ! +1 for BrC, +1 for NPBRCPOA, +1 for WTC (M. Harvey, May 2026)
-  INTEGER, PARAMETER :: NRHAER = 8
+  ! +1 for FSOAS (M. Harvey, Jun 2026)
+  INTEGER, PARAMETER :: NRHAER = 9
 
   ! Number of stratospheric aerosols (SDE 04/17/13)
   INTEGER, PARAMETER :: NSTRATAER = 2

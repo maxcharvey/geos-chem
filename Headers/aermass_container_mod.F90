@@ -101,6 +101,7 @@ MODULE AerMass_Container_Mod
      REAL(fp), POINTER :: BRCPO      (:,:,:)  ! DBRCPOA [kg_OM/m3]
      REAL(fp), POINTER :: NPBRC      (:,:,:)  ! NPBRCPOA [kg_OM/m3]
      REAL(fp), POINTER :: WTCPI      (:,:,:)  ! WTC [kg_OM/m3]
+     REAL(fp), POINTER :: FSOAS      (:,:,:)  ! FSOAS [kg_OM/m3]
      REAL(fp), POINTER :: DAERSL     (:,:,:,:)
      REAL(fp), POINTER :: WAERSL     (:,:,:,:)
 
@@ -489,6 +490,16 @@ CONTAINS
     ENDIF
     Aer%WTCPI = 0.0_fp
 
+    ! Hydrophilic FSOAS: fire SOA (bin N=9) [kg_OM/m3]
+    ALLOCATE( Aer%FSOAS( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'FSOAS', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array FSOAS!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%FSOAS = 0.0_fp
+
     ! Mass of hydrophobic aerosol from Mian Chin (+1 for BRCPO)
     ALLOCATE( Aer%DAERSL( NX, NY, NZ, 3 ), STAT=RC )
     CALL GC_CheckVar( 'DAERSL', 0, RC )
@@ -778,6 +789,13 @@ CONTAINS
        CALL GC_CheckVar( 'Aer%WTCPI', 2, RC )
        IF ( RC /= GC_SUCCESS ) RETURN
        Aer%WTCPI => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%FSOAS ) ) THEN
+       DEALLOCATE( Aer%FSOAS, STAT=RC )
+       CALL GC_CheckVar( 'Aer%FSOAS', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%FSOAS => NULL()
     ENDIF
 
     IF ( ASSOCIATED( Aer%DAERSL ) ) THEN

@@ -1274,8 +1274,8 @@ CONTAINS
     DUST      => State_Chm%SoilDust     ! Dust aerosol Conc. [kg/m3]
 
     ! Index for dust in ODAER and LUT arrays
-    ! Dust is the last entry in SPECFIL (dust.dat); BrC bins at 6,7,8
-    ! shifted it from 8 to NSPAA=11 (see maxcharvey/geos-chem#5)
+    ! Dust is the last entry in SPECFIL (dust.dat); BrC bins at 6,7,8,9
+    ! shifted it from 8 to NSPAA (see maxcharvey/geos-chem#5)
     IDST      = State_Chm%Phot%NSPAA
 
     ! Get dust density from species database (assume dust bin ID is contiguous)

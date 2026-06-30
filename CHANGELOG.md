@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fixed GCHP transport tracers extdata.yaml to include valid_range for CEDS
 - Fixed OpenMP parallelization error in `GeosCore/tomas_mod.F90`
 - Fixed typos (extra `:` characters) in `run/shared/kpp_standalone_interface.yml`
+- Fixed bug where `KPP_AbsTol` and `KPP_RelTol` tags were not being read from `species_database.yml`
 
 ### Removed
 - Removed obsolete code in dust_mod.F90

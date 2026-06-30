@@ -5067,7 +5067,9 @@ FSOAS:
   Is_Aerosol: true
   Is_Advected: true
   Is_DryDep: true
+  Is_HygroGrowth: true
   Is_WetDep: true
+  Density: 1300.0
   MW_g: 150
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0

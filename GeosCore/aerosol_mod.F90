@@ -2920,8 +2920,8 @@ CONTAINS
     ! info but ref index is similar e.g. Scarchilli et al. (2005)
     !(DAR 05/2015)
     SPECFIL = (/ "so4.dat  ", "soot.dat ", "org.dat  ", "ssa.dat  ",  &
-                 "ssc.dat  ", "brc.dat  ", "brc.dat  ", "org.dat  ",  &
-                 "brc.dat  ", "h2so4.dat", "h2so4.dat", "dust.dat "  /)
+                 "ssc.dat  ", "org.dat  ", "org.dat  ", "org.dat  ",  &
+                 "org.dat  ", "h2so4.dat", "h2so4.dat", "dust.dat "  /)
 
     ! Loop over the array of filenames
     DO k = 1, State_Chm%Phot%NSPAA
@@ -2986,9 +2986,9 @@ CONTAINS
        READ(  NJ1, '(A)' ) TITLE0
 110    FORMAT( 3x, a20 )
 
-       IF (k == 1 .OR. k == 3) THEN
-       ! for SO4 and ORGANICS, dry aerosol size varies, therefore all
-       ! opt properties vary.
+       IF ( k == 1 .OR. k == 3 .OR. ( k >= 6 .AND. k <= 9 ) ) THEN
+       ! For SO4 and all bins backed by org.dat, dry aerosol size varies;
+       ! therefore read optical properties for every dry-radius bin.
        DO g = 1, State_Chm%Phot%NDRg
        DO i = 1, State_Chm%Phot%NRAA
        DO j = 1, State_Chm%Phot%NWVAA

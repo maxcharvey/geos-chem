@@ -5107,3 +5107,19 @@ NPBRCPOA:
   WD_RainoutEff: [1, 0.0, 1]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
   BackgroundVV: 1.0e-18
+PBRCPOA:
+  Formula: CO
+  FullName: Persistent brown carbon primary organic aerosol - based off OCPI
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [1, 0.0, 1]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  BackgroundVV: 1.0e-18

@@ -12,9 +12,11 @@
 !    BRCSOA ---(photobleaching)---> WTC
 !
 !  In parallel, non-persistent BrC-POA (directly emitted from fires)
-!  also photo-bleaches to WTC via the same viscosity-dependent scheme:
+!  also photo-bleaches to WTC via the same viscosity-dependent scheme,
+!  while persistent primary BrC-POA is carried as a non-bleaching tracer:
 !
 !    NPBRCPOA ---(photobleaching)---> WTC
+!    PBRCPOA  ---(persistent tracer)---> PBRCPOA
 !
 !  The photobleaching rate (BRCSOA -> WTC) is parameterised as a function
 !  of local temperature and relative humidity following the viscosity-
@@ -76,6 +78,9 @@ MODULE BRC_MOD
 !                             BRCSOA and NPBRCPOA bleaching
 !  19 Mar 2026 - M. Harvey - Added BLEACH_SCHEME runtime switch (0-4)
 !                             for selecting bleaching parameterisation
+!  30 Jun 2026 - M. Harvey - Removed timestep stop-loss; persistent
+!                             primary BrC is now represented by PBRCPOA
+!                             at emission time
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -238,23 +243,13 @@ MODULE BRC_MOD
   !Conversion parameters 
   !=======================================================================
 
-  ! OM:OC ratio for biomass burning organic aerosol
+  ! OM:OC ratio for fresh fire SOA represented by FSOAS [kg_OM kgC-1].
+  ! FSOAS is carried as OM mass like SOAS; conversion to BRCSOA divides
+  ! by this value to store BRCSOA as carbon mass.
   !   Typical range 1.6-2.1 for fresh BBOA
   !   (Aiken et al. 2008, Environ. Sci. Technol. 42, 4478;
   !    Turpin & Lim 2001, Aerosol Sci. Technol. 35, 602)
   REAL(fp), PARAMETER :: OMOC_BBOA = 1.8_fp
-
-  !=========================================================================
-  ! Stop-loss parameter for BrC photobleaching
-  !=========================================================================
-
-  ! FRAC_PERM: fraction of BRCSOA/NPBRCPOA mass shielded from bleaching
-  !   Schnitzler et al. (2022) Fig. 1A shows relative absorption never
-  !   falls below ~50% of initial value.  A 25% mass stop-loss is a
-  !   conservative representation: only 75% of the mass at each timestep
-  !   is exposed to bleaching; 25% is treated as a residual that
-  !   bleaches increasingly slowly.
-  REAL(fp), PARAMETER :: FRAC_PERM = 0.25_fp
 
   !=========================================================================
   ! Bleaching scheme selector
@@ -557,6 +552,7 @@ CONTAINS
 !    Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 1 day)
 !    Step 2: BRCSOA -> WTC    (viscosity-dependent photobleaching)
 !    Step 2b: NPBRCPOA -> WTC (viscosity-dependent photobleaching)
+!    Step 2c: PBRCPOA persists as emitted primary BrC-POA
 !    Step 3: WTC receives bleached mass from BRCSOA and NPBRCPOA
 !
 !  FSOAP and NPBRCPOA are optional: if not defined in the simulation,
@@ -721,6 +717,10 @@ CONTAINS
       ENDIF
 
    ENDIF
+
+   ! PBRCPOA is a persistent primary BrC-POA tracer.  It receives the
+   ! Forrister-style persistent emission fraction in HEMCO and is not
+   ! bleached here.
 
    !-----------------------------------------------------------------
    ! Step 3: Receive bleached mass into WTC
@@ -1357,7 +1357,10 @@ CONTAINS
       !==============================================================
       ! 1) Add newly formed BRCSOA from FSOAS (darkening step)
       !==============================================================
-      CCV = FSOAS_CONV(I,J,L) / OMOC_BBOA  ! Convert from FSOAS mass to BRCSOA mass using OMOC_BBOA
+      ! Convert FSOAS from OM mass to carbon mass.  BRCSOA aerosol mass
+      ! later uses the model's oxidized OC OM:OC, representing additional
+      ! oxygenated mass gained during darkening/aging.
+      CCV = FSOAS_CONV(I,J,L) / OMOC_BBOA
 
       ! BRCSOA mass available to bleach this timestep [kg]
       TC0 = TC(I,J,L) + CCV
@@ -1369,12 +1372,10 @@ CONTAINS
       ! Zero drydep freq (drydep handled in mixing_mod.F90)
       FREQ = 0e+0_fp
 
-      ! Remaining BRCSOA after bleaching [kg]
-      ! Apply stop-loss: only (1 - FRAC_PERM) of mass is exposed to
-      ! bleaching; FRAC_PERM is shielded (Schnitzler et al. 2022 Fig 1A)
+      ! Remaining BRCSOA after bleaching [kgC].  No timestep floor is
+      ! applied; persistent primary BrC is represented by PBRCPOA.
       RKT  = ( KBRCSOA_LOCAL + FREQ ) * DTCHEM
-      CNEW = FRAC_PERM * TC0                                          &
-           + ( 1.0_fp - FRAC_PERM ) * TC0 * EXP( -RKT )
+      CNEW = TC0 * EXP( -RKT )
 
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
@@ -1592,12 +1593,10 @@ CONTAINS
       ! Zero drydep freq (drydep handled in mixing_mod.F90)
       FREQ = 0e+0_fp
 
-      ! Remaining NPBRCPOA after bleaching [kg]
-      ! Apply stop-loss: only (1 - FRAC_PERM) of mass is exposed to
-      ! bleaching; FRAC_PERM is shielded (Schnitzler et al. 2022 Fig 1A)
+      ! Remaining NPBRCPOA after bleaching [kgC].  The persistent share
+      ! of primary BrC emissions is emitted separately as PBRCPOA.
       RKT  = ( KNPBRC_LOCAL + FREQ ) * DTCHEM
-      CNEW = FRAC_PERM * TC0                                          &
-           + ( 1.0_fp - FRAC_PERM ) * TC0 * EXP( -RKT )
+      CNEW = TC0 * EXP( -RKT )
 
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp

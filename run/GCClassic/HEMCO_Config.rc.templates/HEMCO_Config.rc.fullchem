@@ -198,7 +198,7 @@ VerboseOnCores:              root       # Accepted values: root all
     --> Monoterp to SOAS       :       0.050
     --> Othrterp to SOAP       :       0.050
     --> Othrterp to SOAS       :       0.050
-111     GFED                   : ${RUNDIR_GFED_EXT}   NO/CO/ALK4/ACET/MEK/ALD2/PRPE/C2H2/C2H4/C3H8/CH2O/C2H6/SO2/NH3/BCPO/BCPI/OCPO/OCPI/POG1/POG2/MTPA/BENZ/TOLU/XYLE/NAP/EOH/MOH/SOAP/FURA/PHEN/MVK/ISOP/ACTA/MGLY/GLYX/RCHO/HCOOH/ACR/STYR/C4H6/FSOAP/DBRCPOA/NPBRCPOA
+111     GFED                   : ${RUNDIR_GFED_EXT}   NO/CO/ALK4/ACET/MEK/ALD2/PRPE/C2H2/C2H4/C3H8/CH2O/C2H6/SO2/NH3/BCPO/BCPI/OCPO/OCPI/POG1/POG2/MTPA/BENZ/TOLU/XYLE/NAP/EOH/MOH/SOAP/FURA/PHEN/MVK/ISOP/ACTA/MGLY/GLYX/RCHO/HCOOH/ACR/STYR/C4H6/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA
     --> GFED4                  :       true
     --> GFED_daily             :       false
     --> GFED_3hourly           :       false
@@ -211,6 +211,7 @@ VerboseOnCores:              root       # Accepted values: root all
     --> CO to FSOAP            :       0.013
     --> BC to DBRCPOA          :       4.0
     --> OC to NPBRCPOA         :       0.5
+    --> NPBRCPOA persistent fraction :       0.25
     --> GFED_subgrid_coag      :       false
 117     Volcano                : on    SO2
     --> Volcano_Source         :       AeroCom

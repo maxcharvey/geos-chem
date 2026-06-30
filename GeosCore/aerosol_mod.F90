@@ -94,7 +94,7 @@ MODULE AEROSOL_MOD
   INTEGER :: id_SOAIE,   id_INDIOL,  id_LVOCOA
 
   ! BrC species IDs (M. Harvey, 19 Mar 2026)
-  INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC, id_BRC_PBRC
 
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
@@ -547,16 +547,24 @@ CONTAINS
           ! (optical depth) through the standard WAERSL/DAERSL
           ! pipeline in RDAER, with no changes needed downstream.
           !
-          ! All BrC species are transported in kgC (MW = 12.01).
-          ! We apply the same OM:OC ratios as the standard OC
-          ! species to convert to kg_OM/m3:
+          ! BrC chemistry is carbon-conserving.  FSOAS is carried as OM
+          ! mass, then converted to BRCSOA carbon using OMOC_BBOA=1.8.
+          ! The hydrophilic BrC aerosol mass below uses OCFOPOA (~2.1),
+          ! representing additional oxygenated mass gained during
+          ! darkening/bleaching, consistent with oxidized OC handling.
+          !
+          ! BrC species here are transported in kgC (MW = 12.01).
+          ! We apply the same OM:OC ratios as the standard OC species to
+          ! convert to kg_OM/m3:
           !   OCFPOA  (~1.4) for hydrophobic (DBRCPOA)
-          !   OCFOPOA (~2.1) for hydrophilic (BRCSOA, WTC, NPBRCPOA)
+          !   OCFOPOA (~2.1) for hydrophilic (BRCSOA, WTC, NPBRCPOA,
+          !                    PBRCPOA)
           !
           ! Hydrophilic (-> OCPI -> WAERSL(3) -> wet surface area):
           !   BRCSOA   - secondary BrC from darkened fire SOA
           !   WTC      - whitened carbon, bleached and aged
           !   NPBRCPOA - non-persistent BrC POA (replaces BB OC)
+          !   PBRCPOA  - persistent fraction of emitted BrC POA
           !
           ! Hydrophobic (-> OCPO -> DAERSL(2) -> dry surface area):
           !   DBRCPOA  - persistent dark BrC, freshly emitted
@@ -589,6 +597,15 @@ CONTAINS
              State_Chm%AerMass%OCPI(I,J,L) =                       &
                 State_Chm%AerMass%OCPI(I,J,L)                      &
                 + Spc(id_BRC_NPBRC)%Conc(I,J,L)                    &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! PBRCPOA: persistent primary BrC POA emitted with NPBRCPOA
+          IF ( id_BRC_PBRC > 0 ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_BRC_PBRC)%Conc(I,J,L)                     &
                 * State_Chm%AerMass%OCFOPOA(I,J)                   &
                 / AIRVOL(I,J,L)
           ENDIF
@@ -2573,6 +2590,7 @@ CONTAINS
        id_BRC_SOA    = Ind_( 'BRCSOA'  )
        id_BRC_DBRC   = Ind_( 'DBRCPOA' )
        id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
+       id_BRC_PBRC   = Ind_( 'PBRCPOA' )
        
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )

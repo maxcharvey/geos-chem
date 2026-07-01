@@ -838,7 +838,10 @@ CONTAINS
     MIEDX => State_Chm%Phot%MIEDX
 
     ! Taken from aerosol_mod.F
-    IND = (/22,29,36,43,50/)
+    ! N=6 BRCSOA, N=7 NPBRCPOA, N=9 FSOAS, N=10 PBRCPOA, and
+    ! N=11 DBRCPOA temporarily reuse the BrC FJX Mie entry.
+    ! N=8 WTC reuses the OC entry.
+    IND = (/22,29,36,43,50,57,57,36,57,57,57/)
 
     DO I=1,AN_
        MIEDX(I) = 0

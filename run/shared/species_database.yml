@@ -5028,6 +5028,8 @@ FSOAS:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  Is_HygroGrowth: true
+  Density: 1300.0
   MW_g: 150
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0
@@ -5044,6 +5046,8 @@ BRCSOA:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  Is_HygroGrowth: true
+  Density: 1300.0
   MW_g: 12.01
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0
@@ -5060,6 +5064,8 @@ WTC:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  Is_HygroGrowth: true
+  Density: 1300.0
   MW_g: 12.01
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0
@@ -5076,6 +5082,8 @@ DBRCPOA:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  Is_HygroGrowth: true
+  Density: 1300.0
   MW_g: 12.01
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0
@@ -5098,6 +5106,8 @@ NPBRCPOA:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  Is_HygroGrowth: true
+  Density: 1300.0
   MW_g: 12.01
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0
@@ -5114,6 +5124,8 @@ PBRCPOA:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  Is_HygroGrowth: true
+  Density: 1300.0
   MW_g: 12.01
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0
@@ -5123,3 +5135,34 @@ PBRCPOA:
   WD_RainoutEff: [1, 0.0, 1]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
   BackgroundVV: 1.0e-18
+FFOCPI:
+  FullName: Hydrophilic fossil-fuel organic carbon aerosol
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 1.0
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_KcScaleFac_Luo: [0.5, 0.25, 0.5]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.5]
+FFOCPO:
+  FullName: Hydrophobic fossil-fuel organic carbon aerosol
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 1.0
+  WD_KcScaleFac: [0.5, 0.5, 0.5]
+  WD_KcScaleFac_Luo: [0.0, 0.0, 0.0]
+  WD_RainoutEff: [0.0, 0.0, 0.0]

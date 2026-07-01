@@ -202,7 +202,7 @@ CONTAINS
     CHARACTER(LEN=255)           :: metadataID, registryID, registryIDprefix
     CHARACTER(LEN=255)           :: collname, AttName, AttValue
     CHARACTER(LEN=255)           :: AttComp,  FieldName
-    CHARACTER(LEN=2)             :: rrtmgOutputs(10)
+    CHARACTER(LEN=3)             :: rrtmgOutputs(11)
     CHARACTER(LEN=3)             :: topLev, botLev
     CHARACTER(LEN=255)           :: names(100)
     CHARACTER(LEN=QFYAML_NamLen) :: key
@@ -814,7 +814,8 @@ CONTAINS
                 ! RRTMG wildcard since it may not be relevant to the simulation.
                 ! CO2, CFCs, H2O, and N2O also excluded since they are somewhat
                 ! niche (same for trop-only O3).
-                RRTMGOutputs = (/'O3','ME','SU','NI','AM','BC','OA','SS','DU','PM'/)
+                RRTMGOutputs = (/'O3 ','ME ','SU ','NI ','AM ','BC ',       &
+                                  'OA ','SS ','DU ','PM ','BRC'/)
                 DO N = 1, SIZE(rrtmgOutputs,1)
                    IF ( .not. ANY( RadOut == TRIM(rrtmgOutputs(N)) ) ) THEN
                       nRadOut          = nRadOut + 1

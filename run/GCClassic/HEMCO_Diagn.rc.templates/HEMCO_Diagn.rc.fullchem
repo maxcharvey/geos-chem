@@ -396,10 +396,16 @@ EmisNAP_BioBurn    NAP    111    -1  -1   2   kg/m2/s  NAP_emission_flux_from_bi
 EmisNAP_BioBurn3D    NAP    111    -1  -1   3   kg/m2/s  NAP_emission_flux_from_biomass_burning_3D_profile
 
 ###############################################################################
-#####  NPBRCPOA emissions (non-photobleachable BrC POA)                   #####
+#####  NPBRCPOA emissions (photobleachable BrC POA)                       #####
 ###############################################################################
 EmisNPBRCPOA_BioBurn   NPBRCPOA  111   -1  -1   2   kg/m2/s  NPBRCPOA_emission_flux_from_biomass_burning
 EmisNPBRCPOA_BioBurn3D NPBRCPOA  111   -1  -1   3   kg/m2/s  NPBRCPOA_emission_flux_from_biomass_burning_3D_profile
+
+###############################################################################
+#####  PBRCPOA emissions (persistent BrC POA)                              #####
+###############################################################################
+EmisPBRCPOA_BioBurn    PBRCPOA   111   -1  -1   2   kg/m2/s  PBRCPOA_emission_flux_from_biomass_burning
+EmisPBRCPOA_BioBurn3D  PBRCPOA   111   -1  -1   3   kg/m2/s  PBRCPOA_emission_flux_from_biomass_burning_3D_profile
 
 ###############################################################################
 #####  NH3 emissions                                                      #####
@@ -454,6 +460,14 @@ EmisOCPO_Anthro    OCPO   0      1   -1   3   kg/m2/s  OCPO_emission_flux_from_a
 EmisOCPO_BioBurn   OCPO   111    -1  -1   2   kg/m2/s  OCPO_emission_flux_from_biomass_burning
 EmisOCPO_BioBurn3D   OCPO   111    -1  -1   3   kg/m2/s  OCPO_emission_flux_from_biomass_burning_3D_profile
 EmisOCPO_Ship      OCPO   0      10  -1   2   kg/m2/s  OCPO_emission_flux_from_ships
+
+###############################################################################
+#####  FFOCPI and FFOCPO emissions                                        #####
+###############################################################################
+EmisFFOCPI_Anthro  FFOCPI 0      1   -1   3   kg/m2/s  FFOCPI_emission_flux_from_anthropogenic
+EmisFFOCPI_Ship    FFOCPI 0      10  -1   2   kg/m2/s  FFOCPI_emission_flux_from_ships
+EmisFFOCPO_Anthro  FFOCPO 0      1   -1   3   kg/m2/s  FFOCPO_emission_flux_from_anthropogenic
+EmisFFOCPO_Ship    FFOCPO 0      10  -1   2   kg/m2/s  FFOCPO_emission_flux_from_ships
 
 ###############################################################################
 #####  pFe emissions                                                      #####

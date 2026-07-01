@@ -1650,7 +1650,7 @@ CONTAINS
     !------------------------------------------------------------------------
     ! Use brown carbon aerosols?
     !------------------------------------------------------------------------
-    key    = "aerosols%carbon%use_brown_carbon"
+    key    = "aerosols%carbon%brown_carbon"
     v_bool = MISSING_BOOL
     CALL QFYAML_Add_Get( Config, TRIM( key ), v_bool, "", RC )
     IF ( RC /= GC_SUCCESS ) THEN
@@ -1659,6 +1659,24 @@ CONTAINS
        RETURN
     ENDIF
     Input_Opt%LBRC = v_bool
+
+    !------------------------------------------------------------------------
+    ! Brown carbon bleaching scheme?
+    !------------------------------------------------------------------------
+    key   = "aerosols%carbon%bleach_scheme"
+    v_int = 4
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_int, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    IF ( v_int < 0 .OR. v_int > 4 ) THEN
+       errMsg = 'aerosols%carbon%bleach_scheme must be 0, 1, 2, 3, or 4!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Input_Opt%BrC_Bleach_Scheme = v_int
 
     !------------------------------------------------------------------------
     ! Include BC absorption enhancement due to coating?
@@ -1963,6 +1981,7 @@ CONTAINS
        WRITE( 6, 100 ) 'Metal catalyzed SO2 ox.?    : ', Input_Opt%LMETALCATSO2
        WRITE( 6, 100 ) 'Online CARBON AEROSOLS?     : ', Input_Opt%LCARB
        WRITE( 6, 100 ) 'Brown Carbon Aerosol?       : ', Input_Opt%LBRC
+       WRITE( 6, 115 ) 'BrC bleaching scheme        : ', Input_Opt%BrC_Bleach_Scheme
        WRITE( 6, 100 ) 'BC Absorption Enhancement?  : ', Input_Opt%LBCAE
        WRITE( 6, 105 ) 'Hydrophilic BC AE factor    : ', Input_Opt%BCAE_1
        WRITE( 6, 105 ) 'Hydrophobic BC AE factor    : ', Input_Opt%BCAE_2
@@ -1994,6 +2013,7 @@ CONTAINS
 100 FORMAT( A, L5                )
 105 FORMAT( A, f8.2              )
 110 FORMAT( A, f8.2, ' - ', f8.2 )
+115 FORMAT( A, I5                )
 120 FORMAT( A, f8.2, 'K'         )
 125 FORMAT( A, A    )
 

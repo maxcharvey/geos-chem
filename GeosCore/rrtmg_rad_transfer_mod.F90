@@ -2288,7 +2288,7 @@ CONTAINS
        ! DU = Mineral dust
        CASE( 14 )
           ! 7 dust bins for RT
-          Do II=10,16
+          Do II=16,22
              SPECMASK(II)=14
           End Do
 
@@ -2303,10 +2303,16 @@ CONTAINS
        CASE( 16 )
 
           !LSA
-          SPECMASK(8) = 16
+          SPECMASK(14) = 16
 
           !NAT
-          SPECMASK(9) = 16
+          SPECMASK(15) = 16
+
+       ! BRC = Brown carbon family
+       CASE( 17 )
+          DO II = 8, 13
+             SPECMASK(II)=17
+          ENDDO
 
        END SELECT
     ENDIF

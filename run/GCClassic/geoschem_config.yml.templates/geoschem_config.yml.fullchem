@@ -398,6 +398,8 @@ operations:
       - TMB
       - TOLU
       - XYLE
+      - FFOCPI
+      - FFOCPO
       - FSOAS
       - BRCSOA
       - WTC
@@ -415,11 +417,12 @@ operations:
 aerosols:
 
   optics:
-    input_dir: ${RUNDIR_DATA_ROOT}/CHEM_INPUTS/Aerosol_Optics/v2025-03/
+    input_dir: /cluster/work/climate/mharvey/ModelDevlopment/BrC/Aerosol_Optics/full_test_v2025-03/
 
   carbon:
     activate: true
     brown_carbon: false
+    bleach_scheme: 4
     enhance_black_carbon_absorption:
       activate: true
       hydrophilic: 1.5

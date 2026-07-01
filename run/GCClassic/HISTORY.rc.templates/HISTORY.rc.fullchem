@@ -33,6 +33,7 @@ COLLECTIONS: 'Restart',
              #'AdvFluxVert',
              #'AerosolMass',
              #'Aerosols',
+             #'BrCDiagnostics',
              ##'Budget',
              ##'CloudConvFlux',
              ##'ConcAboveSfc',
@@ -267,6 +268,24 @@ COLLECTIONS: 'Restart',
                               #'Chem_KhetiSLAHOBrHBr          ',
 ::
 #==============================================================================
+# %%%%% THE BrCDiagnostics COLLECTION %%%%%
+#
+# BrC species production rates, photobleaching parameters, and dry DBRCPOA AOD
+#==============================================================================
+  BrCDiagnostics.template:   '%y4%m2%d2_%h2%n2z.nc4',
+  BrCDiagnostics.frequency:  ${RUNDIR_HIST_TIME_AVG_FREQ}
+  BrCDiagnostics.duration:   ${RUNDIR_HIST_TIME_AVG_DUR}
+  BrCDiagnostics.mode:       'time-averaged'
+  BrCDiagnostics.fields:     'BrCTauBleach              ',
+                             'BrCKBleach                ',
+                             'BrCEtaBBOA                ',
+                             'BrCFluxFSOAP2FSOAS        ',
+                             'BrCFluxFSOAS2BRC          ',
+                             'BrCFluxBRC2WTC            ',
+                             'BrCFluxNPBRC2WTC          ',
+                             'BrCDryAODWL1              ',
+::
+#==============================================================================
 # %%%%% THE Budget COLLECTION %%%%%
 #
 # GEOS-Chem budget diagnostics defined as species kg/s in the column
@@ -454,6 +473,7 @@ COLLECTIONS: 'Restart',
   ProdLoss.fields:            'Prod_?PRD?                    ',
                               'ProdBCPIfromBCPO              ',
                               'ProdOCPIfromOCPO              ',
+                              'ProdFFOCPIfromFFOCPO          ',
                               'ProdHMSfromSO2andHCHOinCloud  ',
                               'ProdSO2andHCHOfromHMSinCloud  ',
                               'ProdSO4fromHMSinCloud         ',
@@ -504,6 +524,7 @@ COLLECTIONS: 'Restart',
                               'RadClrSkyLWSurf_SS     ',
                               'RadClrSkyLWSurf_DU     ',
                               'RadClrSkyLWSurf_PM     ',
+                              'RadClrSkyLWSurf_BRC    ',
                               #'RadClrSkyLWSurf_ST     ',
                               'RadAllSkyLWSurf_?RRTMG?',
                               'RadClrSkySWSurf_?RRTMG?',
@@ -520,6 +541,7 @@ COLLECTIONS: 'Restart',
                               'RadAODWL1_SS          ',
                               'RadAODWL1_DU          ',
                               'RadAODWL1_PM          ',
+                              'RadAODWL1_BRC         ',
                               #'RadAODWL1_ST          ',
                               'RadSSAWL1_SU          ',
                               'RadSSAWL1_NI          ',
@@ -529,6 +551,7 @@ COLLECTIONS: 'Restart',
                               'RadSSAWL1_SS          ',
                               'RadSSAWL1_DU          ',
                               'RadSSAWL1_PM          ',
+                              'RadSSAWL1_BRC         ',
                               #'RadSSAWL1_ST          ',
                               'RadAsymWL1_SU         ',
                               'RadAsymWL1_NI         ',
@@ -538,6 +561,7 @@ COLLECTIONS: 'Restart',
                               'RadAsymWL1_SS         ',
                               'RadAsymWL1_DU         ',
                               'RadAsymWL1_PM         ',
+                              'RadAsymWL1_BRC        ',
                               #'RadAsymWL1_ST         ',
 ::
 #==============================================================================

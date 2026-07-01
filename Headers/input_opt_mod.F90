@@ -99,6 +99,7 @@ MODULE Input_Opt_Mod
      LOGICAL                     :: LMETALCATSO2
      LOGICAL                     :: LCARB
      LOGICAL                     :: LBRC
+     INTEGER                     :: BrC_Bleach_Scheme
      LOGICAL                     :: LSOA
      LOGICAL                     :: LMPOA
      LOGICAL                     :: LSVPOA
@@ -605,6 +606,7 @@ CONTAINS
     Input_Opt%LMETALCATSO2           = .FALSE.
     Input_Opt%LCARB                  = .FALSE.
     Input_Opt%LBRC                   = .FALSE.
+    Input_Opt%BrC_Bleach_Scheme      = 4
     Input_Opt%LSOA                   = .FALSE.
     Input_Opt%LMPOA                  = .FALSE.
     Input_Opt%LSVPOA                 = .FALSE.

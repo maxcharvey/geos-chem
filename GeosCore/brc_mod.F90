@@ -255,13 +255,12 @@ MODULE BRC_MOD
   ! Bleaching scheme selector
   !=========================================================================
 
-  ! BLEACH_SCHEME: selects the photobleaching parameterisation
+  ! BrC_Bleach_Scheme in geoschem_config.yml selects photobleaching:
   !   0 = No bleaching (BRCSOA/NPBRCPOA persist indefinitely)
   !   1 = Fixed 1-day lifetime everywhere
   !   2 = Fixed 1-day lifetime below 1 km AGL only
   !   3 = Viscosity-dependent (Schnitzler et al. 2022), fixed 35 ppb O3
   !   4 = Viscosity-dependent (Schnitzler et al. 2022), local O3 (default)
-  INTEGER, PARAMETER :: BLEACH_SCHEME = 4
 
   ! Fixed bleaching lifetime [s] for schemes 1 and 2
   REAL(fp), PARAMETER :: TAU_1DAY = 86400.0_fp
@@ -1280,7 +1279,7 @@ CONTAINS
 
       !==============================================================
       ! Compute local bleaching rate
-      ! Scheme is selected by BLEACH_SCHEME module parameter
+      ! Scheme is selected by runtime BrC_Bleach_Scheme
       !==============================================================
 
       ! Local temperature [K] -- always needed for diagnostics
@@ -1292,7 +1291,7 @@ CONTAINS
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
       ! Determine bleaching lifetime based on selected scheme
-      SELECT CASE ( BLEACH_SCHEME )
+      SELECT CASE ( Input_Opt%BrC_Bleach_Scheme )
 
       CASE ( 0 )
          !--- No bleaching ---
@@ -1526,7 +1525,7 @@ CONTAINS
 
       !==============================================================
       ! Compute local bleaching rate
-      ! Scheme is selected by BLEACH_SCHEME module parameter
+      ! Scheme is selected by runtime BrC_Bleach_Scheme
       ! (identical scheme selection to CHEM_BRCSOA)
       !==============================================================
 
@@ -1539,7 +1538,7 @@ CONTAINS
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
       ! Determine bleaching lifetime based on selected scheme
-      SELECT CASE ( BLEACH_SCHEME )
+      SELECT CASE ( Input_Opt%BrC_Bleach_Scheme )
 
       CASE ( 0 )
          !--- No bleaching ---

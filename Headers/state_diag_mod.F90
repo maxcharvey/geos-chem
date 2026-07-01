@@ -734,7 +734,10 @@ MODULE State_Diag_Mod
 
      REAL(f4),           POINTER :: ProdOCPIfromOCPO(:,:,:)
      LOGICAL                     :: Archive_ProdOCPIfromOCPO
-     
+
+     REAL(f4),           POINTER :: ProdFFOCPIfromFFOCPO(:,:,:)
+     LOGICAL                     :: Archive_ProdFFOCPIfromFFOCPO
+
      !%%%%% Brown carbon aerosol diagnostics %%%%%
 
      REAL(f4),           POINTER :: BrCTauBleach(:,:,:)
@@ -757,6 +760,15 @@ MODULE State_Diag_Mod
 
      REAL(f4),           POINTER :: BrCFluxNPBRC2WTC(:,:,:)
      LOGICAL                     :: Archive_BrCFluxNPBRC2WTC
+
+     REAL(f4),           POINTER :: BrCDryAODWL1(:,:,:)
+     LOGICAL                     :: Archive_BrCDryAODWL1
+
+     REAL(f4),           POINTER :: BrCDryAODWL2(:,:,:)
+     LOGICAL                     :: Archive_BrCDryAODWL2
+
+     REAL(f4),           POINTER :: BrCDryAODWL3(:,:,:)
+     LOGICAL                     :: Archive_BrCDryAODWL3
 
      !%%%%%  Sulfur aerosols prod & loss %%%%%
      REAL(f4),           POINTER :: ProdSO2fromDMSandOH(:,:,:)
@@ -2203,6 +2215,9 @@ CONTAINS
     State_Diag%ProdOCPIfromOCPO                    => NULL()
     State_Diag%Archive_ProdOCPIfromOCPO            = .FALSE.
 
+    State_Diag%ProdFFOCPIfromFFOCPO                => NULL()
+    State_Diag%Archive_ProdFFOCPIfromFFOCPO        = .FALSE.
+
     !%%%%% Brown carbon aerosol diagnostics %%%%%
 
     State_Diag%BrCTauBleach                       => NULL()
@@ -2225,6 +2240,15 @@ CONTAINS
 
     State_Diag%BrCFluxNPBRC2WTC                   => NULL()
     State_Diag%Archive_BrCFluxNPBRC2WTC           = .FALSE.
+
+    State_Diag%BrCDryAODWL1                       => NULL()
+    State_Diag%Archive_BrCDryAODWL1               = .FALSE.
+
+    State_Diag%BrCDryAODWL2                       => NULL()
+    State_Diag%Archive_BrCDryAODWL2               = .FALSE.
+
+    State_Diag%BrCDryAODWL3                       => NULL()
+    State_Diag%Archive_BrCDryAODWL3               = .FALSE.
 
     !%%%%% Aerosol prod and loss diagnostics %%%%%
 
@@ -9133,7 +9157,30 @@ CONTAINS
           CALL GC_Error( errMsg, RC, thisLoc )
           RETURN
        ENDIF
-        
+
+       !--------------------------------------------------------------------
+       ! Production of Hydrophilic FF-OC (FFOCPI) from Hydrophobic FF-OC
+       ! (FFOCPO)
+       !--------------------------------------------------------------------
+       diagID = 'ProdFFOCPIfromFFOCPO'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%ProdFFOCPIfromFFOCPO,                &
+            archiveData    = State_Diag%Archive_ProdFFOCPIfromFFOCPO,        &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
        !--------------------------------------------------------------------
        ! BrC bleaching rate constant [s^-1]
        !--------------------------------------------------------------------
@@ -9286,7 +9333,70 @@ CONTAINS
             errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
             CALL GC_Error( errMsg, RC, thisLoc )
             RETURN
-       ENDIF 
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! DBRCPOA dry AOD (hydrophobic, dry carrier bin N=11)
+       !--------------------------------------------------------------------
+       TmpWL  = RadWL(1)
+       diagID = 'BrCDryAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCDryAODWL1,                        &
+            archiveData    = State_Diag%Archive_BrCDryAODWL1,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       TmpWL  = RadWL(2)
+       diagID = 'BrCDryAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCDryAODWL2,                        &
+            archiveData    = State_Diag%Archive_BrCDryAODWL2,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       TmpWL  = RadWL(3)
+       diagID = 'BrCDryAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCDryAODWL3,                        &
+            archiveData    = State_Diag%Archive_BrCDryAODWL3,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
 
        !--------------------------------------------------------------------
        ! Production of SO4 from aqueous oxidation of H2O2 in cloud
@@ -10070,7 +10180,7 @@ CONTAINS
        ! being requested as diagnostic output when the corresponding
        ! array has not been allocated.
        !-------------------------------------------------------------------
-       DO N = 1, 25
+       DO N = 1, 26
 
           ! Select the diagnostic ID
           SELECT CASE( N )
@@ -10079,53 +10189,55 @@ CONTAINS
              CASE( 2  )
                 diagID = 'ProdOCPIfromOCPO'
              CASE( 3  )
-                diagID = 'AODDust'
+                diagID = 'ProdFFOCPIfromFFOCPO'
              CASE( 4  )
+                diagID = 'AODDust'
+             CASE( 5  )
                 TmpWL  = RadWL(1)
                 diagID = 'AODDust' // TRIM( TmpWL ) // 'nm'
-             CASE( 5  )
+             CASE( 6  )
                 TmpWL  = RadWL(2)
                 diagID = 'AODDust' // TRIM( TmpWL ) // 'nm'
-             CASE( 6  )
+             CASE( 7  )
                 TmpWL  = RadWL(3)
                 diagID = 'AODDust' // TRIM( TmpWL ) // 'nm'
-             CASE( 7  )
-                diagID = 'ProdSO4fromH2O2inCloud'
              CASE( 8  )
-                diagID = 'ProdSO4fromO3inCloud'
+                diagID = 'ProdSO4fromH2O2inCloud'
              CASE( 9  )
-                diagID = 'ProdSO4fromO2inCloudMetal'
+                diagID = 'ProdSO4fromO3inCloud'
              CASE( 10 )
-                diagID = 'ProdSO4fromO3inSeaSalt'
+                diagID = 'ProdSO4fromO2inCloudMetal'
              CASE( 11 )
-                diagID = 'ProdSO4fromSRO3'
+                diagID = 'ProdSO4fromO3inSeaSalt'
              CASE( 12 )
-                diagID = 'ProdSO4fromO3s'
+                diagID = 'ProdSO4fromSRO3'
              CASE( 13 )
-                diagID = 'LossHNO3onSeaSalt'
+                diagID = 'ProdSO4fromO3s'
              CASE( 14 )
-                diagID = 'PM25'
+                diagID = 'LossHNO3onSeaSalt'
              CASE( 15 )
-                diagID = 'AerMassBC'
+                diagID = 'PM25'
              CASE( 16 )
-                diagID = 'AerMassNH4'
+                diagID = 'AerMassBC'
              CASE( 17 )
-                diagID = 'AerMassNIT'
+                diagID = 'AerMassNH4'
              CASE( 18 )
-                diagID = 'AerMassSAL'
+                diagID = 'AerMassNIT'
              CASE( 19 )
-                diagID = 'AerMassSO4'
+                diagID = 'AerMassSAL'
              CASE( 20 )
-                diagID = 'TotalOA'
+                diagID = 'AerMassSO4'
              CASE( 21 )
+                diagID = 'TotalOA'
+             CASE( 22 )
                 diagID = 'TotalOC'
-             CASE( 22 ) ! (jmm, 06/29/18)
-                diagID = 'ProdSO4fromHMSinCloud'
              CASE( 23 ) ! (jmm, 06/29/18)
-                diagID = 'ProdHMSfromSO2andHCHOinCloud'
+                diagID = 'ProdSO4fromHMSinCloud'
              CASE( 24 ) ! (jmm, 06/29/18)
-                diagID = 'AerMassHMS'
+                diagID = 'ProdHMSfromSO2andHCHOinCloud'
              CASE( 25 ) ! (jmm, 06/29/18)
+                diagID = 'AerMassHMS'
+             CASE( 26 ) ! (jmm, 06/29/18)
                 diagID = 'ProdSO2andHCHOfromHMSinCloud'
           END SELECT
 
@@ -13393,6 +13505,11 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'ProdFFOCPIfromFFOCPO',                        &
+                   Ptr2Data = State_Diag%ProdFFOCPIfromFFOCPO,               &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
     CALL Finalize( diagId   = 'OHconcAfterChem',                             &
                    Ptr2Data = State_Diag%OHconcAfterChem,                    &
                    RC       = RC                                            )
@@ -14417,6 +14534,21 @@ CONTAINS
 
     CALL Finalize( diagId   = 'BrCFluxNPBRC2WTC',                            &
                    Ptr2Data = State_Diag%BrCFluxNPBRC2WTC,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCDryAOD' // TRIM(RadWL(1)) // 'nm',         &
+                   Ptr2Data = State_Diag%BrCDryAODWL1,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCDryAOD' // TRIM(RadWL(2)) // 'nm',         &
+                   Ptr2Data = State_Diag%BrCDryAODWL2,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCDryAOD' // TRIM(RadWL(3)) // 'nm',         &
+                   Ptr2Data = State_Diag%BrCDryAODWL3,                      &
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
@@ -15585,6 +15717,12 @@ CONTAINS
     ELSE IF ( TRIM( Name_AllCaps ) == 'PRODOCPIFROMOCPO' ) THEN
        IF ( isDesc    ) Desc  = 'Production of hydrophilic organic ' // &
                                 'carbon from hydrophobic organic carbon'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  = 3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'PRODFFOCPIFROMFFOCPO' ) THEN
+       IF ( isDesc    ) Desc  = 'Production of hydrophilic fossil-fuel ' // &
+                                'organic carbon from hydrophobic fossil-fuel organic carbon'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  = 3
 
@@ -16981,6 +17119,28 @@ CONTAINS
        IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to WTC'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCDRYAOD' // &
+                                    TRIM(RadWL(1)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'DBRCPOA dry aerosol optical depth at ' // &
+                                TRIM(RadWL(1)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCDRYAOD' // &
+                                    TRIM(RadWL(2)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'DBRCPOA dry aerosol optical depth at ' // &
+                                TRIM(RadWL(2)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCDRYAOD' // &
+                                    TRIM(RadWL(3)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'DBRCPOA dry aerosol optical depth at ' // &
+                                TRIM(RadWL(3)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
    ELSE
 
        !--------------------------------------------------------------------
@@ -18945,7 +19105,7 @@ CONTAINS
     !   0=BASE and then...
     !   1=O3  2=O3T 3=ME  4=H2O  5=CO2  6=CFC  7=N2O
     !   8=SU  9=NI 10=AM  11=BC  12=OA  13=SS  14=DU
-    !  15=PM  16=ST
+    !  15=PM  16=ST  17=BRC
     !
     ! See wiki.geos-chem.org/Coupling_GEOS-Chem_with_RRTMG.
     !
@@ -18998,6 +19158,8 @@ CONTAINS
              State_Diag%RadOutInd(N) = 15
           CASE( 'ST' )
              State_Diag%RadOutInd(N) = 16
+          CASE( 'BRC' )
+             State_Diag%RadOutInd(N) = 17
           CASE DEFAULT
              ! Nothing
        END SELECT

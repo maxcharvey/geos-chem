@@ -509,7 +509,7 @@ CONTAINS
 !\\
 ! !INTERFACE:
 !
-  SUBROUTINE RD_MIE( amIRoot, dryrun, LBRC, NUN, NAMFIL, RC )
+  SUBROUTINE RD_MIE( amIRoot, dryrun, NUN, NAMFIL, RC )
 !
 ! !USES:
 !
@@ -520,7 +520,6 @@ CONTAINS
 !
     LOGICAL,        INTENT(IN)  :: amIRoot     ! On root thread?
     LOGICAL,        INTENT(IN)  :: dryrun      ! Dry run to print inputs?
-    LOGICAL,        INTENT(IN)  :: LBRC        ! Brown carbon?
     INTEGER,        INTENT(IN)  :: NUN         ! Logical unit #
     CHARACTER(*),   INTENT(IN)  :: NAMFIL      ! File name
 !
@@ -618,21 +617,6 @@ CONTAINS
                       (PAA(i,k,j),i=1,8)
        enddo
     enddo
-
-    ! Brown carbon option
-    IF (LBRC) THEN
-
-       ! Overwrite OC entries (36-42 in jv_spec_mie.dat)
-       ! with BR entries at end of file (labeled 57-63)
-       do j= 36, 42
-          read(NUN,110) TITLAA(j)
-          do k=1,NK
-             read(NUN,*) WAA(k,j),QAA(k,j),RAA(k,j),SAA(k,j), &
-                         (PAA(i,k,j),i=1,8)
-          enddo
-       enddo
-
-    ENDIF
 
     close(NUN)
 

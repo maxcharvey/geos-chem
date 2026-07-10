@@ -793,7 +793,7 @@ CONTAINS
 #else
     USE Cldj_Cmn_Mod,   ONLY : AN_, NAA, TITLAA
 #endif
-    USE CMN_SIZE_Mod,   ONLY : NRHAER, NRH
+    USE CMN_SIZE_Mod,   ONLY : NRHAER, NRH, NSTRATAER
     USE ErrCode_Mod
     USE Input_Opt_Mod,  ONLY : OptInput
     USE State_Chm_Mod,  ONLY : ChmState
@@ -821,7 +821,8 @@ CONTAINS
 !
     CHARACTER(LEN=255) :: ErrMsg, ThisLoc
     INTEGER            :: I, J, K
-    INTEGER            :: IND(NRHAER)
+    INTEGER, PARAMETER :: IND(NRHAER) = (/ 22, 29, 36, 43, 50, 57, &
+                                           57, 36, 57, 57, 57 /)
     INTEGER,   POINTER :: MIEDX(:)
 
     !=================================================================
@@ -839,9 +840,17 @@ CONTAINS
 
     ! Taken from aerosol_mod.F
     ! N=6 BRCSOA, N=7 NPBRCPOA, N=9 FSOAS, N=10 PBRCPOA, and
-    ! N=11 DBRCPOA temporarily reuse the BrC FJX Mie entry.
+    ! N=11 DBRCPOA reuse the BrC FJX Mie entry.
     ! N=8 WTC reuses the OC entry.
-    IND = (/22,29,36,43,50,57,57,36,57,57,57/)
+    ! Keep this constructor the same length as NRHAER so that any new
+    ! aerosol bin requires an explicit Cloud-J optical mapping.
+
+    IF ( AN_ /= 10 + ( NRHAER * NRH ) + NSTRATAER ) THEN
+       WRITE( ErrMsg, '(a,i0,a,i0)' ) 'Cloud-J slot mismatch: AN_=', AN_, &
+                                      ', expected=', 10 + ( NRHAER * NRH ) + NSTRATAER
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
 
     DO I=1,AN_
        MIEDX(I) = 0
@@ -881,7 +890,6 @@ CONTAINS
 
     ! Ensure all 'AN_' types are valid selections
     do i=1,AN_
-       IF (Input_Opt%amIRoot) write(6,1000) MIEDX(i),TITLAA(MIEDX(i))
        if (MIEDX(i).gt.NAA.or.MIEDX(i).le.0) then
           if (Input_Opt%amIRoot) then
              write(6,1200) MIEDX(i),NAA
@@ -890,6 +898,7 @@ CONTAINS
           call GC_Error( ErrMsg, RC, ThisLoc )
           return
        endif
+       IF (Input_Opt%amIRoot) write(6,1000) MIEDX(i),TITLAA(MIEDX(i))
     enddo
 
     ! Free pointer

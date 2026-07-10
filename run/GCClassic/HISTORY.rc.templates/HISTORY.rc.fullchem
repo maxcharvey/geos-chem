@@ -270,7 +270,7 @@ COLLECTIONS: 'Restart',
 #==============================================================================
 # %%%%% THE BrCDiagnostics COLLECTION %%%%%
 #
-# BrC species production rates, photobleaching parameters, and dry DBRCPOA AOD
+# BrC species production rates, photobleaching drivers, family mass, and dry DBRCPOA AOD
 #==============================================================================
   BrCDiagnostics.template:   '%y4%m2%d2_%h2%n2z.nc4',
   BrCDiagnostics.frequency:  ${RUNDIR_HIST_TIME_AVG_FREQ}
@@ -279,11 +279,30 @@ COLLECTIONS: 'Restart',
   BrCDiagnostics.fields:     'BrCTauBleach              ',
                              'BrCKBleach                ',
                              'BrCEtaBBOA                ',
+                             'BrCTemp                   ',
+                             'BrCRH                     ',
+                             'BrCO3ppbv                 ',
+                             'BrCAbsMass                ',
+                             'BrCTotMass                ',
+                             'BrCBleachedFrac           ',
                              'BrCFluxFSOAP2FSOAS        ',
                              'BrCFluxFSOAS2BRC          ',
                              'BrCFluxBRC2WTC            ',
                              'BrCFluxNPBRC2WTC          ',
                              'BrCDryAODWL1              ',
+                             'N2O5GammaSNAOrg           ',
+                             'N2O5GammaORCOnly          ',
+                             'N2O5DeltaGammaBrC         ',
+                             'N2O5YieldClNO2SNAOrg      ',
+                             'N2O5EffRadiusSNAOrg       ',
+                             'N2O5SurfAreaSNAOrg        ',
+                             'N2O5OrgVol                ',
+                             'N2O5OrgVolBrC             ',
+                             'N2O5OrgH2O                ',
+                             'N2O5OrgH2OBrC             ',
+                             'N2O5InorgH2O              ',
+                             'N2O5BrCOrgVolFrac         ',
+                             'N2O5BrCOrgH2OFrac         ',
 ::
 #==============================================================================
 # %%%%% THE Budget COLLECTION %%%%%
@@ -499,11 +518,14 @@ COLLECTIONS: 'Restart',
 #    0=BA (Baseline    )  1=O3 (Ozone          )   2=ME (Methane   )
 #    3=SU (Sulfate     )  4=NI (Nitrate        )   5=AM (Ammonium  )
 #    6=BC (Black carbon)  7=OA (Organic aerosol)   8=SS (Sea Salt  )
-#    9=DU (Mineral dust) 10=PM (All part. matter) 12=ST (Strat aer., UCX only)
+#    9=DU (Mineral dust) 10=PM (All part. matter) 11=BRC (absorbing BrC excl WTC)
+#   12=ST (Strat aer., UCX only) 17=BSOA 18=NPBR 19=WTC 20=FSOA
+#   21=PBRC 22=DBRC 23=BRCT (total BrC incl WTC)
 #
 # NOTES:
 # (1) Only request diagnostics you need to reduce the overall run time.
-# (2) The ?RRTMG? wildcard includes all output except ST (strat aerosols).
+# (2) The ?RRTMG? wildcard includes all output except ST (strat aerosols),
+#     including split BrC tags BSOA/NPBR/WTC/FSOA/PBRC/DBRC/BRCT.
 #     However, if ST is included explicitly for one diagnostic then it
 #     will be included for all others that use the wildcard.
 # (3) Only enable ST if running with UCX.
@@ -525,6 +547,13 @@ COLLECTIONS: 'Restart',
                               'RadClrSkyLWSurf_DU     ',
                               'RadClrSkyLWSurf_PM     ',
                               'RadClrSkyLWSurf_BRC    ',
+                              'RadClrSkyLWSurf_BSOA   ',
+                              'RadClrSkyLWSurf_NPBR   ',
+                              'RadClrSkyLWSurf_WTC    ',
+                              'RadClrSkyLWSurf_FSOA   ',
+                              'RadClrSkyLWSurf_PBRC   ',
+                              'RadClrSkyLWSurf_DBRC   ',
+                              'RadClrSkyLWSurf_BRCT   ',
                               #'RadClrSkyLWSurf_ST     ',
                               'RadAllSkyLWSurf_?RRTMG?',
                               'RadClrSkySWSurf_?RRTMG?',
@@ -542,6 +571,13 @@ COLLECTIONS: 'Restart',
                               'RadAODWL1_DU          ',
                               'RadAODWL1_PM          ',
                               'RadAODWL1_BRC         ',
+                              'RadAODWL1_BSOA        ',
+                              'RadAODWL1_NPBR        ',
+                              'RadAODWL1_WTC         ',
+                              'RadAODWL1_FSOA        ',
+                              'RadAODWL1_PBRC        ',
+                              'RadAODWL1_DBRC        ',
+                              'RadAODWL1_BRCT        ',
                               #'RadAODWL1_ST          ',
                               'RadSSAWL1_SU          ',
                               'RadSSAWL1_NI          ',
@@ -552,6 +588,13 @@ COLLECTIONS: 'Restart',
                               'RadSSAWL1_DU          ',
                               'RadSSAWL1_PM          ',
                               'RadSSAWL1_BRC         ',
+                              'RadSSAWL1_BSOA        ',
+                              'RadSSAWL1_NPBR        ',
+                              'RadSSAWL1_WTC         ',
+                              'RadSSAWL1_FSOA        ',
+                              'RadSSAWL1_PBRC        ',
+                              'RadSSAWL1_DBRC        ',
+                              'RadSSAWL1_BRCT        ',
                               #'RadSSAWL1_ST          ',
                               'RadAsymWL1_SU         ',
                               'RadAsymWL1_NI         ',
@@ -562,6 +605,13 @@ COLLECTIONS: 'Restart',
                               'RadAsymWL1_DU         ',
                               'RadAsymWL1_PM         ',
                               'RadAsymWL1_BRC        ',
+                              'RadAsymWL1_BSOA       ',
+                              'RadAsymWL1_NPBR       ',
+                              'RadAsymWL1_WTC        ',
+                              'RadAsymWL1_FSOA       ',
+                              'RadAsymWL1_PBRC       ',
+                              'RadAsymWL1_DBRC       ',
+                              'RadAsymWL1_BRCT       ',
                               #'RadAsymWL1_ST         ',
 ::
 #==============================================================================

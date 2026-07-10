@@ -598,8 +598,12 @@ CONTAINS
 !
 ! !LOCAL VARIABLES:
 !
+   INTEGER            :: I, J, L
    INTEGER            :: id_FSOAP, id_FSOAS, id_BRCSOA, id_WTC
-   INTEGER            :: id_NPBRCPOA
+   INTEGER            :: id_NPBRCPOA, id_DBRCPOA, id_PBRCPOA
+   REAL(fp)           :: Sum_FSOAP, Sum_FSOAS, Sum_BRCSOA
+   REAL(fp)           :: Sum_NPBRCPOA, Sum_WTC, Sum_DBRCPOA, Sum_PBRCPOA
+   REAL(fp)           :: AbsMass, TotMass
    CHARACTER(LEN=255) :: ErrMsg, ThisLoc
 
    !=================================================================
@@ -618,6 +622,8 @@ CONTAINS
    id_BRCSOA   = Ind_('BRCSOA'  )
    id_WTC      = Ind_('WTC'     )
    id_NPBRCPOA = Ind_('NPBRCPOA')
+   id_DBRCPOA  = Ind_('DBRCPOA' )
+   id_PBRCPOA  = Ind_('PBRCPOA' )
 
    ! Required species: if any missing, return silently
    IF ( id_FSOAS  <= 0 ) RETURN
@@ -725,6 +731,14 @@ CONTAINS
    ! Step 3: Receive bleached mass into WTC
    !         (from both BRCSOA and NPBRCPOA)
    !-----------------------------------------------------------------
+   IF ( Input_Opt%amIRoot ) THEN
+      WRITE( 6, '(a,3(1x,a,es12.4))' )                                     &
+         'BRC_DEBUG ChemBrC flux kg/tstep:',                               &
+         'FSOAP2FSOAS=', SUM( FSOAP_CONV  ),                               &
+         'BRC2WTC=',     SUM( BRCSOA_CONV ),                               &
+         'NPBRC2WTC=',   SUM( NPBRC_CONV  )
+   ENDIF
+
    CALL CHEM_WTC( Input_Opt,  State_Chm, State_Diag, &
                   State_Grid, id_WTC,    RC          )
 
@@ -736,6 +750,83 @@ CONTAINS
 
    IF ( Input_Opt%Verbose ) THEN
       CALL DEBUG_MSG( '### CHEMBRC: after CHEM_WTC' )
+   ENDIF
+
+   !-----------------------------------------------------------------
+   ! BrC-family mass diagnostics.  "Abs" follows the RRTMG BRC label:
+   ! absorbing/dark BrC species only, excluding bleached WTC.  "Tot"
+   ! follows the RRTMG BRCT label: absorbing/dark BrC + WTC.
+   !-----------------------------------------------------------------
+   IF ( State_Diag%Archive_BrCAbsMass      .OR. &
+        State_Diag%Archive_BrCTotMass      .OR. &
+        State_Diag%Archive_BrCBleachedFrac ) THEN
+
+      !$OMP PARALLEL DO                                                &
+      !$OMP DEFAULT( SHARED                                           )&
+      !$OMP PRIVATE( I, J, L, AbsMass, TotMass                        )&
+      !$OMP COLLAPSE( 3                                               )
+      DO L = 1, State_Grid%NZ
+      DO J = 1, State_Grid%NY
+      DO I = 1, State_Grid%NX
+
+         AbsMass = State_Chm%Species(id_BRCSOA)%Conc(I,J,L)             &
+                 + State_Chm%Species(id_FSOAS )%Conc(I,J,L)
+
+         IF ( id_NPBRCPOA > 0 ) THEN
+            AbsMass = AbsMass + State_Chm%Species(id_NPBRCPOA)%Conc(I,J,L)
+         ENDIF
+
+         IF ( id_DBRCPOA > 0 ) THEN
+            AbsMass = AbsMass + State_Chm%Species(id_DBRCPOA)%Conc(I,J,L)
+         ENDIF
+
+         IF ( id_PBRCPOA > 0 ) THEN
+            AbsMass = AbsMass + State_Chm%Species(id_PBRCPOA)%Conc(I,J,L)
+         ENDIF
+
+         TotMass = AbsMass + State_Chm%Species(id_WTC)%Conc(I,J,L)
+
+         IF ( State_Diag%Archive_BrCAbsMass ) THEN
+            State_Diag%BrCAbsMass(I,J,L) = AbsMass
+         ENDIF
+
+         IF ( State_Diag%Archive_BrCTotMass ) THEN
+            State_Diag%BrCTotMass(I,J,L) = TotMass
+         ENDIF
+
+         IF ( State_Diag%Archive_BrCBleachedFrac ) THEN
+            IF ( TotMass > SMALLNUM ) THEN
+               State_Diag%BrCBleachedFrac(I,J,L) =                      &
+                  State_Chm%Species(id_WTC)%Conc(I,J,L) / TotMass
+            ELSE
+               State_Diag%BrCBleachedFrac(I,J,L) = 0.0_fp
+            ENDIF
+         ENDIF
+
+      ENDDO
+      ENDDO
+      ENDDO
+      !$OMP END PARALLEL DO
+   ENDIF
+
+   IF ( Input_Opt%amIRoot ) THEN
+      Sum_FSOAP    = 0.0_fp
+      Sum_NPBRCPOA = 0.0_fp
+      Sum_DBRCPOA  = 0.0_fp
+      Sum_PBRCPOA  = 0.0_fp
+      IF ( id_FSOAP    > 0 ) Sum_FSOAP    = SUM( State_Chm%Species(id_FSOAP   )%Conc )
+      IF ( id_NPBRCPOA > 0 ) Sum_NPBRCPOA = SUM( State_Chm%Species(id_NPBRCPOA)%Conc )
+      IF ( id_DBRCPOA  > 0 ) Sum_DBRCPOA  = SUM( State_Chm%Species(id_DBRCPOA )%Conc )
+      IF ( id_PBRCPOA  > 0 ) Sum_PBRCPOA  = SUM( State_Chm%Species(id_PBRCPOA )%Conc )
+      Sum_FSOAS  = SUM( State_Chm%Species(id_FSOAS )%Conc )
+      Sum_BRCSOA = SUM( State_Chm%Species(id_BRCSOA)%Conc )
+      Sum_WTC    = SUM( State_Chm%Species(id_WTC   )%Conc )
+      WRITE( 6, '(a,7(1x,a,es12.4))' )                                     &
+         'BRC_DEBUG ChemBrC kg:',                                           &
+         'FSOAP=',    Sum_FSOAP,    'FSOAS=',   Sum_FSOAS,                 &
+         'BRCSOA=',   Sum_BRCSOA,   'NPBRC=',   Sum_NPBRCPOA,              &
+         'WTC=',      Sum_WTC,      'DBRC=',    Sum_DBRCPOA,               &
+         'PBRC=',     Sum_PBRCPOA
    ENDIF
 
  END SUBROUTINE ChemBrC
@@ -1237,6 +1328,7 @@ CONTAINS
    REAL(fp)            :: ETA_LOCAL      ! Local BBOA viscosity [Pa s]
    REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
    REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
+   REAL(fp)            :: O3PPBV_LOCAL   ! Local O3 mixing ratio [ppbv]
    REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
 
    ! Pointers
@@ -1270,7 +1362,8 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3, ALT_TOP             )&
+   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3, O3PPBV_LOCAL       )&
+   !$OMP PRIVATE( ALT_TOP                                          )&
    !$OMP PRIVATE( KBRCSOA_LOCAL, CCV, TC0, FREQ, RKT, CNEW        )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1289,6 +1382,9 @@ CONTAINS
       AW_LOCAL = State_Met%RH(I,J,L) / 100.0_fp
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
+
+      P_O3_LOCAL   = P_O3_ATM
+      O3PPBV_LOCAL = P_O3_ATM * 1.0e+9_fp
 
       ! Determine bleaching lifetime based on selected scheme
       SELECT CASE ( Input_Opt%BrC_Bleach_Scheme )
@@ -1322,8 +1418,12 @@ CONTAINS
             X_O3 = MAX( X_O3, 0.0_fp )
             P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
             P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
+            O3PPBV_LOCAL = P_O3_LOCAL                                   &
+                         / MAX( State_Met%PMID(I,J,L) * HPA2ATM,        &
+                                SMALLNUM ) * 1.0e+9_fp
          ELSE
             P_O3_LOCAL = P_O3_ATM
+            O3PPBV_LOCAL = P_O3_ATM * 1.0e+9_fp
          ENDIF
          TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
 
@@ -1351,7 +1451,19 @@ CONTAINS
 
       IF ( State_Diag%Archive_BrCEtaBBOA ) THEN
          State_Diag%BrCEtaBBOA(I,J,L) = ETA_LOCAL
-      ENDIF      
+      ENDIF
+
+      IF ( State_Diag%Archive_BrCTemp ) THEN
+         State_Diag%BrCTemp(I,J,L) = T_LOCAL
+      ENDIF
+
+      IF ( State_Diag%Archive_BrCRH ) THEN
+         State_Diag%BrCRH(I,J,L) = AW_LOCAL * 100.0_fp
+      ENDIF
+
+      IF ( State_Diag%Archive_BrCO3ppbv ) THEN
+         State_Diag%BrCO3ppbv(I,J,L) = O3PPBV_LOCAL
+      ENDIF
 
       !==============================================================
       ! 1) Add newly formed BRCSOA from FSOAS (darkening step)

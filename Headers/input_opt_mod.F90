@@ -720,7 +720,7 @@ CONTAINS
     IF ( RC /= GC_SUCCESS ) RETURN
 
     ! Number of RRTMG outputs (change as necessary)
-    Input_Opt%NSpecRadMenu           = 17
+    Input_Opt%NSpecRadMenu           = 24
 
     arrayId = 'Input_Opt%LSPECRADMENU'
     ALLOCATE( Input_Opt%LSPECRADMENU( Input_Opt%NSpecRadMenu ), STAT=RC )

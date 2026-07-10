@@ -1003,6 +1003,61 @@ CONTAINS
 
        ENDIF
 
+       ! Archive diagnostic-only N2O5 SNA+ORG coating quantities.
+       ! These do not change chemistry; they expose BrC vs ORC-only impacts.
+       IF ( State_Diag%Archive_N2O5GammaSNAOrg ) THEN
+          State_Diag%N2O5GammaSNAOrg(I,J,L) = State_Het%N2O5_gamma_SNAOrg
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5GammaORCOnly ) THEN
+          State_Diag%N2O5GammaORCOnly(I,J,L) = State_Het%N2O5_gamma_ORCOnly
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5DeltaGammaBrC ) THEN
+          State_Diag%N2O5DeltaGammaBrC(I,J,L) = State_Het%N2O5_gamma_DeltaBrC
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5YieldClNO2SNAOrg ) THEN
+          State_Diag%N2O5YieldClNO2SNAOrg(I,J,L) =                           &
+             State_Het%N2O5_YClNO2_SNAOrg
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5EffRadiusSNAOrg ) THEN
+          State_Diag%N2O5EffRadiusSNAOrg(I,J,L) = State_Het%N2O5_Rp_SNAOrg
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5SurfAreaSNAOrg ) THEN
+          State_Diag%N2O5SurfAreaSNAOrg(I,J,L) = State_Het%N2O5_SA_SNAOrg
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5OrgVol ) THEN
+          State_Diag%N2O5OrgVol(I,J,L) = State_Het%N2O5_OrgVol
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5OrgVolBrC ) THEN
+          State_Diag%N2O5OrgVolBrC(I,J,L) = State_Het%N2O5_OrgVolBrC
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5OrgH2O ) THEN
+          State_Diag%N2O5OrgH2O(I,J,L) = State_Het%N2O5_OrgH2O
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5OrgH2OBrC ) THEN
+          State_Diag%N2O5OrgH2OBrC(I,J,L) = State_Het%N2O5_OrgH2OBrC
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5InorgH2O ) THEN
+          State_Diag%N2O5InorgH2O(I,J,L) = State_Het%N2O5_InorgH2O
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5BrCOrgVolFrac ) THEN
+          State_Diag%N2O5BrCOrgVolFrac(I,J,L) = State_Het%N2O5_BrCOrgVolFrac
+       ENDIF
+
+       IF ( State_Diag%Archive_N2O5BrCOrgH2OFrac ) THEN
+          State_Diag%N2O5BrCOrgH2OFrac(I,J,L) = State_Het%N2O5_BrCOrgH2OFrac
+       ENDIF
+
 #ifdef KPP_INTEGRATOR_AUTOREDUCE
        !=====================================================================
        ! Set options for the KPP integrator in vectors ICNTRL and RCNTRL

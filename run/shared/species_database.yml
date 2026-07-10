@@ -5082,6 +5082,9 @@ DBRCPOA:
   Is_Advected: true
   Is_DryDep: true
   Is_WetDep: true
+  # Keep in the hygroscopic-growth species list so AOD/AerSurf diagnostics
+  # expose a DBRCPOA tag, but aerosol_mod treats DBRCPOA as a dry carrier:
+  # WAERSL(N=11)=0 and dry DAERSL(3) uses dbrc.dat for online AOD/RRTMG.
   Is_HygroGrowth: true
   Density: 1300.0
   MW_g: 12.01

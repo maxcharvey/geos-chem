@@ -312,6 +312,7 @@ CONTAINS
     REAL*8             :: NUMER,DENOM
     REAL*4             :: AODTMP,AODOUT,SSATMP,SSAOUT
     REAL*4             :: ASYMTMP,ASYMOUT
+    REAL*8             :: DBG_RT_AOD_LO, DBG_RT_AOD_HI, DBG_RAD_AOD
     INTEGER            :: FLG_FIRST_STRAT(State_Grid%NX,State_Grid%NY)
     INTEGER            :: ONECOL
     REAL*4             :: CH4SCL(State_Grid%NX,State_Grid%NY)
@@ -2114,6 +2115,39 @@ CONTAINS
     ENDDO
     !$OMP END PARALLEL DO
 
+    IF ( Input_Opt%amIRoot ) THEN
+       IF ( LOUTPUTAERO .AND. Input_Opt%NWVSELECT >= 1 .AND.                &
+            iSpecMenu >= 17 .AND. iSpecMenu <= 24 ) THEN
+          DO W = 1, Input_Opt%NWVSELECT
+             DBG_RT_AOD_LO = SUM( TAUAERDIAG(:,:,:,IRTWVSELECT(1,W)) )
+             DBG_RT_AOD_HI = SUM( TAUAERDIAG(:,:,:,IRTWVSELECT(2,W)) )
+             DBG_RAD_AOD   = 0.0D0
+             SELECT CASE ( W )
+             CASE ( 1 )
+                IF ( State_Diag%Archive_RADAODWL1 ) THEN
+                   DBG_RAD_AOD = SUM( State_Diag%RADAODWL1(:,:,iNcDiag) )
+                ENDIF
+             CASE ( 2 )
+                IF ( State_Diag%Archive_RADAODWL2 ) THEN
+                   DBG_RAD_AOD = SUM( State_Diag%RADAODWL2(:,:,iNcDiag) )
+                ENDIF
+             CASE ( 3 )
+                IF ( State_Diag%Archive_RADAODWL3 ) THEN
+                   DBG_RAD_AOD = SUM( State_Diag%RADAODWL3(:,:,iNcDiag) )
+                ENDIF
+             END SELECT
+             WRITE( 6, '(a,i0,1x,a,i0,1x,a,i0,1x,a,f8.1,3(1x,a,es12.4))' ) &
+                'BRC_DEBUG RRTMG ispec=', iSpecMenu,                        &
+                'incdiag=', iNcDiag,                                        &
+                'WL=', W,                                                   &
+                'nm=', Input_Opt%WVSELECT(W),                               &
+                'tie_lo=',  DBG_RT_AOD_LO,                                  &
+                'tie_hi=',  DBG_RT_AOD_HI,                                  &
+                'rad_aod=', DBG_RAD_AOD
+          ENDDO
+       ENDIF
+    ENDIF
+
     ! Halt RRTMG timer (so that unit conv can be timed separately)
     IF ( Input_Opt%useTimers ) THEN
        CALL Timer_End( "RRTMG", RC )
@@ -2308,10 +2342,42 @@ CONTAINS
           !NAT
           SPECMASK(15) = 16
 
-       ! BRC = Brown carbon family
+       ! BRC = Brown/absorbing carbon only (excludes WTC)
        CASE( 17 )
+          SPECMASK(8)  = 17
+          SPECMASK(9)  = 17
+          SPECMASK(11) = 17
+          SPECMASK(12) = 17
+          SPECMASK(13) = 17
+
+       ! BSOA = BRCSOA
+       CASE( 18 )
+          SPECMASK(8) = 18
+
+       ! NPBR = NPBRCPOA
+       CASE( 19 )
+          SPECMASK(9) = 19
+
+       ! WTC = white/transparent carbon
+       CASE( 20 )
+          SPECMASK(10) = 20
+
+       ! FSOA = FSOAS
+       CASE( 21 )
+          SPECMASK(11) = 21
+
+       ! PBRC = PBRCPOA
+       CASE( 22 )
+          SPECMASK(12) = 22
+
+       ! DBRC = DBRCPOA dry carrier
+       CASE( 23 )
+          SPECMASK(13) = 23
+
+       ! BRCT = total BrC family, including WTC
+       CASE( 24 )
           DO II = 8, 13
-             SPECMASK(II)=17
+             SPECMASK(II) = 24
           ENDDO
 
        END SELECT
@@ -2397,7 +2463,8 @@ CONTAINS
     ! Optional outputs (requested via HISTORY.rc)
     !   1=O3  2=O3T  3=ME  4=H2O  5=CO2  6=CFC  7=N2O
     !   8=SU  9=NI  10=AM 11=BC  12=OA  13=SS  14=DU  
-    !  15=PM  16=ST
+    !  15=PM  16=ST  17=BRC  18=BSOA 19=NPBR 20=WTC
+    !  21=FSOA 22=PBRC 23=DBRC 24=BRCT
     !
     ! NB: "O3" is all ozone; "O3T" is tropospheric ozone only.
     !=================================================================
@@ -2438,6 +2505,22 @@ CONTAINS
           Input_Opt%LSpecRadMenu(15) = 1
        CASE( 'ST' )
           Input_Opt%LSpecRadMenu(16) = 1
+       CASE( 'BRC' )
+          Input_Opt%LSpecRadMenu(17) = 1
+       CASE( 'BSOA' )
+          Input_Opt%LSpecRadMenu(18) = 1
+       CASE( 'NPBR' )
+          Input_Opt%LSpecRadMenu(19) = 1
+       CASE( 'WTC' )
+          Input_Opt%LSpecRadMenu(20) = 1
+       CASE( 'FSOA' )
+          Input_Opt%LSpecRadMenu(21) = 1
+       CASE( 'PBRC' )
+          Input_Opt%LSpecRadMenu(22) = 1
+       CASE( 'DBRC' )
+          Input_Opt%LSpecRadMenu(23) = 1
+       CASE( 'BRCT' )
+          Input_Opt%LSpecRadMenu(24) = 1
        CASE DEFAULT
           ! Nothing
        END SELECT

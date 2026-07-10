@@ -1029,7 +1029,7 @@ CONTAINS
       ! Parameterized dry effective radius for SNA and OM
       !===========================================================
       IF ( State_Chm%AerMass%SO4_NH4_NIT(I,J,L) > 0e+0_fp ) THEN
-         ! dry SNA and OM mass [ug/m3] (include all BrC hygroscopic bins)
+         ! dry SNA and OM mass [ug/m3] (include BrC hygroscopic bins)
          State_Chm%AerMass%SNAOM(I,J,L) = ( State_Chm%AerMass%SO4_NH4_NIT(I,J,L) + &
                                             State_Chm%AerMass%OCPO(I,J,L) + &
                                             State_Chm%AerMass%OCPISOA(I,J,L) + &
@@ -1037,18 +1037,16 @@ CONTAINS
                                             State_Chm%AerMass%NPBRC(I,J,L) + &
                                             State_Chm%AerMass%WTCPI(I,J,L) + &
                                             State_Chm%AerMass%FSOAS(I,J,L) + &
-                                            State_Chm%AerMass%PBRC(I,J,L) + &
-                                            State_Chm%AerMass%BRCPO(I,J,L) ) * 1.0e+9_fp
+                                            State_Chm%AerMass%PBRC(I,J,L) ) * 1.0e+9_fp
 
-         ! ratio between OM and SNA, unitless (include all BrC hygroscopic bins)
+         ! ratio between OM and SNA, unitless (include BrC hygroscopic bins)
          State_Chm%AerMass%R_OMSNA(I,J,L) = ( State_Chm%AerMass%OCPO(I,J,L) + &
                                               State_Chm%AerMass%OCPISOA(I,J,L) + &
                                               State_Chm%AerMass%BRCPI(I,J,L) + &
                                               State_Chm%AerMass%NPBRC(I,J,L) + &
                                               State_Chm%AerMass%WTCPI(I,J,L) + &
                                               State_Chm%AerMass%FSOAS(I,J,L) + &
-                                              State_Chm%AerMass%PBRC(I,J,L) + &
-                                              State_Chm%AerMass%BRCPO(I,J,L) ) / &
+                                              State_Chm%AerMass%PBRC(I,J,L) ) / &
                                               State_Chm%AerMass%SO4_NH4_NIT(I,J,L)
 
          ! Parameterized dry effective radius, in unit of um
@@ -1274,11 +1272,13 @@ CONTAINS
     CHARACTER(LEN=16)   :: STAMP
     INTEGER             :: I, J, L, N, R, IRH, W, IRHN, NA, SpcID, g
     INTEGER             :: AA, IWV, IIWV, NWVS, IR, NRT, S
+    INTEGER             :: DBG_NA(6), DBG_SLOT
     REAL*4              :: TEMP( State_Grid%NX,State_Grid%NY,State_Grid%NZ)
     REAL(fp)            :: TEMP2(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
     REAL(fp)            :: MSDENS(NAER), DRYAREA, VDRY, VH2O
     REAL(f8)            :: XTAU
     REAL*8              :: BCSCAT_AE  !(xnw, 8/24/15)
+    REAL*8              :: DBG_AOD_STD(6)
 
     ! Variables for speed diagnostics
     INTEGER             :: ITIMEVALS(8)
@@ -1521,7 +1521,9 @@ CONTAINS
           ! PBRCPOA (N=10, pbrc.dat) [kg_OM/m3]
           State_Chm%AerMass%WAERSL(I,J,L,10) = State_Chm%AerMass%PBRC(I,J,L)
 
-          ! DBRCPOA dry carrier (N=11, dbrc.dat) has no wet mass
+          ! DBRCPOA is listed as Is_HygroGrowth in species_database.yml only
+          ! to expose DBRCPOA-tagged AOD/area diagnostics.  Its optics stay
+          ! dry here: no WAERSL wet mass, dry DAERSL(3), dbrc.dat.
           State_Chm%AerMass%WAERSL(I,J,L,11) = 0.0_fp
 
           ! Hydrophobic BC (a.k.a EC) [kg/m3]
@@ -2518,6 +2520,69 @@ CONTAINS
        ENDDO ! end of loop over hygroscopic aerosols
        !$OMP END PARALLEL DO
 
+    ENDIF
+
+    IF ( Input_Opt%amIRoot .AND. PRESENT( ODSWITCH ) ) THEN
+       IF ( ODSWITCH == 1 .AND. Input_Opt%NWVSELECT >= 1 ) THEN
+          DBG_NA(:) = 0
+          DO NA = 1, NRHAER
+             SELECT CASE ( Map_NRHAER(NA) )
+             CASE ( 6 )
+                DBG_NA(1) = NA
+             CASE ( 7 )
+                DBG_NA(2) = NA
+             CASE ( 8 )
+                DBG_NA(3) = NA
+             CASE ( 9 )
+                DBG_NA(4) = NA
+             CASE ( 10 )
+                DBG_NA(5) = NA
+             CASE ( 11 )
+                DBG_NA(6) = NA
+             END SELECT
+          ENDDO
+          DO W = 1, Input_Opt%NWVSELECT
+             DBG_AOD_STD(:) = 0.0D0
+             SELECT CASE ( W )
+             CASE ( 1 )
+                IF ( State_Diag%Archive_AODHygWL1 ) THEN
+                   DO N = 1, 6
+                      DBG_SLOT = 0
+                      IF ( DBG_NA(N) > 0 ) DBG_SLOT = State_Diag%Map_AODHygWL1%id2slot(DBG_NA(N))
+                      IF ( DBG_SLOT > 0 ) THEN
+                         DBG_AOD_STD(N) = SUM( State_Diag%AODHygWL1(:,:,:,DBG_SLOT) )
+                      ENDIF
+                   ENDDO
+                ENDIF
+             CASE ( 2 )
+                IF ( State_Diag%Archive_AODHygWL2 ) THEN
+                   DO N = 1, 6
+                      DBG_SLOT = 0
+                      IF ( DBG_NA(N) > 0 ) DBG_SLOT = State_Diag%Map_AODHygWL2%id2slot(DBG_NA(N))
+                      IF ( DBG_SLOT > 0 ) THEN
+                         DBG_AOD_STD(N) = SUM( State_Diag%AODHygWL2(:,:,:,DBG_SLOT) )
+                      ENDIF
+                   ENDDO
+                ENDIF
+             CASE ( 3 )
+                IF ( State_Diag%Archive_AODHygWL3 ) THEN
+                   DO N = 1, 6
+                      DBG_SLOT = 0
+                      IF ( DBG_NA(N) > 0 ) DBG_SLOT = State_Diag%Map_AODHygWL3%id2slot(DBG_NA(N))
+                      IF ( DBG_SLOT > 0 ) THEN
+                         DBG_AOD_STD(N) = SUM( State_Diag%AODHygWL3(:,:,:,DBG_SLOT) )
+                      ENDIF
+                   ENDDO
+                ENDIF
+             END SELECT
+             WRITE( 6, '(a,i0,1x,a,f8.1,6(1x,a,es12.4))' )                &
+                'BRC_DEBUG AOD standard WL=', W,                           &
+                'nm=', Input_Opt%WVSELECT(W),                              &
+                'BRCSOA=', DBG_AOD_STD(1), 'NPBRC=', DBG_AOD_STD(2),      &
+                'WTC=',    DBG_AOD_STD(3), 'FSOAS=', DBG_AOD_STD(4),      &
+                'PBRC=',   DBG_AOD_STD(5), 'DBRC=',  DBG_AOD_STD(6)
+          ENDDO
+       ENDIF
     ENDIF
 
     !------------------------------------

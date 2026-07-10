@@ -25,7 +25,7 @@ MODULE fullchem_RateLawFuncs
 !
 ! !DEFINED PARAMETERS:
 !
-  ! Indices for aerosol type (1 .. NAEROTYPE=14)
+  ! Indices for aerosol type (1 .. NAEROTYPE=20)
   INTEGER,  PRIVATE, PARAMETER :: DU1            = 1  ! Dust (Reff = 0.151 um)
   INTEGER,  PRIVATE, PARAMETER :: DU2            = 2  ! Dust (Reff = 0.253 um)
   INTEGER,  PRIVATE, PARAMETER :: DU3            = 3  ! Dust (Reff = 0.402 um)
@@ -38,8 +38,14 @@ MODULE fullchem_RateLawFuncs
   INTEGER,  PRIVATE, PARAMETER :: ORC            = 10 ! Organic Carbon
   INTEGER,  PRIVATE, PARAMETER :: SSA            = 11 ! Accum-mode sea salt
   INTEGER,  PRIVATE, PARAMETER :: SSC            = 12 ! Coarse-mode sea salt
-  INTEGER,  PRIVATE, PARAMETER :: SLA            = 13 ! Strat sulfate liq aer
-  INTEGER,  PRIVATE, PARAMETER :: IIC            = 14 ! Irregular ice cloud
+  INTEGER,  PRIVATE, PARAMETER :: BRC            = 13 ! BRCSOA
+  INTEGER,  PRIVATE, PARAMETER :: NPBR           = 14 ! NPBRCPOA
+  INTEGER,  PRIVATE, PARAMETER :: WTC            = 15 ! White/transparent carbon
+  INTEGER,  PRIVATE, PARAMETER :: FSOA           = 16 ! FSOAS
+  INTEGER,  PRIVATE, PARAMETER :: PBRC           = 17 ! PBRCPOA
+  INTEGER,  PRIVATE, PARAMETER :: DBRC           = 18 ! DBRCPOA
+  INTEGER,  PRIVATE, PARAMETER :: SLA            = 19 ! Strat sulfate liq aer
+  INTEGER,  PRIVATE, PARAMETER :: IIC            = 20 ! Irregular ice cloud
 
   ! Indices for Fine and Coarse sea-salt indices
   INTEGER,  PRIVATE, PARAMETER :: SS_FINE        = 1
@@ -98,6 +104,102 @@ MODULE fullchem_RateLawFuncs
 !------------------------------------------------------------------------------
 !BOC
 CONTAINS
+
+  FUNCTION OrgAndBrCArs_L1k( H, gamma, srMw ) RESULT( k )
+    !
+    ! Treat BrC bins as organic aerosol surface area for uptake rates
+    ! that already include OC.
+    !
+    TYPE(HetState), INTENT(IN) :: H              ! Hetchem State
+    REAL(dp),       INTENT(IN) :: gamma, srMw    ! rxn prob, sqrt(mol wt)
+    REAL(dp)                   :: k              ! rxn rate [1/s]
+    !
+    k = 0.0_dp
+    k = k + Ars_L1k( H%xArea(ORC),  H%xRadi(ORC),  gamma, srMw )
+    k = k + Ars_L1k( H%xArea(BRC),  H%xRadi(BRC),  gamma, srMw )
+    k = k + Ars_L1k( H%xArea(NPBR), H%xRadi(NPBR), gamma, srMw )
+    k = k + Ars_L1k( H%xArea(WTC),  H%xRadi(WTC),  gamma, srMw )
+    k = k + Ars_L1k( H%xArea(FSOA), H%xRadi(FSOA), gamma, srMw )
+    k = k + Ars_L1k( H%xArea(PBRC), H%xRadi(PBRC), gamma, srMw )
+    k = k + Ars_L1k( H%xArea(DBRC), H%xRadi(DBRC), gamma, srMw )
+  END FUNCTION OrgAndBrCArs_L1k
+
+  FUNCTION OrgAndBrCVol( H ) RESULT( vol )
+    !
+    ! Treat BrC bins as redirected organic aerosol volume anywhere ORC
+    ! represents generic organic aerosol material.  DBRCPOA contributes
+    ! dry organic volume, consistent with its dry-carrier optics treatment.
+    !
+    TYPE(HetState), INTENT(IN) :: H              ! Hetchem State
+    REAL(dp)                   :: vol            ! organic volume [cm3/cm3]
+    !
+    vol = H%xVol(ORC)  + H%xVol(BRC)  + H%xVol(NPBR)                  &
+        + H%xVol(WTC)  + H%xVol(FSOA) + H%xVol(PBRC)                  &
+        + H%xVol(DBRC)
+  END FUNCTION OrgAndBrCVol
+
+  FUNCTION BrCOrgVol( H ) RESULT( vol )
+    !
+    ! BrC-only contribution to generic organic aerosol volume.
+    !
+    TYPE(HetState), INTENT(IN) :: H              ! Hetchem State
+    REAL(dp)                   :: vol            ! BrC volume [cm3/cm3]
+    !
+    vol = H%xVol(BRC)  + H%xVol(NPBR) + H%xVol(WTC)                    &
+        + H%xVol(FSOA) + H%xVol(PBRC) + H%xVol(DBRC)
+  END FUNCTION BrCOrgVol
+
+  FUNCTION OrgAndBrCH2O( H ) RESULT( H2O )
+    !
+    ! BrC species that share hygroscopic/wet organic treatment contribute
+    ! organic water.  DBRCPOA is intentionally excluded: it remains a dry
+    ! hydrophobic carrier unless/until a separate aging-to-wet phase exists.
+    !
+    TYPE(HetState), INTENT(IN) :: H              ! Hetchem State
+    REAL(dp)                   :: H2O            ! organic water [cm3/cm3]
+    !
+    H2O = H%xH2O(ORC)  + H%xH2O(BRC)  + H%xH2O(NPBR)                 &
+        + H%xH2O(WTC)  + H%xH2O(FSOA) + H%xH2O(PBRC)
+  END FUNCTION OrgAndBrCH2O
+
+  FUNCTION BrCOrgH2O( H ) RESULT( H2O )
+    !
+    ! BrC-only organic water.  DBRCPOA is dry and intentionally excluded.
+    !
+    TYPE(HetState), INTENT(IN) :: H              ! Hetchem State
+    REAL(dp)                   :: H2O            ! BrC water [cm3/cm3]
+    !
+    H2O = H%xH2O(BRC)  + H%xH2O(NPBR) + H%xH2O(WTC)                    &
+        + H%xH2O(FSOA) + H%xH2O(PBRC)
+  END FUNCTION BrCOrgH2O
+
+  SUBROUTINE Save_N2O5SNAOrg_Diags( H, gamma, gammaORC, Y_ClNO2, Rp, SA )
+    !
+    ! Save diagnostic-only N2O5 SNA+ORG coating quantities in HetState.
+    !
+    TYPE(HetState), INTENT(INOUT) :: H              ! Hetchem State
+    REAL(dp),       INTENT(IN)    :: gamma          ! ORC+BrC gamma [1]
+    REAL(dp),       INTENT(IN)    :: gammaORC       ! ORC-only gamma [1]
+    REAL(dp),       INTENT(IN)    :: Y_ClNO2        ! ClNO2 yield [1]
+    REAL(dp),       INTENT(IN)    :: Rp             ! radius [cm]
+    REAL(dp),       INTENT(IN)    :: SA             ! surface area [cm2/cm3]
+    !
+    H%N2O5_gamma_SNAOrg   = gamma
+    H%N2O5_gamma_ORCOnly  = gammaORC
+    H%N2O5_gamma_DeltaBrC = gamma - gammaORC
+    H%N2O5_YClNO2_SNAOrg  = Y_ClNO2
+    H%N2O5_Rp_SNAOrg      = Rp
+    H%N2O5_SA_SNAOrg      = SA
+    H%N2O5_OrgVol         = OrgAndBrCVol(H)
+    H%N2O5_OrgVolBrC      = BrCOrgVol(H)
+    H%N2O5_OrgH2O         = OrgAndBrCH2O(H)
+    H%N2O5_OrgH2OBrC      = BrCOrgH2O(H)
+    H%N2O5_InorgH2O       = H%xH2O(SUL)
+    H%N2O5_BrCOrgVolFrac  = SafeDiv( H%N2O5_OrgVolBrC,                    &
+                                     H%N2O5_OrgVol, 0.0_dp )
+    H%N2O5_BrCOrgH2OFrac  = SafeDiv( H%N2O5_OrgH2OBrC,                    &
+                                     H%N2O5_OrgH2O, 0.0_dp )
+  END SUBROUTINE Save_N2O5SNAOrg_Diags
 
   !#########################################################################
   !#####          RATE-LAW FUNCTIONS FOR GAS-PHASE REACTIONS           #####
@@ -1478,7 +1580,7 @@ CONTAINS
     k = k + Ars_L1k( H%xArea(DU7), H%xRadi(DU7), H%gamma_HO2, srMw )
     k = k + Ars_L1k( H%xArea(SUL), H%xRadi(SUL), H%gamma_HO2, srMw )
     k = k + Ars_L1k( H%xArea(BKC), H%xRadi(BKC), H%gamma_HO2, srMw )
-    k = k + Ars_L1k( H%xArea(ORC), H%xRadi(ORC), H%gamma_HO2, srMw )
+    k = k + OrgAndBrCArs_L1k( H, H%gamma_HO2, srMw )
     k = k + Ars_L1k( H%xArea(SSA), H%xRadi(SSA), H%gamma_HO2, srMw )
     k = k + Ars_L1k( H%xArea(SSC), H%xRadi(SSC), H%gamma_HO2, srMw )
   END FUNCTION HO2uptk1stOrd
@@ -2588,6 +2690,7 @@ CONTAINS
     REAL(dp)                      :: k
     !
     REAL(dp) :: Y_ClNO2, Rp, SA, SA_sum, area, gamma, srMw, ktmp
+    REAL(dp) :: gammaORC, Y_ClNO2_ORC, RpORC, SAORC
     !
     k    = 0.0_dp
     srMw = SR_MW(ind_N2O5)
@@ -2603,13 +2706,22 @@ CONTAINS
     k = k + Ars_L1K( H%ClearFr * H%xArea(DU7), H%xRadi(DU7), gamma, srMw )
     !
     ! Uptake on tropospheric sulfate
+    ! BrC bins are redirected OA mass, so include them in the generic
+    ! organic coating volume/water used by the SNA+ORG N2O5 uptake scheme.
     ! Reduce the rate of the HNO3 pathway in accordinace with
     ! the ClNO2 yield on SNA + ORG aerosol
     ! Reduce ClNO2 yield by 75% (cf McDuffie et al, JGR, 2018)
     CALL N2O5_InorgOrg(                                                      &
-         H,           H%AClVol,  H%xVol(ORC), H%xH2O(SUL),                   &
-         H%xH2O(ORC), H%AClRadi, C(ind_NIT), C(ind_SALACL),                  &
+         H,              H%AClVol,  OrgAndBrCVol(H), H%xH2O(SUL),            &
+         OrgAndBrCH2O(H), H%AClRadi, C(ind_NIT),     C(ind_SALACL),          &
          gamma,       Y_ClNO2,   Rp,         SA                             )
+    !
+    ! Diagnostic-only shadow calculation with the old ORC-only coating.
+    CALL N2O5_InorgOrg(                                                      &
+         H,              H%AClVol,  H%xVol(ORC), H%xH2O(SUL),                &
+         H%xH2O(ORC),    H%AClRadi, C(ind_NIT), C(ind_SALACL),               &
+         gammaORC,       Y_ClNO2_ORC, RpORC,    SAORC                       )
+    CALL Save_N2O5SNAOrg_Diags( H, gamma, gammaORC, Y_ClNO2, Rp, SA )
     !
     ktmp = Ars_L1K( H%ClearFr * SA, Rp, gamma, srMw )
     k = k + ktmp - ( ktmp * Y_ClNO2 * 0.25_dp )
@@ -2645,19 +2757,28 @@ CONTAINS
     ! Computes uptake rate of N2O5 on Cl- in fine sea salt.
     ! This reaction follows the N2O5 + Cl- channel.
     !
-    TYPE(HetState), INTENT(IN) :: H              ! Hetchem State
+    TYPE(HetState), INTENT(INOUT) :: H           ! Hetchem State
     REAL(dp)                   :: k              ! Rxn rate [1/s]
     REAL(dp) :: gamma, Y_ClNO2, Rp, SA           ! local vars
+    REAL(dp) :: gammaORC, Y_ClNO2_ORC, RpORC, SAORC
     !
     ! Exit if in the stratosphere
     k = 0.0_dp
     IF ( H%stratBox ) RETURN
     !
-    ! Properties of inorganic (SNA) sea salt coated with organics
+    ! Properties of inorganic (SNA) sea salt coated with organics.
+    ! Include BrC volume/water wherever ORC is generic organic material.
     CALL N2O5_InorgOrg(                                                      &
-         H,           H%AClVol,  H%xVol(ORC), H%xH2O(SUL),                   &
-         H%xH2O(ORC), H%aClRadi, C(ind_NIT),  C(ind_SALACL),                 &
+         H,              H%AClVol,  OrgAndBrCVol(H), H%xH2O(SUL),            &
+         OrgAndBrCH2O(H), H%aClRadi, C(ind_NIT),     C(ind_SALACL),          &
          gamma,       Y_ClNO2,   Rp,          SA                            )
+    !
+    ! Diagnostic-only shadow calculation with the old ORC-only coating.
+    CALL N2O5_InorgOrg(                                                      &
+         H,              H%AClVol,  H%xVol(ORC), H%xH2O(SUL),                &
+         H%xH2O(ORC),    H%aClRadi, C(ind_NIT), C(ind_SALACL),               &
+         gammaORC,       Y_ClNO2_ORC, RpORC,    SAORC                       )
+    CALL Save_N2O5SNAOrg_Diags( H, gamma, gammaORC, Y_ClNO2, Rp, SA )
     !
     ! Total loss rate of N2O5 (kN2O5) on SNA+ORG+SSA aerosol.
     ! Reduce ClNO2 production yield on fine inorganic+organic
@@ -2956,7 +3077,7 @@ CONTAINS
     !
     ! Uptake by organic carbon (aerosol type 10)
     gamma = 1e-6_dp
-    k = k + Ars_L1k( H%xArea(ORC), H%xRadi(ORC), gamma, srMw )
+    k = k + OrgAndBrCArs_L1k( H, gamma, srMw )
     !
     ! Uptake by fine & coarse sea salt (aerosol types 11-12)
     IF ( relhum < 40.0_dp ) THEN
@@ -3045,7 +3166,7 @@ CONTAINS
     !
     ! Uptake by organic carbon
     gamma = 0.005_dp
-    k = k + Ars_L1k( H%xArea(ORC), H%xRadi(ORC), gamma, srMw )
+    k = k + OrgAndBrCArs_L1k( H, gamma, srMw )
     !
     ! Uptake by stratospheric sulfate liquid aerosol
     ! and by irregular ice cloud
@@ -3448,7 +3569,7 @@ CONTAINS
     IF ( RELHUM >= CRITRH ) THEN
        k = k + Ars_L1k( H%xArea(SUL), H%xRadi(SUL), gamma, srMw )
        k = k + Ars_L1k( H%xArea(BKC), H%xRadi(BKC), gamma, srMw )
-       k = k + Ars_L1k( H%xArea(ORC), H%xRadi(ORC), gamma, srMw )
+       k = k + OrgAndBrCArs_L1k( H, gamma, srMw )
        k = k + Ars_L1k( H%xArea(SSA), H%xRadi(SSA), gamma, srMw )
        k = k + Ars_L1k( H%xArea(SSC), H%xRadi(SSC), gamma, srMw )
        k = k + Ars_L1k( H%xArea(SLA), H%xRadi(SLA), gamma, srMw )

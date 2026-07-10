@@ -84,7 +84,7 @@ MODULE DiagList_Mod
   CHARACTER(LEN=3),  PUBLIC  :: budgetBotLev_str ! Budget diag level range bottom
   CHARACTER(LEN=3),  PUBLIC  :: budgetTopLev_str ! Budget diag level range top
   CHARACTER(LEN=5),  PUBLIC  :: RadWL(3)         ! Wavelengths in radiation menu
-  CHARACTER(LEN=4),  PUBLIC  :: RadOut(17)       ! Names of RRTMG outputs (tags)
+  CHARACTER(LEN=4),  PUBLIC  :: RadOut(25)       ! Names of RRTMG outputs (tags)
   INTEGER,           PUBLIC  :: nRadOut          ! # of selected RRTMG outputs
   LOGICAL,           PUBLIC  :: IsFullChem       ! Is it a fullchem simulation?
   LOGICAL,           PUBLIC  :: IsHg             ! Is it a Hg simulation?
@@ -202,7 +202,7 @@ CONTAINS
     CHARACTER(LEN=255)           :: metadataID, registryID, registryIDprefix
     CHARACTER(LEN=255)           :: collname, AttName, AttValue
     CHARACTER(LEN=255)           :: AttComp,  FieldName
-    CHARACTER(LEN=3)             :: rrtmgOutputs(11)
+    CHARACTER(LEN=4)             :: rrtmgOutputs(18)
     CHARACTER(LEN=3)             :: topLev, botLev
     CHARACTER(LEN=255)           :: names(100)
     CHARACTER(LEN=QFYAML_NamLen) :: key
@@ -790,7 +790,7 @@ CONTAINS
           strInd(4) = INDEX( TRIM(metadataID), 'RADSSA' )
           strInd(5) = INDEX( TRIM(metadataID), 'RADASYM' )
           strIndMax = MAX(strInd(1),strInd(2),strInd(3),strInd(4),strInd(5))
-          IF ( strIndMax == 1 .AND. nRadOut < 17 ) THEN
+          IF ( strIndMax == 1 .AND. nRadOut < SIZE( RadOut ) ) THEN
 
              ! If RRTMG diagnostics present, always calculate BASE, and store
              ! first, since used to calculate other outputs.
@@ -814,8 +814,10 @@ CONTAINS
                 ! RRTMG wildcard since it may not be relevant to the simulation.
                 ! CO2, CFCs, H2O, and N2O also excluded since they are somewhat
                 ! niche (same for trop-only O3).
-                RRTMGOutputs = (/'O3 ','ME ','SU ','NI ','AM ','BC ',       &
-                                  'OA ','SS ','DU ','PM ','BRC'/)
+                RRTMGOutputs = (/'O3  ','ME  ','SU  ','NI  ','AM  ',       &
+                                  'BC  ','OA  ','SS  ','DU  ','PM  ',       &
+                                  'BRC ','BSOA','NPBR','WTC ',              &
+                                  'FSOA','PBRC','DBRC','BRCT'/)
                 DO N = 1, SIZE(rrtmgOutputs,1)
                    IF ( .not. ANY( RadOut == TRIM(rrtmgOutputs(N)) ) ) THEN
                       nRadOut          = nRadOut + 1

@@ -144,6 +144,23 @@ CONTAINS
     H%NO3_molal     = State_Chm%IsorropNitrate(I,J,L,1)
     H%SO4_molal     = State_Chm%IsorropSulfate(I,J,L)
 
+    ! N2O5 SNA+ORG diagnostics are populated by rate-law functions
+    ! after Update_RCONST.  Reset them here to avoid stale thread values
+    ! when a path exits early.
+    H%N2O5_gamma_SNAOrg   = 0.0_dp
+    H%N2O5_gamma_ORCOnly  = 0.0_dp
+    H%N2O5_gamma_DeltaBrC = 0.0_dp
+    H%N2O5_YClNO2_SNAOrg  = 0.0_dp
+    H%N2O5_Rp_SNAOrg      = 0.0_dp
+    H%N2O5_SA_SNAOrg      = 0.0_dp
+    H%N2O5_OrgVol         = 0.0_dp
+    H%N2O5_OrgVolBrC      = 0.0_dp
+    H%N2O5_OrgH2O         = 0.0_dp
+    H%N2O5_OrgH2OBrC      = 0.0_dp
+    H%N2O5_InorgH2O       = 0.0_dp
+    H%N2O5_BrCOrgVolFrac  = 0.0_dp
+    H%N2O5_BrCOrgH2OFrac  = 0.0_dp
+
     ! pH and alkalinity fields
     H%H_plus        = State_Chm%IsorropHplus(I,J,L,1)
     H%pHCloud       = State_Chm%pHCloud(I,J,L)

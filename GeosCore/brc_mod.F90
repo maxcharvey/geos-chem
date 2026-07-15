@@ -81,6 +81,8 @@ MODULE BRC_MOD
 !  30 Jun 2026 - M. Harvey - Removed timestep stop-loss; persistent
 !                             primary BrC is now represented by PBRCPOA
 !                             at emission time
+!  14 Jul 2026 - Codex - Make bleach scheme 0 an exact no-bleaching tracer
+!  15 Jul 2026 - Codex - Set production TAU_MAX to 1e8 s
 !EOP
 !------------------------------------------------------------------------------
 !BOC
@@ -225,9 +227,12 @@ MODULE BRC_MOD
   !   = 1 - 1/sqrt(e) = 1 - e^(-0.5) ≈ 0.3935
   REAL(fp), PARAMETER :: C_FACTOR     = 0.39346934_fp
 
-  ! Maximum allowed lifetime [s] (~3.2 years; effectively no whitening)
-  ! Changed value to be 1e10 s (317 years) for testing
-  REAL(fp), PARAMETER :: TAU_MAX      = 1.0e+10_fp
+  ! Maximum allowed lifetime [s] (~3.2 years; effectively no whitening
+  ! over the roughly one-week atmospheric residence time of BBOA)
+  ! Long-lived cold/dry regime: Schnitzler et al. (2022),
+  ! doi:10.1073/pnas.2205610119; Xie et al. (2025),
+  ! doi:10.5194/acp-25-13547-2025
+  REAL(fp), PARAMETER :: TAU_MAX      = 1.0e+8_fp
 
   ! Minimum allowed lifetime [s]
   ! Set to 6 hours based on observational constraints on fastest
@@ -1432,8 +1437,13 @@ CONTAINS
 
       END SELECT
 
-      ! First-order rate constant [s^-1]
-      KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
+      ! First-order rate constant [s^-1]. Scheme 0 is an exact tracer
+      ! control, rather than the finite TAU_MAX approximation.
+      IF ( Input_Opt%BrC_Bleach_Scheme == 0 ) THEN
+         KBRCSOA_LOCAL = 0.0_fp
+      ELSE
+         KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
+      ENDIF
 
       ! Local BBOA viscosity [Pa s] for diagnostics
       ETA_LOCAL = VISC_BBOA_FUNC( T_LOCAL, AW_LOCAL )
@@ -1483,17 +1493,23 @@ CONTAINS
       ! Zero drydep freq (drydep handled in mixing_mod.F90)
       FREQ = 0e+0_fp
 
-      ! Remaining BRCSOA after bleaching [kgC].  No timestep floor is
-      ! applied; persistent primary BrC is represented by PBRCPOA.
-      RKT  = ( KBRCSOA_LOCAL + FREQ ) * DTCHEM
-      CNEW = TC0 * EXP( -RKT )
+      IF ( KBRCSOA_LOCAL + FREQ > 0.0_fp ) THEN
+         ! Remaining BRCSOA after bleaching [kgC]. No timestep floor is
+         ! applied; persistent primary BrC is represented by PBRCPOA.
+         RKT  = ( KBRCSOA_LOCAL + FREQ ) * DTCHEM
+         CNEW = TC0 * EXP( -RKT )
 
-      ! Prevent underflow condition
-      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+         ! Prevent underflow condition
+         IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
-      ! Amount bleached from BRCSOA to WTC [kg/timestep]
-      BRCSOA_CONV(I,J,L) = ( TC0 - CNEW )                         &
-                          * KBRCSOA_LOCAL / ( KBRCSOA_LOCAL + FREQ )
+         ! Amount bleached from BRCSOA to WTC [kg/timestep]
+         BRCSOA_CONV(I,J,L) = ( TC0 - CNEW )                       &
+                             * KBRCSOA_LOCAL                        &
+                             / ( KBRCSOA_LOCAL + FREQ )
+      ELSE
+         CNEW = TC0
+         BRCSOA_CONV(I,J,L) = 0.0_fp
+      ENDIF
 
       ! Store diagnostic: BRCSOA->WTC flux [kg/timestep]
       IF ( State_Diag%Archive_BrCFluxBRC2WTC ) THEN
@@ -1691,8 +1707,13 @@ CONTAINS
 
       END SELECT
 
-      ! First-order rate constant [s^-1]
-      KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL
+      ! First-order rate constant [s^-1]. Scheme 0 is an exact tracer
+      ! control, rather than the finite TAU_MAX approximation.
+      IF ( Input_Opt%BrC_Bleach_Scheme == 0 ) THEN
+         KNPBRC_LOCAL = 0.0_fp
+      ELSE
+         KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL
+      ENDIF
 
       !==============================================================
       ! Bleach NPBRCPOA -> WTC as first-order loss over DTCHEM
@@ -1704,17 +1725,23 @@ CONTAINS
       ! Zero drydep freq (drydep handled in mixing_mod.F90)
       FREQ = 0e+0_fp
 
-      ! Remaining NPBRCPOA after bleaching [kgC].  The persistent share
-      ! of primary BrC emissions is emitted separately as PBRCPOA.
-      RKT  = ( KNPBRC_LOCAL + FREQ ) * DTCHEM
-      CNEW = TC0 * EXP( -RKT )
+      IF ( KNPBRC_LOCAL + FREQ > 0.0_fp ) THEN
+         ! Remaining NPBRCPOA after bleaching [kgC]. The persistent share
+         ! of primary BrC emissions is emitted separately as PBRCPOA.
+         RKT  = ( KNPBRC_LOCAL + FREQ ) * DTCHEM
+         CNEW = TC0 * EXP( -RKT )
 
-      ! Prevent underflow condition
-      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+         ! Prevent underflow condition
+         IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
-      ! Amount bleached from NPBRCPOA to WTC [kg/timestep]
-      NPBRC_CONV(I,J,L) = ( TC0 - CNEW )                          &
-                         * KNPBRC_LOCAL / ( KNPBRC_LOCAL + FREQ )
+         ! Amount bleached from NPBRCPOA to WTC [kg/timestep]
+         NPBRC_CONV(I,J,L) = ( TC0 - CNEW )                        &
+                            * KNPBRC_LOCAL                         &
+                            / ( KNPBRC_LOCAL + FREQ )
+      ELSE
+         CNEW = TC0
+         NPBRC_CONV(I,J,L) = 0.0_fp
+      ENDIF
 
       ! Store diagnostic: NPBRCPOA->WTC flux [kg/timestep]
       IF ( State_Diag%Archive_BrCFluxNPBRC2WTC ) THEN

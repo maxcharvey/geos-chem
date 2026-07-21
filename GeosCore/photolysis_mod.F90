@@ -34,6 +34,7 @@ MODULE PHOTOLYSIS_MOD
 !
 ! !REVISION HISTORY:
 !  20 Mar 2023 - E. Lundgren - initial version, adapted from fast_jx_mod.F90
+!  21 Jul 2026 - M. Harvey - Add optional dry-DBRCPOA Cloud-J FJX mapping
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -812,6 +813,7 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  31 Mar 2013 - S. D. Eastham - Adapted from J. Mao FJX v6.2 implementation
+!  21 Jul 2026 - M. Harvey - Map DBRCPOA to dedicated FJX records when present
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -821,8 +823,8 @@ CONTAINS
 !
     CHARACTER(LEN=255) :: ErrMsg, ThisLoc
     INTEGER            :: I, J, K
-    INTEGER, PARAMETER :: IND(NRHAER) = (/ 22, 29, 36, 43, 50, 57, &
-                                           57, 36, 57, 57, 57 /)
+    INTEGER, PARAMETER :: DBRC_FJX_FIRST = 64
+    INTEGER            :: IND(NRHAER)
     INTEGER,   POINTER :: MIEDX(:)
 
     !=================================================================
@@ -834,13 +836,28 @@ CONTAINS
     ErrMsg = ''
     ThisLoc = ' -> at Set_Aer (in module GeosCore/photolysis_mod.F90)'
 
+    IND = (/ 22, 29, 36, 43, 50, 57, 57, 36, 57, 57, 57 /)
+
+#ifndef FASTJX
+    ! A 63-entry FJX table retains legacy shared wet-BrC optics.  Case-local
+    ! 68-entry tables provide five dedicated, RH-indexed dry-DBRCPOA records.
+    IF ( Input_Opt%LBRC .AND. NAA >= DBRC_FJX_FIRST + NRH - 1 ) THEN
+       IND(11) = DBRC_FJX_FIRST
+    ENDIF
+#endif
+
+    ! Disabled BrC bins carry no aerosol mass.  Map them to an existing OC
+    ! record so that a main-branch (56-entry) FJX table remains valid.
+    IF ( .NOT. Input_Opt%LBRC ) IND(6:NRHAER) = 36
+
 
     ! Set pointer
     MIEDX => State_Chm%Phot%MIEDX
 
     ! Taken from aerosol_mod.F
-    ! N=6 BRCSOA, N=7 NPBRCPOA, N=9 FSOAS, N=10 PBRCPOA, and
-    ! N=11 DBRCPOA reuse the BrC FJX Mie entry.
+    ! N=6 BRCSOA, N=7 NPBRCPOA, N=9 FSOAS, and N=10 PBRCPOA reuse the
+    ! wet-BrC FJX Mie entry. N=11 DBRCPOA uses dedicated dry entries 64-68
+    ! when present, otherwise it retains the legacy wet-BrC mapping.
     ! N=8 WTC reuses the OC entry.
     ! Keep this constructor the same length as NRHAER so that any new
     ! aerosol bin requires an explicit Cloud-J optical mapping.

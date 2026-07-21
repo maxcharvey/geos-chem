@@ -129,6 +129,7 @@ MODULE CARBON_MOD
 !
 ! !REVISION HISTORY:
 !  01 Apr 1994 - R. Park - Initial version
+!  21 Jul 2026 - M. Harvey - Gate BrC chemistry on brown_carbon setting
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -551,7 +552,7 @@ CONTAINS
        ENDIF
     ENDIF
 
-    IF ( id_FFOCPO > 0 ) THEN
+    IF ( Input_Opt%LBRC .AND. id_FFOCPO > 0 ) THEN
        CALL CHEM_FFOCPO( Input_Opt  = Input_Opt,                             &
                          State_Chm  = State_Chm,                             &
                          State_Diag = State_Diag,                            &
@@ -560,7 +561,7 @@ CONTAINS
                          RC         = RC                                    )
     ENDIF
 
-    IF ( id_FFOCPI > 0 ) THEN
+    IF ( Input_Opt%LBRC .AND. id_FFOCPI > 0 ) THEN
        CALL CHEM_FFOCPI( Input_Opt  = Input_Opt,                             &
                          State_Chm  = State_Chm,                             &
                          State_Diag = State_Diag,                            &
@@ -944,12 +945,14 @@ CONTAINS
    !================================================================
    ! Do brown carbon chemistry (BrC darkening scheme) - mch 24/02/26
    !================================================================
-   CALL ChemBrC( Input_Opt, State_Chm, State_Diag, &
-                 State_Grid, State_Met, RC )
-   IF ( RC /= GC_SUCCESS ) THEN
-      ErrMsg = 'Error encountered in "ChemBrC"!'
-      CALL GC_Error( ErrMsg, RC, Loc )
-      RETURN
+   IF ( Input_Opt%LBRC ) THEN
+      CALL ChemBrC( Input_Opt, State_Chm, State_Diag, &
+                    State_Grid, State_Met, RC )
+      IF ( RC /= GC_SUCCESS ) THEN
+         ErrMsg = 'Error encountered in "ChemBrC"!'
+         CALL GC_Error( ErrMsg, RC, Loc )
+         RETURN
+      ENDIF
    ENDIF
 
  END SUBROUTINE CHEMCARBON

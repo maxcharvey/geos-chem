@@ -212,6 +212,7 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  14 Dec 2022 - E. Lundgren - initial version
+!  21 Jul 2026 - M. Harvey - Derive stratospheric aerosol slots from aerosol dimensions
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -220,6 +221,7 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
     CHARACTER(LEN=255) :: ErrMsg, ThisLoc
+    INTEGER, PARAMETER :: I_STRAT_AER_FIRST = 10 + NRHAER * NRH + 1
     INTEGER            :: A, I, J, L, K, N, S, MaxLev, RH_ind
     INTEGER            :: SO4_ind, BC_ind, OC_ind, SALA_ind, SALC_ind, BRC_ind
     INTEGER            :: S_rh0, S_rhx, K_rh0, K_rhx, ind_1000
@@ -787,6 +789,7 @@ CONTAINS
                    !----------------------------------------------------
                    ! Brown carbon [dry kg_OM/m3] -> [wet g/m2]
                    !----------------------------------------------------
+                   IF ( Input_Opt%LBRC ) THEN
 
                    ! Get indexes to optical property LUT
                    S_rh0 = 3 + NDUST + NRH*(BRC_ind-1) + 1  ! BrC index for RH=0 in NDXAER
@@ -917,6 +920,8 @@ CONTAINS
                    S_rhx = S_rh0 + RH_ind - 1
                    AERSP(L,S_rhx) = State_Chm%AerMass%BRCPO(I,J,L) * 1.d3 * BoxHt
 
+                   ENDIF ! LBRC
+
                 ENDIF
 
                 !----------------------------------------------------
@@ -996,13 +1001,13 @@ CONTAINS
 
              !  SSA/LBS/STS
              IF ( State_Chm%Phot%ODAER(I,J,L,State_Chm%Phot%IWV1000,6) > 0._fp ) THEN
-                AERSP(L,41) = State_Chm%Species(id_SO4)%Conc(I,J,L) &
+                AERSP(L,I_STRAT_AER_FIRST) = State_Chm%Species(id_SO4)%Conc(I,J,L) &
                      * MW_g / AVO * BoxHt * 1e+6_fp
              ENDIF
 
              !  NAT/ice PSCs
              IF ( State_Chm%Phot%ODAER(I,J,L,State_Chm%Phot%IWV1000,7) > 0._fp ) THEN
-                AERSP(L,42) = State_Chm%Species(id_SO4)%Conc(I,J,L) &
+                AERSP(L,I_STRAT_AER_FIRST+1) = State_Chm%Species(id_SO4)%Conc(I,J,L) &
                      * MW_g / AVO * BoxHt * 1e+6_fp
              ENDIF
 
@@ -1024,8 +1029,8 @@ CONTAINS
        !IF ( .NOT. use_sala     ) AERSP(:,26:30) = 0.d0
        !IF ( .NOT. use_salc     ) AERSP(:,31:35) = 0.d0
        !IF ( .NOT. use_brc      ) AERSP(:,36:40) = 0.d0
-       !IF ( .NOT. use_stratso4 ) AERSP(:,41)    = 0.d0
-       !IF ( .NOT. use_psc      ) AERSP(:,37)    = 0.d0
+       !IF ( .NOT. use_stratso4 ) AERSP(:,I_STRAT_AER_FIRST)   = 0.d0
+       !IF ( .NOT. use_psc      ) AERSP(:,I_STRAT_AER_FIRST+1) = 0.d0
 
        !-----------------------------------------------------------------
        ! Set remaining inputs needed for Cloud_JX

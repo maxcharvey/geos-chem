@@ -77,6 +77,7 @@ MODULE AEROSOL_MOD
 !
 ! !REVISION HISTORY:
 !  20 Jul 2004 - R. Yantosca - Initial version
+!  21 Jul 2026 - M. Harvey - Gate BrC optical inputs on brown_carbon setting
 !  See https://github.com/geoschem/geos-chem for complete history
 !------------------------------------------------------------------------------
 !BOC
@@ -570,6 +571,8 @@ CONTAINS
           State_Chm%AerMass%FSOAS(I,J,L) = 0.0_fp
           State_Chm%AerMass%PBRC(I,J,L)  = 0.0_fp
 
+          IF ( Input_Opt%LBRC ) THEN
+
           ! BRCSOA -> BRCPI (bin N=6, brc.dat)
           IF ( id_BRC_SOA > 0 ) THEN
              State_Chm%AerMass%BRCPI(I,J,L) =                      &
@@ -616,7 +619,9 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          IF ( IS_FFOCPI ) THEN
+          ENDIF ! LBRC
+
+          IF ( Input_Opt%LBRC .AND. IS_FFOCPI ) THEN
              State_Chm%AerMass%OCPI(I,J,L) =                       &
                 State_Chm%AerMass%OCPI(I,J,L)                      &
                 + Spc(id_FFOCPI)%Conc(I,J,L)                       &
@@ -624,7 +629,7 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          IF ( IS_FFOCPO ) THEN
+          IF ( Input_Opt%LBRC .AND. IS_FFOCPO ) THEN
              State_Chm%AerMass%OCPO(I,J,L) =                       &
                 State_Chm%AerMass%OCPO(I,J,L)                      &
                 + Spc(id_FFOCPO)%Conc(I,J,L)                       &
@@ -958,19 +963,19 @@ CONTAINS
 
           ! FSOAS (own bin N=9): keep in PM2.5 now that it is
           ! no longer carried inside SOAS (maxcharvey/geos-chem#7)
-          IF ( id_FSOAS > 0 ) THEN
+          IF ( Input_Opt%LBRC .AND. id_FSOAS > 0 ) THEN
              State_Chm%AerMass%PM25(I,J,L)                    =              &
                 State_Chm%AerMass%PM25(I,J,L)                 +              &
                 ( State_Chm%AerMass%FSOAS(I,J,L) * ORG_GROWTH )
           ENDIF
 
-          IF ( id_BRC_PBRC > 0 ) THEN
+          IF ( Input_Opt%LBRC .AND. id_BRC_PBRC > 0 ) THEN
              State_Chm%AerMass%PM25(I,J,L)                    =              &
                 State_Chm%AerMass%PM25(I,J,L)                 +              &
                 ( State_Chm%AerMass%PBRC(I,J,L) * ORG_GROWTH )
           ENDIF
 
-          IF ( id_BRC_DBRC > 0 ) THEN
+          IF ( Input_Opt%LBRC .AND. id_BRC_DBRC > 0 ) THEN
              State_Chm%AerMass%PM25(I,J,L)                    =              &
                 State_Chm%AerMass%PM25(I,J,L)                 +              &
                 ( State_Chm%AerMass%BRCPO(I,J,L) * ORG_GROWTH )
@@ -1506,25 +1511,29 @@ CONTAINS
           ! Hydrophilic OC [kg/m3]
           State_Chm%AerMass%WAERSL(I,J,L,3) = State_Chm%AerMass%OCPISOA(I,J,L)
 
-          ! BRCSOA (N=6, brc.dat) [kg_OM/m3]
-          State_Chm%AerMass%WAERSL(I,J,L,6) = State_Chm%AerMass%BRCPI(I,J,L)
+          IF ( Input_Opt%LBRC ) THEN
+             ! BRCSOA (N=6, brc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,6) = State_Chm%AerMass%BRCPI(I,J,L)
 
-          ! NPBRCPOA (N=7, brc.dat) [kg_OM/m3]
-          State_Chm%AerMass%WAERSL(I,J,L,7) = State_Chm%AerMass%NPBRC(I,J,L)
+             ! NPBRCPOA (N=7, brc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,7) = State_Chm%AerMass%NPBRC(I,J,L)
 
-          ! WTC (N=8, org.dat) [kg_OM/m3]
-          State_Chm%AerMass%WAERSL(I,J,L,8) = State_Chm%AerMass%WTCPI(I,J,L)
+             ! WTC (N=8, org.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,8) = State_Chm%AerMass%WTCPI(I,J,L)
 
-          ! FSOAS (N=9, brc.dat) [kg_OM/m3]
-          State_Chm%AerMass%WAERSL(I,J,L,9) = State_Chm%AerMass%FSOAS(I,J,L)
+             ! FSOAS (N=9, brc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,9) = State_Chm%AerMass%FSOAS(I,J,L)
 
-          ! PBRCPOA (N=10, pbrc.dat) [kg_OM/m3]
-          State_Chm%AerMass%WAERSL(I,J,L,10) = State_Chm%AerMass%PBRC(I,J,L)
+             ! PBRCPOA (N=10, pbrc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,10) = State_Chm%AerMass%PBRC(I,J,L)
 
-          ! DBRCPOA is listed as Is_HygroGrowth in species_database.yml only
-          ! to expose DBRCPOA-tagged AOD/area diagnostics.  Its optics stay
-          ! dry here: no WAERSL wet mass, dry DAERSL(3), dbrc.dat.
-          State_Chm%AerMass%WAERSL(I,J,L,11) = 0.0_fp
+             ! DBRCPOA is listed as Is_HygroGrowth in species_database.yml only
+             ! to expose DBRCPOA-tagged AOD/area diagnostics.  Its optics stay
+             ! dry here: no WAERSL wet mass, dry DAERSL(3), dbrc.dat.
+             State_Chm%AerMass%WAERSL(I,J,L,11) = 0.0_fp
+          ELSE
+             State_Chm%AerMass%WAERSL(I,J,L,6:11) = 0.0_fp
+          ENDIF
 
           ! Hydrophobic BC (a.k.a EC) [kg/m3]
           State_Chm%AerMass%DAERSL(I,J,L,1) = State_Chm%AerMass%BCPO(I,J,L)
@@ -1533,7 +1542,11 @@ CONTAINS
           State_Chm%AerMass%DAERSL(I,J,L,2) = State_Chm%AerMass%OCPO(I,J,L)
 
           ! Hydrophobic BrC (DBRCPOA) [kg_OM/m3]
-          State_Chm%AerMass%DAERSL(I,J,L,3) = State_Chm%AerMass%BRCPO(I,J,L)
+          IF ( Input_Opt%LBRC ) THEN
+             State_Chm%AerMass%DAERSL(I,J,L,3) = State_Chm%AerMass%BRCPO(I,J,L)
+          ELSE
+             State_Chm%AerMass%DAERSL(I,J,L,3) = 0.0_fp
+          ENDIF
 
        ENDDO
        ENDDO
@@ -3064,6 +3077,11 @@ CONTAINS
                  "ssc.dat  ", "brc.dat  ", "brc.dat  ", "org.dat  ",  &
                  "brc.dat  ", "pbrc.dat ", "dbrc.dat ", "h2so4.dat",  &
                  "h2so4.dat", "dust.dat "                              /)
+
+    ! When BrC is disabled, retain the 14-entry array layout but use an
+    ! existing main-branch optics file for the six inactive BrC entries.
+    ! Their aerosol masses are zeroed in RDAER, so they do not contribute.
+    IF ( .NOT. LBRC ) SPECFIL(6:11) = "org.dat  "
 
     ! Loop over the array of filenames
     DO k = 1, State_Chm%Phot%NSPAA

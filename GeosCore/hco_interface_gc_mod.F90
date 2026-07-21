@@ -67,6 +67,7 @@ MODULE HCO_Interface_GC_Mod
   PRIVATE :: Get_SzaFact
   PRIVATE :: GridEdge_Set
   PRIVATE :: CheckSettings
+  PRIVATE :: Restore_Legacy_OC
   PRIVATE :: SetHcoGrid
   PRIVATE :: SetHcoSpecies
 
@@ -79,6 +80,8 @@ MODULE HCO_Interface_GC_Mod
 !
 ! !REVISION HISTORY:
 !  20 Aug 2013 - C. Keller   - Initial version.
+!  21 Jul 2026 - M. Harvey  - Pass brown-carbon setting to GFED extension
+!                              and restore legacy OC emissions when disabled
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -247,6 +250,7 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  12 Sep 2013 - C. Keller   - Initial version
+!  21 Jul 2026 - M. Harvey   - Restore legacy OC emissions when BrC is disabled
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -1033,6 +1037,18 @@ CONTAINS
           CALL GC_Error( ErrMsg, RC, ThisLoc )
           RETURN
        ENDIF
+
+       ! A restart from a BrC run can contain FFOC tracers.  Fold them into
+       ! the legacy OC tracers when the BrC implementation is disabled.
+       IF ( .NOT. Input_Opt%LBRC ) THEN
+          CALL Restore_Legacy_OC( State_Chm, HMRC )
+          IF ( HMRC /= HCO_SUCCESS ) THEN
+             RC     = HMRC
+             ErrMsg = 'Error encountered in "Restore_Legacy_OC"!'
+             CALL GC_Error( ErrMsg, RC, ThisLoc )
+             RETURN
+          ENDIF
+       ENDIF
     ENDIF
 
     !=======================================================================
@@ -1124,6 +1140,18 @@ CONTAINS
           RETURN
        ENDIF
 
+       ! Route fossil-fuel OC fluxes from the branch-specific FFOC tracers
+       ! to the legacy OCPI/OCPO tracers before mixing applies emissions.
+       IF ( .NOT. Input_Opt%LBRC ) THEN
+          CALL Restore_Legacy_OC( State_Chm, HMRC )
+          IF ( HMRC /= HCO_SUCCESS ) THEN
+             RC     = HMRC
+             ErrMsg = 'Error encountered in "Restore_Legacy_OC"!'
+             CALL GC_Error( ErrMsg, RC, ThisLoc )
+             RETURN
+          ENDIF
+       ENDIF
+
        !====================================================================
        ! Update all 'AutoFill' diagnostics. This makes sure that all
        ! diagnostics fields with the 'AutoFill' flag are up-to-date. The
@@ -1176,6 +1204,97 @@ CONTAINS
     RC = GC_SUCCESS
 
   END SUBROUTINE HCOI_GC_Run
+!EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: restore_legacy_oc
+!
+! !DESCRIPTION: RESTORE_LEGACY_OC folds branch-specific fossil-fuel OC state
+! and HEMCO fluxes into OCPI and OCPO when brown carbon is disabled.
+!\\
+!
+! !INTERFACE:
+!
+  SUBROUTINE Restore_Legacy_OC( State_Chm, RC )
+!
+! !USES:
+!
+    USE HCO_Arr_Mod,   ONLY : HCO_ArrAssert
+    USE HCO_State_Mod, ONLY : HCO_GetHcoID
+    USE State_Chm_Mod, ONLY : ChmState, Ind_
+!
+! !INPUT/OUTPUT PARAMETERS:
+!
+    TYPE(ChmState), INTENT(INOUT) :: State_Chm ! Chemistry State object
+    INTEGER,        INTENT(OUT)   :: RC        ! Success or failure?
+!
+! !REVISION HISTORY:
+!  21 Jul 2026 - M. Harvey - Initial version
+!EOP
+!------------------------------------------------------------------------------
+!BOC
+
+    INTEGER :: Hco_OCPI, Hco_OCPO, Hco_FFOCPI, Hco_FFOCPO
+    INTEGER :: id_OCPI,  id_OCPO,  id_FFOCPI,  id_FFOCPO
+
+    RC = HCO_SUCCESS
+
+    id_OCPI   = Ind_( 'OCPI'   )
+    id_OCPO   = Ind_( 'OCPO'   )
+    id_FFOCPI = Ind_( 'FFOCPI' )
+    id_FFOCPO = Ind_( 'FFOCPO' )
+
+    ! Transfer any restart concentration before it can participate in a
+    ! disabled-BrC calculation.  The paired OC and FFOC tracers share MW.
+    IF ( id_OCPI > 0 .AND. id_FFOCPI > 0 ) THEN
+       State_Chm%Species(id_OCPI)%Conc = State_Chm%Species(id_OCPI)%Conc + &
+                                        State_Chm%Species(id_FFOCPI)%Conc
+       State_Chm%Species(id_FFOCPI)%Conc = 0.0_fp
+    ENDIF
+
+    IF ( id_OCPO > 0 .AND. id_FFOCPO > 0 ) THEN
+       State_Chm%Species(id_OCPO)%Conc = State_Chm%Species(id_OCPO)%Conc + &
+                                        State_Chm%Species(id_FFOCPO)%Conc
+       State_Chm%Species(id_FFOCPO)%Conc = 0.0_fp
+    ENDIF
+
+    Hco_OCPI   = HCO_GetHcoID( 'OCPI',   HcoState )
+    Hco_OCPO   = HCO_GetHcoID( 'OCPO',   HcoState )
+    Hco_FFOCPI = HCO_GetHcoID( 'FFOCPI', HcoState )
+    Hco_FFOCPO = HCO_GetHcoID( 'FFOCPO', HcoState )
+
+    IF ( Hco_OCPI > 0 .AND. Hco_FFOCPI > 0 ) THEN
+       IF ( ASSOCIATED( HcoState%Spc(Hco_FFOCPI)%Emis ) ) THEN
+          IF ( ASSOCIATED( HcoState%Spc(Hco_FFOCPI)%Emis%Val ) ) THEN
+             CALL HCO_ArrAssert( HcoState%Spc(Hco_OCPI)%Emis,                &
+                                 HcoState%NX, HcoState%NY, HcoState%NZ, RC )
+             IF ( RC /= HCO_SUCCESS ) RETURN
+             HcoState%Spc(Hco_OCPI)%Emis%Val =                               &
+                  HcoState%Spc(Hco_OCPI)%Emis%Val +                          &
+                  HcoState%Spc(Hco_FFOCPI)%Emis%Val
+             HcoState%Spc(Hco_FFOCPI)%Emis%Val = 0.0_hp
+          ENDIF
+       ENDIF
+    ENDIF
+
+    IF ( Hco_OCPO > 0 .AND. Hco_FFOCPO > 0 ) THEN
+       IF ( ASSOCIATED( HcoState%Spc(Hco_FFOCPO)%Emis ) ) THEN
+          IF ( ASSOCIATED( HcoState%Spc(Hco_FFOCPO)%Emis%Val ) ) THEN
+             CALL HCO_ArrAssert( HcoState%Spc(Hco_OCPO)%Emis,                &
+                                 HcoState%NX, HcoState%NY, HcoState%NZ, RC )
+             IF ( RC /= HCO_SUCCESS ) RETURN
+             HcoState%Spc(Hco_OCPO)%Emis%Val =                               &
+                  HcoState%Spc(Hco_OCPO)%Emis%Val +                          &
+                  HcoState%Spc(Hco_FFOCPO)%Emis%Val
+             HcoState%Spc(Hco_FFOCPO)%Emis%Val = 0.0_hp
+          ENDIF
+       ENDIF
+    ENDIF
+
+  END SUBROUTINE Restore_Legacy_OC
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -4067,6 +4186,29 @@ CONTAINS
           RETURN
        ENDIF
 
+    ENDIF
+
+    !-----------------------------------------------------------------------
+    ! Brown carbon
+    !
+    ! The model-level setting controls BrC GFED partitioning as well as
+    ! chemistry and optics.  This injected option is intentionally internal:
+    ! users set aerosols%carbon%brown_carbon in geoschem_config.yml.
+    !-----------------------------------------------------------------------
+    ExtNr = GetExtNr( HcoConfig%ExtList, 'GFED' )
+    IF ( ExtNr > 0 ) THEN
+       IF ( Input_Opt%LBRC ) THEN
+          OptName = 'GEOSCHEM_BROWN_CARBON : true'
+       ELSE
+          OptName = 'GEOSCHEM_BROWN_CARBON : false'
+       ENDIF
+       CALL AddExtOpt( HcoConfig, TRIM(OptName), ExtNr, RC=HMRC )
+       IF ( HMRC /= HCO_SUCCESS ) THEN
+          RC     = HMRC
+          ErrMsg = 'Error encountered in "AddExtOpt( GEOSCHEM_BROWN_CARBON )"!'
+          CALL GC_Error( ErrMsg, RC, ThisLoc )
+          RETURN
+       ENDIF
     ENDIF
 
     !-----------------------------------------------------------------------

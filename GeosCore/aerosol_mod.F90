@@ -78,6 +78,7 @@ MODULE AEROSOL_MOD
 ! !REVISION HISTORY:
 !  20 Jul 2004 - R. Yantosca - Initial version
 !  21 Jul 2026 - M. Harvey - Gate BrC optical inputs on brown_carbon setting
+!  22 Jul 2026 - M. Harvey - Safeguard ordinary brown_carbon:false map
 !  See https://github.com/geoschem/geos-chem for complete history
 !------------------------------------------------------------------------------
 !BOC
@@ -2405,8 +2406,10 @@ CONTAINS
        !$OMP DEFAULT( SHARED                                               ) &
        !$OMP PRIVATE( I, J, L, N, W, LINTERP, IsWL1, IsWL2, IsWL3, S       ) &
        !$OMP SCHEDULE( DYNAMIC                                             )
-       ! Loop over hydroscopic aerosols
-       DO NA = 1, NRHAER
+       ! Loop over state-backed hygroscopic aerosols.  In an ordinary
+       ! brown_carbon:false state, inactive bins 6:11 have no HYG
+       ! diagnostic entry even though the optics layout retains them.
+       DO NA = 1, State_Chm%nHygGrth
 
           ! Get ID following ordering of aerosol densities in RD_AOD
           N = Map_NRHAER(NA)
@@ -2538,7 +2541,7 @@ CONTAINS
     IF ( Input_Opt%amIRoot .AND. PRESENT( ODSWITCH ) ) THEN
        IF ( ODSWITCH == 1 .AND. Input_Opt%NWVSELECT >= 1 ) THEN
           DBG_NA(:) = 0
-          DO NA = 1, NRHAER
+          DO NA = 1, State_Chm%nHygGrth
              SELECT CASE ( Map_NRHAER(NA) )
              CASE ( 6 )
                 DBG_NA(1) = NA
@@ -2607,8 +2610,9 @@ CONTAINS
        !$OMP DEFAULT( SHARED        ) &
        !$OMP PRIVATE( I, J, L, N, S ) &
        !$OMP SCHEDULE( DYNAMIC      )
-       ! Loop over hydroscopic aerosols
-       DO NA = 1, NRHAER
+       ! Loop over state-backed hygroscopic aerosols.  See Init_Aerosol for
+       ! the fixed-layout handling of inactive brown_carbon:false bins.
+       DO NA = 1, State_Chm%nHygGrth
 
           ! Get ID following ordering of aerosol densities in RD_AOD
           N = Map_NRHAER(NA)
@@ -2846,7 +2850,30 @@ CONTAINS
        ! Initialize the mapping between hygroscopic species in the
        ! species database and the species order in NRHAER
        !---------------------------------------------------------------------
-       DO N = 1, NRHAER
+       ! The inactive BrC bins remain distinct, zero-mass optical bins when
+       ! brown_carbon is false and the ordinary state has only five entries.
+       ! Do not alias them to OCPI: downstream aerosol, Fast-J, and RRTMG
+       ! code still requires the expanded 11-bin layout.
+       Map_NRHAER(:) = (/ ( N, N = 1, NRHAER ) /)
+
+       ! A larger state map cannot be represented by the fixed optical
+       ! layout.  Stop instead of silently truncating a caller's species map.
+       IF ( State_Chm%nHygGrth > NRHAER ) THEN
+          ErrMsg = 'State_Chm%nHygGrth exceeds the fixed NRHAER aerosol layout!'
+          CALL GC_ERROR( ErrMsg, RC, 'Init_Aerosol in aerosol_mod.F90' )
+          RETURN
+       ENDIF
+
+       ! An enabled BrC state must provide the complete expanded mapping.
+       IF ( Input_Opt%LBRC .AND. State_Chm%nHygGrth < NRHAER ) THEN
+          ErrMsg = 'brown_carbon requires all NRHAER hygroscopic species!'
+          CALL GC_ERROR( ErrMsg, RC, 'Init_Aerosol in aerosol_mod.F90' )
+          RETURN
+       ENDIF
+
+       ! Map all active species entries.  Canonical fallback slots above
+       ! remain in place only for inactive BrC bins in the ordinary state.
+       DO N = 1, State_Chm%nHygGrth
 
           ! Get the species database index from the species database
           ! mapping array for hygroscopic growth species

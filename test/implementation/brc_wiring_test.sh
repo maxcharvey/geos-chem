@@ -52,6 +52,16 @@ require "IF ( Input_Opt%LBRC ) THEN" "${carbon}"
 require "IF ( Input_Opt%LBRC .AND. id_FFOCPO > 0 ) THEN" "${carbon}"
 require "IF ( .NOT. LBRC ) SPECFIL(6:11) = \"org.dat  \"" "${aerosol}"
 require "IF ( .NOT. Input_Opt%LBRC ) IND(6:NRHAER) = 36" "${photolysis}"
+
+# The ordinary brown_carbon:false state has only the five legacy hygroscopic
+# species.  Keep all 11 distinct optical bins valid; do not alias or drop
+# inactive BrC slots.
+require "Map_NRHAER(:) = (/ ( N, N = 1, NRHAER ) /)" "${aerosol}"
+require "IF ( State_Chm%nHygGrth > NRHAER ) THEN" "${aerosol}"
+require "IF ( Input_Opt%LBRC .AND. State_Chm%nHygGrth < NRHAER ) THEN" "${aerosol}"
+require "DO N = 1, State_Chm%nHygGrth" "${aerosol}"
+require "DO NA = 1, State_Chm%nHygGrth" "${aerosol}"
+
 require "GEOSCHEM_BROWN_CARBON" "${hco_interface}"
 require "GEOSCHEM_BROWN_CARBON" "${gfed}"
 require "IF ( .NOT. Inst%UseBrC ) THEN" "${gfed}"

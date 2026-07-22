@@ -57,10 +57,21 @@ require "IF ( .NOT. Input_Opt%LBRC ) IND(6:NRHAER) = 36" "${photolysis}"
 # species.  Keep all 11 distinct optical bins valid; do not alias or drop
 # inactive BrC slots.
 require "Map_NRHAER(:) = (/ ( N, N = 1, NRHAER ) /)" "${aerosol}"
+require "INTEGER :: Map_NRHAER(NRHAER)" "${aerosol}"
 require "IF ( State_Chm%nHygGrth > NRHAER ) THEN" "${aerosol}"
-require "IF ( Input_Opt%LBRC .AND. State_Chm%nHygGrth < NRHAER ) THEN" "${aerosol}"
+require "IF ( Seen_NRHAER(Map_NRHAER(N)) ) THEN" "${aerosol}"
+require "brown_carbon has duplicate hygroscopic species" "${aerosol}"
+require "brown_carbon is missing canonical aerosol bin" "${aerosol}"
 require "DO N = 1, State_Chm%nHygGrth" "${aerosol}"
 require "DO NA = 1, State_Chm%nHygGrth" "${aerosol}"
+
+# A longer Cloud-J table is usable for dry DBRC only when all five optional
+# records are present and explicitly carry DBRC identities.
+require "NAA >= DBRC_FJX_FIRST .AND. NAA < DBRC_FJX_LAST" "${photolysis}"
+require "(/ 'DB00', 'DB50', 'DB70', 'DB80', 'DB90' /)" "${photolysis}"
+require "MieTitle(1:4) /=" "${photolysis}"
+require "Cloud-J DBRC optics: dedicated records" "${photolysis}"
+require "Cloud-J DBRC optics: wet-BrC fallback records 57-61" "${photolysis}"
 
 require "GEOSCHEM_BROWN_CARBON" "${hco_interface}"
 require "GEOSCHEM_BROWN_CARBON" "${gfed}"

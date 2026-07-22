@@ -35,6 +35,7 @@ MODULE PHOTOLYSIS_MOD
 ! !REVISION HISTORY:
 !  20 Mar 2023 - E. Lundgren - initial version, adapted from fast_jx_mod.F90
 !  21 Jul 2026 - M. Harvey - Add optional dry-DBRCPOA Cloud-J FJX mapping
+!  22 Jul 2026 - M. Harvey - Validate optional dry-DBRCPOA FJX records
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -822,8 +823,12 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
     CHARACTER(LEN=255) :: ErrMsg, ThisLoc
+    CHARACTER(LEN=80 ) :: MieTitle
     INTEGER            :: I, J, K
     INTEGER, PARAMETER :: DBRC_FJX_FIRST = 64
+    INTEGER, PARAMETER :: DBRC_FJX_LAST  = DBRC_FJX_FIRST + NRH - 1
+    CHARACTER(LEN=4), PARAMETER :: DBRC_FJX_TITLE(NRH) =              &
+       (/ 'DB00', 'DB50', 'DB70', 'DB80', 'DB90' /)
     INTEGER            :: IND(NRHAER)
     INTEGER,   POINTER :: MIEDX(:)
 
@@ -841,8 +846,37 @@ CONTAINS
 #ifndef FASTJX
     ! A 63-entry FJX table retains legacy shared wet-BrC optics.  Case-local
     ! 68-entry tables provide five dedicated, RH-indexed dry-DBRCPOA records.
-    IF ( Input_Opt%LBRC .AND. NAA >= DBRC_FJX_FIRST + NRH - 1 ) THEN
-       IND(11) = DBRC_FJX_FIRST
+    IF ( Input_Opt%LBRC ) THEN
+       IF ( NAA >= DBRC_FJX_FIRST .AND. NAA < DBRC_FJX_LAST ) THEN
+          WRITE( ErrMsg, '(a,i0,a,i0,a,i0)' )                           &
+             'Incomplete Cloud-J DBRC block: table has ', NAA,          &
+             ' records; dedicated DBRC requires records ',              &
+             DBRC_FJX_FIRST, '-', DBRC_FJX_LAST
+          CALL GC_Error( ErrMsg, RC, ThisLoc )
+          RETURN
+       ELSEIF ( NAA >= DBRC_FJX_LAST ) THEN
+          ! This is an identity guard only.  Table provenance and optical
+          ! QA remain mandatory run-input checks outside the model.
+          DO J = DBRC_FJX_FIRST, DBRC_FJX_LAST
+             MieTitle = ADJUSTL( TITLAA(J) )
+             IF ( MieTitle(1:4) /=                                    &
+                  DBRC_FJX_TITLE(J - DBRC_FJX_FIRST + 1) ) THEN
+                WRITE( ErrMsg, '(a,i0,5a)' )                           &
+                   'Cloud-J record ', J, ' has title "',               &
+                   TRIM(TITLAA(J)), '"; expected "',                   &
+                   DBRC_FJX_TITLE(J - DBRC_FJX_FIRST + 1), '"'
+                CALL GC_Error( ErrMsg, RC, ThisLoc )
+                RETURN
+             ENDIF
+          ENDDO
+          IND(11) = DBRC_FJX_FIRST
+          IF ( Input_Opt%amIRoot ) WRITE(6,'(a,i0,a,i0)')               &
+             'Cloud-J DBRC optics: dedicated records ', DBRC_FJX_FIRST, &
+             '-', DBRC_FJX_LAST
+       ELSE
+          IF ( Input_Opt%amIRoot ) WRITE(6,'(a)')                       &
+             'Cloud-J DBRC optics: wet-BrC fallback records 57-61'
+       ENDIF
     ENDIF
 #endif
 

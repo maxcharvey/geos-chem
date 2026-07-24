@@ -81,6 +81,7 @@ MODULE AEROSOL_MOD
 !  21 Jul 2026 - M. Harvey - Gate BrC optical inputs on brown_carbon setting
 !  22 Jul 2026 - M. Harvey - Safeguard ordinary brown_carbon:false map
 !  22 Jul 2026 - M. Harvey - Validate enabled BrC aerosol-bin mapping
+!  23 Jul 2026 - M. Harvey - Use executable BrC map validator
 !  See https://github.com/geoschem/geos-chem for complete history
 !------------------------------------------------------------------------------
 !BOC
@@ -2724,6 +2725,7 @@ CONTAINS
 ! !USES:
 !
     USE CMN_SIZE_MOD,   ONLY : NAER, NDUST
+    USE BRC_AEROSOL_MAP_MOD, ONLY : VALIDATE_BRC_AEROSOL_MAP
     USE ErrCode_Mod
     USE Input_Opt_Mod,  ONLY : OptInput
     USE Species_Mod,    ONLY : Species
@@ -2756,7 +2758,7 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
     INTEGER                :: N, SpcID
-    LOGICAL                :: Seen_NRHAER(NRHAER)
+    INTEGER                :: DuplicateEntry, MissingBin
     CHARACTER(LEN=255)     :: ThisLoc
     CHARACTER(LEN=512)     :: ErrMsg
 
@@ -2858,7 +2860,6 @@ CONTAINS
        ! Do not alias them to OCPI: downstream aerosol, Fast-J, and RRTMG
        ! code still requires the expanded 11-bin layout.
        Map_NRHAER(:) = (/ ( N, N = 1, NRHAER ) /)
-       Seen_NRHAER(:) = .FALSE.
 
        ! A larger state map cannot be represented by the fixed optical
        ! layout.  Stop instead of silently truncating a caller's species map.
@@ -2911,40 +2912,39 @@ CONTAINS
                 RETURN
           END SELECT
 
-          ! Count alone cannot prove an enabled BrC state has every optical
-          ! species.  Reject duplicate canonical bins (e.g. OCPI and POA1)
-          ! before a missing BrC bin can be hidden by the expected count.
-          IF ( Input_Opt%LBRC ) THEN
-             IF ( Seen_NRHAER(Map_NRHAER(N)) ) THEN
-                WRITE( ErrMsg, '(a,a,a,i0,a)' )                         &
-                   'brown_carbon has duplicate hygroscopic species "', &
-                   TRIM(SpcInfo%Name), '" for canonical aerosol bin ',  &
-                   Map_NRHAER(N), '!'
-                CALL GC_ERROR( ErrMsg, RC,                              &
-                               'Init_Aerosol in aerosol_mod.F90' )
-                SpcInfo => NULL()
-                RETURN
-             ENDIF
-             Seen_NRHAER(Map_NRHAER(N)) = .TRUE.
-          ENDIF
-
           ! Free pointer
           SpcInfo => NULL()
 
        ENDDO
 
-       ! Require every canonical optical bin when BrC is enabled.  The state
-       ! species may be in any order; Map_NRHAER preserves that ordering.
+       ! Reject duplicate and missing canonical optical bins when BrC is
+       ! enabled.  The state species may be in any order.
        IF ( Input_Opt%LBRC ) THEN
-          DO N = 1, NRHAER
-             IF ( .NOT. Seen_NRHAER(N) ) THEN
-                WRITE( ErrMsg, '(a,i0,a)' )                             &
-                   'brown_carbon is missing canonical aerosol bin ', N, '!'
-                CALL GC_ERROR( ErrMsg, RC,                              &
-                               'Init_Aerosol in aerosol_mod.F90' )
-                RETURN
-             ENDIF
-          ENDDO
+          CALL VALIDATE_BRC_AEROSOL_MAP(                                &
+             Map_NRHAER(1:State_Chm%nHygGrth), NRHAER,                 &
+             DuplicateEntry, MissingBin )
+
+          IF ( DuplicateEntry > 0 ) THEN
+             SpcID   = State_Chm%Map_HygGrth(DuplicateEntry)
+             SpcInfo => State_Chm%SpcData(SpcID)%Info
+             WRITE( ErrMsg, '(a,a,a,i0,a)' )                            &
+                'brown_carbon has duplicate hygroscopic species "',    &
+                TRIM(SpcInfo%Name), '" for canonical aerosol bin ',     &
+                Map_NRHAER(DuplicateEntry), '!'
+             CALL GC_ERROR( ErrMsg, RC,                                 &
+                            'Init_Aerosol in aerosol_mod.F90' )
+             SpcInfo => NULL()
+             RETURN
+          ENDIF
+
+          IF ( MissingBin > 0 ) THEN
+             WRITE( ErrMsg, '(a,i0,a)' )                                &
+                'brown_carbon is missing canonical aerosol bin ',       &
+                MissingBin, '!'
+             CALL GC_ERROR( ErrMsg, RC,                                 &
+                            'Init_Aerosol in aerosol_mod.F90' )
+             RETURN
+          ENDIF
        ENDIF
     ENDIF
 

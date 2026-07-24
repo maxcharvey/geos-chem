@@ -35,6 +35,8 @@ forbid() {
 cldj="${geos_root}/GeosCore/cldj_interface_mod.F90"
 carbon="${geos_root}/GeosCore/carbon_mod.F90"
 aerosol="${geos_root}/GeosCore/aerosol_mod.F90"
+brc_map="${geos_root}/GeosCore/brc_aerosol_map_mod.F90"
+brc_cloudj_map="${geos_root}/GeosCore/brc_cloudj_map_mod.F90"
 photolysis="${geos_root}/GeosCore/photolysis_mod.F90"
 hco_interface="${geos_root}/GeosCore/hco_interface_gc_mod.F90"
 gfed="${hemco_root}/src/Extensions/hcox_gfed_mod.F90"
@@ -51,7 +53,7 @@ forbid "AERSP(L,42)" "${cldj}"
 require "IF ( Input_Opt%LBRC ) THEN" "${carbon}"
 require "IF ( Input_Opt%LBRC .AND. id_FFOCPO > 0 ) THEN" "${carbon}"
 require "IF ( .NOT. LBRC ) SPECFIL(6:11) = \"org.dat  \"" "${aerosol}"
-require "IF ( .NOT. Input_Opt%LBRC ) IND(6:NRHAER) = 36" "${photolysis}"
+require "CALL BUILD_BRC_CLOUDJ_MAP(" "${photolysis}"
 
 # The ordinary brown_carbon:false state has only the five legacy hygroscopic
 # species.  Keep all 11 distinct optical bins valid; do not alias or drop
@@ -59,19 +61,22 @@ require "IF ( .NOT. Input_Opt%LBRC ) IND(6:NRHAER) = 36" "${photolysis}"
 require "Map_NRHAER(:) = (/ ( N, N = 1, NRHAER ) /)" "${aerosol}"
 require "INTEGER :: Map_NRHAER(NRHAER)" "${aerosol}"
 require "IF ( State_Chm%nHygGrth > NRHAER ) THEN" "${aerosol}"
-require "IF ( Seen_NRHAER(Map_NRHAER(N)) ) THEN" "${aerosol}"
+require "CALL VALIDATE_BRC_AEROSOL_MAP(" "${aerosol}"
+require "IF ( Seen(Bins(N)) ) THEN" "${brc_map}"
 require "brown_carbon has duplicate hygroscopic species" "${aerosol}"
 require "brown_carbon is missing canonical aerosol bin" "${aerosol}"
 require "DO N = 1, State_Chm%nHygGrth" "${aerosol}"
 require "DO NA = 1, State_Chm%nHygGrth" "${aerosol}"
 
-# A longer Cloud-J table is usable for dry DBRC only when all five optional
-# records are present and explicitly carry DBRC identities.
-require "NAA >= DBRC_FJX_FIRST .AND. NAA < DBRC_FJX_LAST" "${photolysis}"
-require "(/ 'DB00', 'DB50', 'DB70', 'DB80', 'DB90' /)" "${photolysis}"
-require "MieTitle(1:4) /=" "${photolysis}"
-require "Cloud-J DBRC optics: dedicated records" "${photolysis}"
-require "Cloud-J DBRC optics: wet-BrC fallback records 57-61" "${photolysis}"
+# Cloud-J organic mode maps wet BrC to OC records and dry DBRC to OC00.
+# Dedicated mode requires identified wet, persistent, and dry BrC records.
+require "CASE ( 'ORGANIC' )" "${brc_cloudj_map}"
+require "AerMap(11,J) = DRY_BRC_RECORD" "${brc_cloudj_map}"
+require "(/ 'WB00', 'WB50', 'WB70', 'WB80', 'WB90' /)" "${brc_cloudj_map}"
+require "(/ 'PB00', 'PB50', 'PB70', 'PB80', 'PB90' /)" "${brc_cloudj_map}"
+require "IF ( MieTitle(1:4) /= 'DB00' ) THEN" "${brc_cloudj_map}"
+require "Cloud-J BrC optics: organic-equivalence records" "${photolysis}"
+forbid "wet-BrC fallback records 57-61" "${photolysis}"
 
 require "GEOSCHEM_BROWN_CARBON" "${hco_interface}"
 require "GEOSCHEM_BROWN_CARBON" "${gfed}"
@@ -81,5 +86,6 @@ require "SUBROUTINE Restore_Legacy_OC" "${hco_interface}"
 require "CALL HCO_ArrAssert( HcoState%Spc(Hco_OCPI)%Emis" "${hco_interface}"
 require "HcoState%Spc(Hco_OCPI)%Emis%Val +" "${hco_interface}"
 require "HcoState%Spc(Hco_FFOCPI)%Emis%Val = 0.0_hp" "${hco_interface}"
+require "IF ( .NOT. ASSOCIATED( HcoState ) ) RETURN" "${hco_interface}"
 
 echo "PASS: BrC wiring static regression checks"

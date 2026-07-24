@@ -82,6 +82,7 @@ MODULE HCO_Interface_GC_Mod
 !  20 Aug 2013 - C. Keller   - Initial version.
 !  21 Jul 2026 - M. Harvey  - Pass brown-carbon setting to GFED extension
 !                              and restore legacy OC emissions when disabled
+!  23 Jul 2026 - M. Harvey  - Skip cleanup before HEMCO initialization
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -1353,6 +1354,9 @@ CONTAINS
     HMRC     = HCO_SUCCESS
     ErrMsg   = ''
     ThisLoc  = ' -> at HCOI_GC_Final (in module GeosCore/hco_interface_gc_mod.F90)'
+
+    ! Early GEOS-Chem initialization errors can precede HEMCO allocation.
+    IF ( .NOT. ASSOCIATED( HcoState ) ) RETURN
 
     !-----------------------------------------------------------------------
     ! Cleanup HEMCO core

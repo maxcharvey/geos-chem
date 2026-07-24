@@ -36,6 +36,7 @@ MODULE PHOTOLYSIS_MOD
 !  20 Mar 2023 - E. Lundgren - initial version, adapted from fast_jx_mod.F90
 !  21 Jul 2026 - M. Harvey - Add optional dry-DBRCPOA Cloud-J FJX mapping
 !  22 Jul 2026 - M. Harvey - Validate optional dry-DBRCPOA FJX records
+!  23 Jul 2026 - M. Harvey - Add explicit organic/dedicated BrC optics modes
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -790,6 +791,7 @@ CONTAINS
 !
 ! !USES:
 !
+    USE BrC_CloudJ_Map_Mod, ONLY : BUILD_BRC_CLOUDJ_MAP
 #ifdef FASTJX
     USE CMN_FJX_Mod,    ONLY : AN_, NAA, TITLAA
 #else
@@ -823,13 +825,8 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
     CHARACTER(LEN=255) :: ErrMsg, ThisLoc
-    CHARACTER(LEN=80 ) :: MieTitle
     INTEGER            :: I, J, K
-    INTEGER, PARAMETER :: DBRC_FJX_FIRST = 64
-    INTEGER, PARAMETER :: DBRC_FJX_LAST  = DBRC_FJX_FIRST + NRH - 1
-    CHARACTER(LEN=4), PARAMETER :: DBRC_FJX_TITLE(NRH) =              &
-       (/ 'DB00', 'DB50', 'DB70', 'DB80', 'DB90' /)
-    INTEGER            :: IND(NRHAER)
+    INTEGER            :: AerMap(NRHAER,NRH)
     INTEGER,   POINTER :: MIEDX(:)
 
     !=================================================================
@@ -841,60 +838,27 @@ CONTAINS
     ErrMsg = ''
     ThisLoc = ' -> at Set_Aer (in module GeosCore/photolysis_mod.F90)'
 
-    IND = (/ 22, 29, 36, 43, 50, 57, 57, 36, 57, 57, 57 /)
+    CALL BUILD_BRC_CLOUDJ_MAP( Input_Opt%LBRC,                         &
+                               Input_Opt%CloudJ_BrC_Optics, NAA,      &
+                               TITLAA, AerMap, RC, ErrMsg )
+    IF ( RC /= GC_SUCCESS ) THEN
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
 
-#ifndef FASTJX
-    ! A 63-entry FJX table retains legacy shared wet-BrC optics.  Case-local
-    ! 68-entry tables provide five dedicated, RH-indexed dry-DBRCPOA records.
-    IF ( Input_Opt%LBRC ) THEN
-       IF ( NAA >= DBRC_FJX_FIRST .AND. NAA < DBRC_FJX_LAST ) THEN
-          WRITE( ErrMsg, '(a,i0,a,i0,a,i0)' )                           &
-             'Incomplete Cloud-J DBRC block: table has ', NAA,          &
-             ' records; dedicated DBRC requires records ',              &
-             DBRC_FJX_FIRST, '-', DBRC_FJX_LAST
-          CALL GC_Error( ErrMsg, RC, ThisLoc )
-          RETURN
-       ELSEIF ( NAA >= DBRC_FJX_LAST ) THEN
-          ! This is an identity guard only.  Table provenance and optical
-          ! QA remain mandatory run-input checks outside the model.
-          DO J = DBRC_FJX_FIRST, DBRC_FJX_LAST
-             MieTitle = ADJUSTL( TITLAA(J) )
-             IF ( MieTitle(1:4) /=                                    &
-                  DBRC_FJX_TITLE(J - DBRC_FJX_FIRST + 1) ) THEN
-                WRITE( ErrMsg, '(a,i0,5a)' )                           &
-                   'Cloud-J record ', J, ' has title "',               &
-                   TRIM(TITLAA(J)), '"; expected "',                   &
-                   DBRC_FJX_TITLE(J - DBRC_FJX_FIRST + 1), '"'
-                CALL GC_Error( ErrMsg, RC, ThisLoc )
-                RETURN
-             ENDIF
-          ENDDO
-          IND(11) = DBRC_FJX_FIRST
-          IF ( Input_Opt%amIRoot ) WRITE(6,'(a,i0,a,i0)')               &
-             'Cloud-J DBRC optics: dedicated records ', DBRC_FJX_FIRST, &
-             '-', DBRC_FJX_LAST
+    IF ( Input_Opt%LBRC .AND. Input_Opt%amIRoot ) THEN
+       IF ( TRIM(Input_Opt%CloudJ_BrC_Optics) == 'ORGANIC' ) THEN
+          WRITE(6,'(a)') 'Cloud-J BrC optics: organic-equivalence records'
        ELSE
-          IF ( Input_Opt%amIRoot ) WRITE(6,'(a)')                       &
-             'Cloud-J DBRC optics: wet-BrC fallback records 57-61'
+          WRITE(6,'(a)') 'Cloud-J BrC optics: dedicated records 64-74'
        ENDIF
     ENDIF
-#endif
-
-    ! Disabled BrC bins carry no aerosol mass.  Map them to an existing OC
-    ! record so that a main-branch (56-entry) FJX table remains valid.
-    IF ( .NOT. Input_Opt%LBRC ) IND(6:NRHAER) = 36
 
 
     ! Set pointer
     MIEDX => State_Chm%Phot%MIEDX
 
-    ! Taken from aerosol_mod.F
-    ! N=6 BRCSOA, N=7 NPBRCPOA, N=9 FSOAS, and N=10 PBRCPOA reuse the
-    ! wet-BrC FJX Mie entry. N=11 DBRCPOA uses dedicated dry entries 64-68
-    ! when present, otherwise it retains the legacy wet-BrC mapping.
-    ! N=8 WTC reuses the OC entry.
-    ! Keep this constructor the same length as NRHAER so that any new
-    ! aerosol bin requires an explicit Cloud-J optical mapping.
+    ! BUILD_BRC_CLOUDJ_MAP defines every aerosol/RH pair explicitly.
 
     IF ( AN_ /= 10 + ( NRHAER * NRH ) + NSTRATAER ) THEN
        WRITE( ErrMsg, '(a,i0,a,i0)' ) 'Cloud-J slot mismatch: AN_=', AN_, &
@@ -927,7 +891,7 @@ CONTAINS
     ! Aerosols
     DO I=1,NRHAER
        DO J=1,NRH
-          MIEDX(10+((I-1)*NRH)+J)=IND(I)+J-1
+          MIEDX(10+((I-1)*NRH)+J)=AerMap(I,J)
        ENDDO
     ENDDO
 

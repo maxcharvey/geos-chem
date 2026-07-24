@@ -2783,6 +2783,7 @@ CONTAINS
 !
 ! !USES:
 !
+    USE Charpak_Mod,   ONLY : To_UpperCase
     USE ErrCode_Mod
     USE Input_Opt_Mod, ONLY : OptInput
     USE RoundOff_Mod,  ONLY : Cast_and_RoundOff
@@ -2864,6 +2865,19 @@ CONTAINS
        RETURN
     ENDIF
     Input_Opt%CloudJ_DIR = TRIM( v_str )
+
+    ! BrC optical mapping: organic for equivalence tests, dedicated for
+    ! generated Cloud-J BrC records.  Default preserves old run directories.
+    key   = "operations%photolysis%cloud-j%brc_optics"
+    v_str = MISSING_STR
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_str, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    IF ( TRIM( v_str ) == MISSING_STR ) v_str = 'organic'
+    Input_Opt%CloudJ_BrC_Optics = To_UpperCase( TRIM( v_str ) )
 
     ! Number levels with clouds to use in photolysis (Cloud-J var LWEPAR)
     key   = "operations%photolysis%cloud-j%num_levs_with_cloud"
@@ -3158,6 +3172,8 @@ CONTAINS
                        TRIM( Input_Opt%FAST_JX_DIR )
        WRITE( 6,120 ) 'Cloud-J input directory     : ',                      &
                        TRIM( Input_Opt%CloudJ_Dir )
+       WRITE( 6,120 ) 'Cloud-J BrC optics          : ',                      &
+                       TRIM( Input_Opt%CloudJ_BrC_Optics )
        WRITE( 6,130 ) 'Number levels with cloud    : ',                      &
                        Input_Opt%Nlevs_Phot_Cloud
        WRITE( 6,130 ) 'Cloud-J cloud flag          : ', Input_Opt%Cloud_Flag

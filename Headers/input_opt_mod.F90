@@ -184,6 +184,7 @@ MODULE Input_Opt_Mod
      LOGICAL                     :: Do_Photolysis
      CHARACTER(LEN=255)          :: FAST_JX_DIR
      CHARACTER(LEN=255)          :: CloudJ_Dir
+     CHARACTER(LEN=16)           :: CloudJ_BrC_Optics
      INTEGER                     :: Nlevs_Phot_Cloud   ! Cloud-J var LWEPAR
      INTEGER                     :: Cloud_Flag         ! Cloud-J var CLDFLAG
      REAL(fp)                    :: OD_Increase_Factor ! Cloud-J var ATAU
@@ -683,6 +684,7 @@ CONTAINS
     Input_Opt%Do_Photolysis         = .FALSE.
     Input_Opt%FAST_JX_DIR           = ''
     Input_Opt%CloudJ_Dir            = ''
+    Input_Opt%CloudJ_BrC_Optics     = 'ORGANIC'
     Input_Opt%Nlevs_Phot_Cloud      = 0
     Input_Opt%Cloud_Flag            = 0
     Input_Opt%OD_Increase_Factor    = 0.0_fp

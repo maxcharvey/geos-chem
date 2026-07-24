@@ -12,8 +12,10 @@
 - Integration tests compile and run several different "out-of-the-box" GEOS-Chem Classic and GCHP configurations in order to identify errors caused by source code updates.
 
 `implementation/`
-- Directory containing source-level regression checks that do not build or run GEOS-Chem.
-- Run `bash implementation/brc_wiring_test.sh` to verify the optional BrC wiring.
+- Directory containing focused implementation regression checks.
+- Run `bash implementation/run_brc_aerosol_map_test.sh` for aerosol-bin mapping.
+- Run `bash implementation/run_brc_cloudj_map_test.sh` for Cloud-J mapping.
+- Run `bash implementation/brc_wiring_test.sh` for cross-submodule BrC wiring.
 
 `parallel/`
 - Directory contianing scripts for performing **parallel tests** for GEOS-Chem Classic.

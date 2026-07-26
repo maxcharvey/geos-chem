@@ -2135,12 +2135,17 @@ CONTAINS
                 !  Hygroscopic growth of Organic Carbon     [unitless]
                 !  Hygroscopic growth of Sea Salt (accum)   [unitless]
                 !  Hygroscopic growth of Sea Salt (coarse)  [unitless]
-                IF ( State_Diag%Archive_AerHygGrowth .AND. &
-                     L <= State_Grid%MaxChemLev      .AND. &
-                     ODSWITCH.EQ.1 ) THEN
-                   S = State_Diag%Map_AerHygGrowth%id2slot(NA)
-                   IF ( S > 0 ) THEN
-                      State_Diag%AerHygGrowth(I,J,L,S) = SCALEOD
+                ! An ordinary brown_carbon:false state has only the five
+                ! legacy hygroscopic diagnostic slots, but retains the full
+                ! NRHAER optical layout.  Do not look up inactive BrC slots.
+                IF ( NA <= State_Chm%nHygGrth ) THEN
+                   IF ( State_Diag%Archive_AerHygGrowth .AND. &
+                        L <= State_Grid%MaxChemLev      .AND. &
+                        ODSWITCH.EQ.1 ) THEN
+                      S = State_Diag%Map_AerHygGrowth%id2slot(NA)
+                      IF ( S > 0 ) THEN
+                         State_Diag%AerHygGrowth(I,J,L,S) = SCALEOD
+                      ENDIF
                    ENDIF
                 ENDIF
 

@@ -17,7 +17,15 @@ MODULE AEROSOL_MOD
 !
 ! !USES:
 !
-  USE CMN_SIZE_MOD, ONLY : NRHAER
+  USE BRC_OPTICS_TEST_MOD, ONLY : BRC_OPTICS_MODE
+  USE BRC_OPTICS_TEST_MOD, ONLY : BRC_OPTICS_CURRENT
+  USE BRC_OPTICS_TEST_MOD, ONLY : BrC_Base_Compatible_PDER
+  USE BRC_OPTICS_TEST_MOD, ONLY : BrC_Get_PDER_Optics
+  USE BRC_OPTICS_TEST_MOD, ONLY : BrC_Optical_Mass_Parts
+  USE BRC_OPTICS_TEST_MOD, ONLY : BrC_Optics_Mode_Name
+  USE BRC_OPTICS_TEST_MOD, ONLY : BrC_Uses_Base_PDER
+  USE BRC_OPTICS_TEST_MOD, ONLY : BrC_Uses_PDER
+  USE CMN_SIZE_MOD,        ONLY : NRHAER
   USE PRECISION_MOD
 
   IMPLICIT NONE
@@ -82,6 +90,7 @@ MODULE AEROSOL_MOD
 !  22 Jul 2026 - M. Harvey - Safeguard ordinary brown_carbon:false map
 !  22 Jul 2026 - M. Harvey - Validate enabled BrC aerosol-bin mapping
 !  23 Jul 2026 - M. Harvey - Use executable BrC map validator
+!  26 Jul 2026 - OpenAI Codex - Add isolated BrC optical-routing tests
 !  See https://github.com/geoschem/geos-chem for complete history
 !------------------------------------------------------------------------------
 !BOC
@@ -1289,6 +1298,27 @@ CONTAINS
     REAL*8              :: BCSCAT_AE  !(xnw, 8/24/15)
     REAL*8              :: DBG_AOD_STD(6)
 
+    ! Isolated BrC online-AOD/RRTMG optical-routing experiment
+    LOGICAL             :: BrCTestOverride
+    REAL(fp)            :: BrCTestDiagScaleOD
+    REAL(fp)            :: BrCTestMassDry
+    REAL(fp)            :: BrCTestMassWet
+    REAL(fp)            :: BrCTestPDER
+    REAL(f8)            :: BrCTestAsym
+    REAL(f8)            :: BrCTestAsymDry
+    REAL(f8)            :: BrCTestAsymWet
+    REAL(f8)            :: BrCTestDryRadius
+    REAL(f8)            :: BrCTestQdry
+    REAL(f8)            :: BrCTestRdry
+    REAL(f8)            :: BrCTestScatDry
+    REAL(f8)            :: BrCTestScatWet
+    REAL(f8)            :: BrCTestScaleOD
+    REAL(f8)            :: BrCTestSSA
+    REAL(f8)            :: BrCTestSSADry
+    REAL(f8)            :: BrCTestSSAWet
+    REAL(f8)            :: BrCTestTauDry
+    REAL(f8)            :: BrCTestTauWet
+
     ! Variables for speed diagnostics
     INTEGER             :: ITIMEVALS(8)
     REAL*8              :: OLDSECS, NEWSECS
@@ -1405,6 +1435,12 @@ CONTAINS
 
     ! Assume success
     RC                   = GC_SUCCESS
+
+    ! Always record the compiled experiment mode in GC.log
+    IF ( FIRST .AND. Input_Opt%amIRoot ) THEN
+       WRITE( 6, '(a,i0,2a)' ) '     - BrC optics test mode: ', &
+            BRC_OPTICS_MODE, ' (', TRIM( BrC_Optics_Mode_Name() ) // ')'
+    ENDIF
 
     ! Copy fields from INPUT_OPT to local variables for use below
     LCARB                = Input_Opt%LCARB
@@ -1672,6 +1708,35 @@ CONTAINS
     !set default values for RH index array
     IRHARR(:,:,:)=1
 
+    ! Precompute reconstructed base-compatible PDER once per grid box.
+    ! TEMP2 is local to RDAER and otherwise unused.
+    IF ( BrC_Uses_PDER() ) THEN
+       TEMP2(:,:,:) = State_Chm%AerMass%PDER(:,:,:)
+    ENDIF
+    IF ( Input_Opt%LBRC .AND. BrC_Uses_Base_PDER() ) THEN
+       !$OMP PARALLEL DO       &
+       !$OMP DEFAULT( SHARED ) &
+       !$OMP PRIVATE( I, J, L )
+       DO L = 1, State_Grid%NZ
+       DO J = 1, State_Grid%NY
+       DO I = 1, State_Grid%NX
+          TEMP2(I,J,L) = BrC_Base_Compatible_PDER(                    &
+               State_Chm%AerMass%SO4_NH4_NIT(I,J,L),                 &
+               State_Chm%AerMass%OCPO(I,J,L),                        &
+               State_Chm%AerMass%OCPISOA(I,J,L),                     &
+               State_Chm%AerMass%BRCPI(I,J,L),                       &
+               State_Chm%AerMass%NPBRC(I,J,L),                       &
+               State_Chm%AerMass%WTCPI(I,J,L),                       &
+               State_Chm%AerMass%FSOAS(I,J,L),                       &
+               State_Chm%AerMass%PBRC(I,J,L),                        &
+               State_Chm%AerMass%OCFOPOA(I,J),                       &
+               State_Chm%AerMass%OCFPOA(I,J)                        )
+       ENDDO
+       ENDDO
+       ENDDO
+       !$OMP END PARALLEL DO
+    ENDIF
+
     ! Empty ODAER before refilling. This is required to make sure that
     ! all gridboxes outside the chemistry grid are zero and do not carry
     ! over values from previous time steps. (ckeller, 10/15/15)
@@ -1793,6 +1858,16 @@ CONTAINS
           !$OMP PRIVATE( SCALEA,   SCALEQ,  SCALESSA, SCALEASY, FRAC      ) &
           !$OMP PRIVATE( SCALER,   SCALEOD, SCALEVOL, DRYAREA,  TAERVOL   ) &
           !$OMP PRIVATE( TK,       CONSEXP, VPRESH2O, RELHUM,   BCSCAT_AE ) &
+          !$OMP PRIVATE( BrCTestOverride,    BrCTestDiagScaleOD            ) &
+          !$OMP PRIVATE( BrCTestMassDry,     BrCTestMassWet                 ) &
+          !$OMP PRIVATE( BrCTestPDER,        BrCTestAsym                    ) &
+          !$OMP PRIVATE( BrCTestAsymDry,     BrCTestAsymWet                 ) &
+          !$OMP PRIVATE( BrCTestDryRadius                                   ) &
+          !$OMP PRIVATE( BrCTestQdry,        BrCTestRdry                    ) &
+          !$OMP PRIVATE( BrCTestScatDry,     BrCTestScatWet                 ) &
+          !$OMP PRIVATE( BrCTestScaleOD,     BrCTestSSA                     ) &
+          !$OMP PRIVATE( BrCTestSSADry,      BrCTestSSAWet                  ) &
+          !$OMP PRIVATE( BrCTestTauDry,      BrCTestTauWet                  ) &
 #ifdef RRTMG
           !$OMP PRIVATE( IR                                               ) &
 #endif
@@ -1840,6 +1915,25 @@ CONTAINS
              VDRY      = 0.0_fp
              VH2O      = 0.0_fp
              BCSCAT_AE = 0.0_fp
+             BrCTestOverride    = .FALSE.
+             BrCTestDiagScaleOD = 0.0_fp
+             BrCTestMassDry     = 0.0_fp
+             BrCTestMassWet     = 0.0_fp
+             BrCTestPDER        = 0.0_fp
+             BrCTestAsym        = 0.0_f8
+             BrCTestAsymDry     = 0.0_f8
+             BrCTestAsymWet     = 0.0_f8
+             BrCTestDryRadius   = 0.0_f8
+             BrCTestQdry        = 0.0_f8
+             BrCTestRdry        = 0.0_f8
+             BrCTestScatDry     = 0.0_f8
+             BrCTestScatWet     = 0.0_f8
+             BrCTestScaleOD     = 0.0_f8
+             BrCTestSSA         = 0.0_f8
+             BrCTestSSADry      = 0.0_f8
+             BrCTestSSAWet      = 0.0_f8
+             BrCTestTauDry      = 0.0_f8
+             BrCTestTauWet      = 0.0_f8
 
              ! Loop over relative humidity bins
              IF (N == 1 .or. N == 3) THEN ! (hzhu, 08/2023)
@@ -1978,6 +2072,7 @@ CONTAINS
 
              SCALER  = REFF / RW(1)
              SCALEOD = SCALEQ * SCALER * SCALER
+             BrCTestDiagScaleOD = SCALEOD
 
 
              IF ( N.LE.NRHAER ) THEN
@@ -2028,6 +2123,94 @@ CONTAINS
                                    0.75d0 * BXHEIGHT(I,J,L) * &
                                    State_Chm%AerMass%DAERSL(I,J,L,N-1) * QW(1)  / &
                                    ( MSDENS(N) * State_Chm%AerMass%PDER(I,J,L) * 1.0D-6 )
+                ENDIF
+
+                !--------------------------------------------------------
+                ! Isolated BrC online-AOD/RRTMG optical-routing tests.
+                !
+                ! Preserve the ordinary ODSWITCH=0 Cloud-J and aerosol-area
+                ! pathways.  Only replace optical depth and RT properties
+                ! during ODSWITCH=1 diagnostic/radiation calculations.
+                !--------------------------------------------------------
+                IF ( Input_Opt%LBRC                         .AND. &
+                     ODSWITCH == 1                          .AND. &
+                     BRC_OPTICS_MODE /= BRC_OPTICS_CURRENT .AND. &
+                     N >= 6 .AND. N <= 10                   .AND. &
+                     ( BrC_Uses_PDER() .OR. N == 7 .OR. N == 8 .OR. N == 10 ) ) THEN
+
+                   BrCTestPDER = State_Chm%AerMass%PDER(I,J,L)
+                   IF ( BrC_Uses_PDER() ) BrCTestPDER = TEMP2(I,J,L)
+
+                   IF ( BrC_Uses_PDER() ) THEN
+                      CALL BrC_Get_PDER_Optics(                              &
+                           BrCTestPDER,             RELHUM,                  &
+                           RH,                      REAA(1:NRH,N,:),          &
+                           QQAA(IWV,1:NRH,N,:),      SSAA(IWV,1:NRH,N,:),     &
+                           ASYMAA(IWV,1:NRH,N,:),    BrCTestRdry,             &
+                           BrCTestQdry,              BrCTestScaleOD,          &
+                           BrCTestSSADry,            BrCTestAsymDry,          &
+                           BrCTestSSAWet,            BrCTestAsymWet          )
+                   ELSE
+                      BrCTestRdry    = RW(1)
+                      BrCTestQdry    = QW(1)
+                      BrCTestScaleOD = SCALEOD
+                      BrCTestSSAWet  = SCALESSA *                            &
+                           SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                      BrCTestAsymWet = SCALEASY *                            &
+                           ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
+                      BrCTestSSADry  = SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                      BrCTestAsymDry = ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
+                   ENDIF
+
+                   BrCTestDryRadius = BrCTestRdry
+                   IF ( BrC_Uses_PDER() .AND. BrCTestPDER > 0.0_fp ) THEN
+                      BrCTestDryRadius = REAL( BrCTestPDER, f8 )
+                   ENDIF
+
+                   CALL BrC_Optical_Mass_Parts(                             &
+                        N,                                                   &
+                        State_Chm%AerMass%OCFOPOA(I,J),                     &
+                        State_Chm%AerMass%OCFPOA(I,J),                      &
+                        State_Chm%AerMass%WAERSL(I,J,L,N),                  &
+                        BrCTestMassWet,                                     &
+                        BrCTestMassDry                                     )
+
+                   IF ( BrCTestRdry > 0.0_f8 .AND. BrCTestDryRadius > 0.0_f8 ) THEN
+                      BrCTestTauWet =                                       &
+                           0.75_f8 * BXHEIGHT(I,J,L) * BrCTestQdry *         &
+                           BrCTestScaleOD * BrCTestMassWet / BrCTestRdry /   &
+                           ( MSDENS(N) * 1.0e-6_f8 )
+                      BrCTestTauDry =                                       &
+                           0.75_f8 * BXHEIGHT(I,J,L) * BrCTestQdry *         &
+                           BrCTestMassDry / BrCTestDryRadius /               &
+                           ( MSDENS(N) * 1.0e-6_f8 )
+                      ODAER(I,J,L,IWV,N) = BrCTestTauWet + BrCTestTauDry
+                   ELSE
+                      ODAER(I,J,L,IWV,N) = 0.0_f8
+                   ENDIF
+
+                   IF ( ODAER(I,J,L,IWV,N) > 0.0_f8 ) THEN
+                      BrCTestSSA =                                          &
+                           ( BrCTestTauWet * BrCTestSSAWet +                 &
+                             BrCTestTauDry * BrCTestSSADry ) /               &
+                           ODAER(I,J,L,IWV,N)
+                      BrCTestScatWet = BrCTestTauWet * BrCTestSSAWet
+                      BrCTestScatDry = BrCTestTauDry * BrCTestSSADry
+                      IF ( BrCTestScatWet + BrCTestScatDry > 0.0_f8 ) THEN
+                         BrCTestAsym =                                      &
+                              ( BrCTestScatWet * BrCTestAsymWet +           &
+                                BrCTestScatDry * BrCTestAsymDry ) /          &
+                              ( BrCTestScatWet + BrCTestScatDry )
+                      ELSE
+                         BrCTestAsym = 0.0_f8
+                      ENDIF
+                   ELSE
+                      BrCTestSSA  = 0.0_f8
+                      BrCTestAsym = 0.0_f8
+                   ENDIF
+
+                   BrCTestDiagScaleOD = REAL( BrCTestScaleOD, fp )
+                   BrCTestOverride    = .TRUE.
                 ENDIF
 
                 ! Get the AOD contribution from isoprene SOA only (eam, 2014)
@@ -2114,13 +2297,20 @@ CONTAINS
                 !This will automatically be added after the standard aerosol
                 !(NRHAER+1,2) but before dust
                 RTODAER(I,J,L,IWV,NRT)     = ODAER(I,J,L,IWV,N)
-                RTSSAER(I,J,L,IWV,NRT)     = SCALESSA*SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                IF ( BrCTestOverride ) THEN
+                   RTSSAER(I,J,L,IWV,NRT)   = BrCTestSSA
+                   RTASYMAER(I,J,L,IWV,NRT) = BrCTestAsym
+                ELSE
+                   RTSSAER(I,J,L,IWV,NRT)   = SCALESSA * &
+                                              SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                   RTASYMAER(I,J,L,IWV,NRT) = SCALEASY * &
+                                              ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
+                ENDIF
                 !for BC SSA with absorption enhancement (xnw 8/24/15)
                 IF ((N .EQ. 2) .AND. (LBCAE)) THEN
                    RTSSAER(I,J,L,IWV,NRT)  = BCSCAT_AE / &
                                              ODAER(I,J,L,IWV,N)
                 ENDIF
-                RTASYMAER(I,J,L,IWV,NRT)   = SCALEASY*ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
              ENDIF
 #endif
 
@@ -2144,7 +2334,11 @@ CONTAINS
                         ODSWITCH.EQ.1 ) THEN
                       S = State_Diag%Map_AerHygGrowth%id2slot(NA)
                       IF ( S > 0 ) THEN
-                         State_Diag%AerHygGrowth(I,J,L,S) = SCALEOD
+                         IF ( BrCTestOverride ) THEN
+                            State_Diag%AerHygGrowth(I,J,L,S) = BrCTestDiagScaleOD
+                         ELSE
+                            State_Diag%AerHygGrowth(I,J,L,S) = SCALEOD
+                         ENDIF
                       ENDIF
                    ENDIF
                 ENDIF

@@ -12,6 +12,14 @@ if(${USE_REAL8})
   endif()
 endif()
 
+# BrC optical-routing experiment.  Mode 0 preserves current behavior.
+set(BRC_OPTICS_TEST_MODE "0" CACHE STRING
+  "BrC optics test: 0=current, 1=PDER, 2=OMOC, 3=wetdry, 4=full, 5=base-PDER, 6=fixed-full")
+set_property(CACHE BRC_OPTICS_TEST_MODE PROPERTY STRINGS 0 1 2 3 4 5 6)
+if(NOT BRC_OPTICS_TEST_MODE MATCHES "^[0-6]$")
+  message(FATAL_ERROR "BRC_OPTICS_TEST_MODE must be 0 through 6")
+endif()
+
 #-----------------------------------------------------------------------------
 # Define libGeosCore.a
 #-----------------------------------------------------------------------------
@@ -20,6 +28,7 @@ add_library(GeosCore
   aero_drydep.F90
   brc_aerosol_map_mod.F90
   brc_cloudj_map_mod.F90
+  brc_optics_test_mod.F90
   aerosol_mod.F90
   aerosol_thermodynamics_mod.F90
   airs_ch4_mod.F90
@@ -91,6 +100,9 @@ add_library(GeosCore
   $<$<BOOL:${APM}>:apm_driv_mod.F90>
   # exchange_mod : TODO
 )
+
+set_source_files_properties(brc_optics_test_mod.F90 PROPERTIES
+  COMPILE_DEFINITIONS "BRC_OPTICS_TEST_MODE=${BRC_OPTICS_TEST_MODE}")
 
 # Fixes #64: If GCC>=8.0.0 then ocean_mercury_mod.F90 
 # should be compiled with -O1

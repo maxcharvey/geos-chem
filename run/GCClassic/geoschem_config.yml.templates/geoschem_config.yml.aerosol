@@ -110,6 +110,13 @@ operations:
       - SO4s
       - SOAP
       - SOAS
+      - FSOAS
+      - BRCSOA
+      - WTC
+      - DBRCPOA
+      - FSOAP
+      - NPBRCPOA
+      - PBRCPOA
 
   wet_deposition:
     activate: true

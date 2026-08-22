@@ -854,6 +854,21 @@ HcoConvectiveCloudTopHeight     -1 103 -1 -1 2 level           Convective_cloud_
 #InvMEGAN_AAXX         -1     108  -1  -1  2   kg/m2/s  Acetic_acid_emission_flux_from_MEGAN_extension
 
 #=============================
+# FINNv2.5 config inventory
+# Cat 5/Hier 3 identifies config-driven biomass burning; run one fire
+# inventory at a time. BC and OC source totals are component sums.
+#=============================
+InvFINNv25_CO             CO       0   5   3  2   kg/m2/s  FINNv25_native_CO_emission_mass_flux
+InvFINNv25_BCPI           BCPI     0   5   3  2   kg/m2/s  FINNv25_native_hydrophilic_BC_emission_mass_flux
+InvFINNv25_BCPO           BCPO     0   5   3  2   kg/m2/s  FINNv25_native_hydrophobic_BC_emission_mass_flux
+InvFINNv25_OCPI           OCPI     0   5   3  2   kg/m2/s  FINNv25_residual_hydrophilic_OC_emission_mass_flux
+InvFINNv25_OCPO           OCPO     0   5   3  2   kg/m2/s  FINNv25_residual_hydrophobic_OC_emission_mass_flux
+InvFINNv25_FSOAP_BRC_HS   FSOAP    0   5   3  2   kg/m2/s  FINNv25_CO_proxy_FSOAP_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_DBRCPOA_BRC_HS DBRCPOA  0   5   3  2   kg/m2/s  FINNv25_BC_proxy_DBRCPOA_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_NPBRCPOA_BRC_HS NPBRCPOA 0  5   3  2   kg/m2/s  FINNv25_OC_proxy_NPBRCPOA_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_PBRCPOA_BRC_HS PBRCPOA  0   5   3  2   kg/m2/s  FINNv25_OC_proxy_PBRCPOA_emission_mass_flux_harmonized_sensitivity
+
+#=============================
 # GFED Extension
 #=============================
 #InvGFED_ACET         ACET   111  -1  -1  2   kg/m2/s  ACET_emission_flux_from_GFED_extension

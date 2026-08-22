@@ -106,6 +106,21 @@ EmisOCPO_BioBurn   OCPO   111    -1  -1   2   kg/m2/s  OCPO_emission_flux_from_b
 EmisOCPO_Ship      OCPO   0      10  -1   2   kg/m2/s  OCPO_emission_flux_from_ships
 
 ###############################################################################
+#####  FINNv2.5 config inventory and harmonized BrC sensitivity           #####
+# Cat 5/Hier 3 identifies config-driven biomass burning; run one fire
+# inventory at a time. BC and OC source totals are component sums.
+###############################################################################
+InvFINNv25_SOAP           SOAP     0   5   3  2   kg/m2/s  FINNv25_CO_field_scaled_to_SOAP_mass_flux_existing_path
+InvFINNv25_BCPI           BCPI     0   5   3  2   kg/m2/s  FINNv25_native_hydrophilic_BC_emission_mass_flux
+InvFINNv25_BCPO           BCPO     0   5   3  2   kg/m2/s  FINNv25_native_hydrophobic_BC_emission_mass_flux
+InvFINNv25_OCPI           OCPI     0   5   3  2   kg/m2/s  FINNv25_residual_hydrophilic_OC_emission_mass_flux
+InvFINNv25_OCPO           OCPO     0   5   3  2   kg/m2/s  FINNv25_residual_hydrophobic_OC_emission_mass_flux
+InvFINNv25_FSOAP_BRC_HS   FSOAP    0   5   3  2   kg/m2/s  FINNv25_CO_proxy_FSOAP_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_DBRCPOA_BRC_HS DBRCPOA  0   5   3  2   kg/m2/s  FINNv25_BC_proxy_DBRCPOA_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_NPBRCPOA_BRC_HS NPBRCPOA 0  5   3  2   kg/m2/s  FINNv25_OC_proxy_NPBRCPOA_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_PBRCPOA_BRC_HS PBRCPOA  0   5   3  2   kg/m2/s  FINNv25_OC_proxy_PBRCPOA_emission_mass_flux_harmonized_sensitivity
+
+###############################################################################
 #####  pFe emissions                                                      ##### 
 ###############################################################################
 EmispFe_Total      pFe    -1     -1  -1   3   kg/m2/s  pFe_emission_flux_from_all_sectors

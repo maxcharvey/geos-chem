@@ -4235,7 +4235,9 @@ CONTAINS
     !-----------------------------------------------------------------------
     L_GFED = GetExtNr( HcoConfig%ExtList, 'GFED' ) > 0
     L_GFAS = GetExtNr( HcoConfig%ExtList, 'GFAS' ) > 0
-    L_QFED2 = GetExtNr( HcoConfig%ExtList, 'QFED2' ) > 0
+    CALL GetExtOpt( HcoConfig, -999, 'QFED2', OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
+    IF ( HMRC /= HCO_SUCCESS ) GOTO 900
+    IF ( FOUND ) L_QFED2 = LTMP
     CALL GetExtOpt( HcoConfig, -999, 'FINNv25', OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
     IF ( HMRC /= HCO_SUCCESS ) GOTO 900
     IF ( FOUND ) L_FINNV25 = LTMP

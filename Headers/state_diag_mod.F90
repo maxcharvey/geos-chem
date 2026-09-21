@@ -13264,6 +13264,9 @@ CONTAINS
                                 State_Diag%Archive_AODSOAfromAqIsopWL1  .or. &
                                 State_Diag%Archive_AODSOAfromAqIsopWL2  .or. &
                                 State_Diag%Archive_AODSOAfromAqIsopWL3  .or. &
+                                State_Diag%Archive_BrCDryAODWL1         .or. &
+                                State_Diag%Archive_BrCDryAODWL2         .or. &
+                                State_Diag%Archive_BrCDryAODWL3         .or. &
                                 State_Diag%Archive_AODDust              .or. &
                                 State_Diag%Archive_AODDustWL1           .or. &
                                 State_Diag%Archive_AODDustWL2           .or. &

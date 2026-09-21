@@ -1229,6 +1229,7 @@ CONTAINS
 ! !USES:
 !
     USE CMN_SIZE_Mod,   ONLY : NAER, NRH, NDUST, NSTRATAER
+    USE BRC_Optics_Mod, ONLY : BRC_DRY_AOD_AT_WAVELENGTH
     USE ErrCode_Mod
     USE ERROR_MOD,      ONLY : ERROR_STOP, Safe_Div
     USE Input_Opt_Mod,  ONLY : OptInput
@@ -1288,6 +1289,7 @@ CONTAINS
     REAL(f8)            :: XTAU
     REAL*8              :: BCSCAT_AE  !(xnw, 8/24/15)
     REAL*8              :: DBG_AOD_STD(6)
+    REAL*8              :: BrCDryAOD
 
     ! Variables for speed diagnostics
     INTEGER             :: ITIMEVALS(8)
@@ -2078,6 +2080,13 @@ CONTAINS
 
              ENDIF
 
+             ! LSTRATOD controls every optical consumer, including RRTMG and
+             ! archived stratospheric AOD.  Surface-area chemistry is stored
+             ! separately in TAREA below and remains available.
+             IF ( .NOT. LSTRATOD .AND. N > NRHAER ) THEN
+                ODAER(I,J,L,IWV,N) = 0.0D0
+             ENDIF
+
 #ifdef RRTMG
              !SNA currently treated as one with optics but considered
              !separately for RT, so we split them by mass here
@@ -2395,6 +2404,7 @@ CONTAINS
        !$OMP PARALLEL DO                                                     &
        !$OMP DEFAULT( SHARED                                               ) &
        !$OMP PRIVATE( I, J, L, N, W, LINTERP, IsWL1, IsWL2, IsWL3, S       ) &
+       !$OMP PRIVATE( BrCDryAOD                                           ) &
        !$OMP SCHEDULE( DYNAMIC                                             )
        ! Loop over state-backed hygroscopic aerosols.  In an ordinary
        ! brown_carbon:false state, inactive bins 6:11 have no HYG
@@ -2498,36 +2508,20 @@ CONTAINS
                 ENDIF
 
                 ! DBRCPOA uses the dry carrier N=11.  Archive its requested
-                ! AOD after the same wavelength interpolation used by AODHyg.
+                ! AOD independently of AODHyg and after the same wavelength
+                ! interpolation.  The pure helper returns zero for a zero
+                ! endpoint, preventing a stale archived value.
                 IF ( N == 11 ) THEN
-                   IF ( .NOT. LINTERP ) THEN
-                      IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) &
-                         State_Diag%BrCDryAODWL1(I,J,L) = &
-                         ODAER(I,J,L,IWVSELECT(1,W),N)
-                      IF ( State_Diag%Archive_BrCDryAODWL2 .AND. IsWL2 ) &
-                         State_Diag%BrCDryAODWL2(I,J,L) = &
-                         ODAER(I,J,L,IWVSELECT(1,W),N)
-                      IF ( State_Diag%Archive_BrCDryAODWL3 .AND. IsWL3 ) &
-                         State_Diag%BrCDryAODWL3(I,J,L) = &
-                         ODAER(I,J,L,IWVSELECT(1,W),N)
-                   ELSE IF ( ODAER(I,J,L,IWVSELECT(1,W),N) > 0.0_fp .AND. &
-                             ODAER(I,J,L,IWVSELECT(2,W),N) > 0.0_fp ) THEN
-                      IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) &
-                         State_Diag%BrCDryAODWL1(I,J,L) = &
-                         ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)** &
-                         ( BCOEF_WV(W) * LOG( ODAER(I,J,L,IWVSELECT(1,W),N) / &
-                                               ODAER(I,J,L,IWVSELECT(2,W),N) ) )
-                      IF ( State_Diag%Archive_BrCDryAODWL2 .AND. IsWL2 ) &
-                         State_Diag%BrCDryAODWL2(I,J,L) = &
-                         ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)** &
-                         ( BCOEF_WV(W) * LOG( ODAER(I,J,L,IWVSELECT(1,W),N) / &
-                                               ODAER(I,J,L,IWVSELECT(2,W),N) ) )
-                      IF ( State_Diag%Archive_BrCDryAODWL3 .AND. IsWL3 ) &
-                         State_Diag%BrCDryAODWL3(I,J,L) = &
-                         ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)** &
-                         ( BCOEF_WV(W) * LOG( ODAER(I,J,L,IWVSELECT(1,W),N) / &
-                                               ODAER(I,J,L,IWVSELECT(2,W),N) ) )
-                   ENDIF
+                   BrCDryAOD = BRC_DRY_AOD_AT_WAVELENGTH(                  &
+                        ODAER(I,J,L,IWVSELECT(1,W),N),                      &
+                        ODAER(I,J,L,IWVSELECT(2,W),N), LINTERP,             &
+                        ACOEF_WV(W), BCOEF_WV(W) )
+                   IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) &
+                      State_Diag%BrCDryAODWL1(I,J,L) = BrCDryAOD
+                   IF ( State_Diag%Archive_BrCDryAODWL2 .AND. IsWL2 ) &
+                      State_Diag%BrCDryAODWL2(I,J,L) = BrCDryAOD
+                   IF ( State_Diag%Archive_BrCDryAODWL3 .AND. IsWL3 ) &
+                      State_Diag%BrCDryAODWL3(I,J,L) = BrCDryAOD
                 ENDIF
 
                 !----------------------------------------------------
@@ -2663,12 +2657,6 @@ CONTAINS
        ENDDO ! end of loop over hygroscopic aerosols
        !$OMP END PARALLEL DO
 
-    ENDIF
-
-    ! Turn off radiative effects of stratospheric aerosols?
-    IF ( .not. LSTRATOD ) THEN
-       ODAER(:,:,:,:,NRHAER+1) = 0.d0
-       ODAER(:,:,:,:,NRHAER+2) = 0.d0
     ENDIF
 
     !=================================================================

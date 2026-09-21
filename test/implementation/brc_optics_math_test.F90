@@ -1,36 +1,35 @@
 PROGRAM BRC_OPTICS_MATH_TEST
 
-  ! Regression oracle for the two numerical contracts used by the DBRC path:
-  ! (1) wavelength interpolation is log-linear in AOD, and (2) dry DBRC uses
-  ! the RH-bin-1 SSA and asymmetry without applying wet scaling factors.
+  USE BRC_OPTICS_MOD, ONLY : BRC_DRY_AOD_AT_WAVELENGTH
+
+  ! Exercise the exact production helper used by the DBRC diagnostic.
   IMPLICIT NONE
 
-  REAL :: aod_lo, aod_hi, acoef, bcoef, aod_interp
-  REAL :: ssa_dry, asym_dry, scale_ssa, scale_asym
+  REAL(KIND=8) :: aod
 
-  aod_lo = 2.0
-  aod_hi = 8.0
-  acoef  = EXP(1.0)
-  bcoef  = 1.0
-  aod_interp = aod_hi * acoef**( bcoef * LOG( aod_lo / aod_hi ) )
-  CALL Assert_Close( aod_interp, 2.0, 1.e-6, 1 )
+  ! Exact requested wavelength (e.g., 550 nm).
+  aod = BRC_DRY_AOD_AT_WAVELENGTH( 3.D-1, 9.D-1, .FALSE., 1.D0, 1.D0 )
+  CALL Assert_Close( aod, 3.D-1, 1.D-12, 1 )
 
-  ssa_dry    = 0.83
-  asym_dry   = 0.61
-  scale_ssa  = 1.20
-  scale_asym = 0.90
-  ! The dry branch deliberately does not multiply by these RH scalings.
-  CALL Assert_Close( ssa_dry, 0.83, 1.e-6, 2 )
-  CALL Assert_Close( asym_dry, 0.61, 1.e-6, 3 )
-  IF ( ABS(ssa_dry - scale_ssa * ssa_dry) < 1.e-6 ) ERROR STOP 4
-  IF ( ABS(asym_dry - scale_asym * asym_dry) < 1.e-6 ) ERROR STOP 5
+  ! Interpolated requested wavelengths 527.1 and 693.5 nm use their
+  ! precomputed ACOEF/BCOEF pair; test two distinct nontrivial pairs.
+  aod = BRC_DRY_AOD_AT_WAVELENGTH( 2.D-1, 8.D-1, .TRUE., EXP(1.D0), 5.D-1 )
+  CALL Assert_Close( aod, 4.D-1, 1.D-12, 2 )
+  aod = BRC_DRY_AOD_AT_WAVELENGTH( 8.D-1, 2.D-1, .TRUE., EXP(1.D0), 5.D-1 )
+  CALL Assert_Close( aod, 4.D-1, 1.D-12, 3 )
 
-  WRITE(*,'(a)') 'PASS: BrC dry-optics numerical regression'
+  ! A zero endpoint must clear the diagnostic, not retain stale data.
+  aod = BRC_DRY_AOD_AT_WAVELENGTH( 0.D0, 8.D-1, .TRUE., EXP(1.D0), 5.D-1 )
+  CALL Assert_Close( aod, 0.D0, 1.D-12, 4 )
+  aod = BRC_DRY_AOD_AT_WAVELENGTH( 8.D-1, 0.D0, .TRUE., EXP(1.D0), 5.D-1 )
+  CALL Assert_Close( aod, 0.D0, 1.D-12, 5 )
+
+  WRITE(*,'(a)') 'PASS: BrC requested-wavelength regression'
 
 CONTAINS
 
   SUBROUTINE Assert_Close( Actual, Expected, Tolerance, Code )
-    REAL, INTENT(IN) :: Actual, Expected, Tolerance
+    REAL(KIND=8), INTENT(IN) :: Actual, Expected, Tolerance
     INTEGER, INTENT(IN) :: Code
     IF ( ABS(Actual - Expected) > Tolerance ) ERROR STOP Code
   END SUBROUTINE Assert_Close

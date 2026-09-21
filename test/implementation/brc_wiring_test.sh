@@ -37,6 +37,7 @@ carbon="${geos_root}/GeosCore/carbon_mod.F90"
 aerosol="${geos_root}/GeosCore/aerosol_mod.F90"
 brc_map="${geos_root}/GeosCore/brc_aerosol_map_mod.F90"
 brc_cloudj_map="${geos_root}/GeosCore/brc_cloudj_map_mod.F90"
+brc_optics="${geos_root}/GeosCore/brc_optics_mod.F90"
 photolysis="${geos_root}/GeosCore/photolysis_mod.F90"
 hco_interface="${geos_root}/GeosCore/hco_interface_gc_mod.F90"
 gfed="${hemco_root}/src/Extensions/hcox_gfed_mod.F90"
@@ -85,9 +86,11 @@ require "WTC is classified as primary OC here" "${aerosol}"
 require "IF ( N == 11 ) THEN" "${aerosol}"
 require "RTSSAER(I,J,L,IWV,NRT)  = SSAA(IWV,1,N,State_Chm%Phot%DRg)" "${aerosol}"
 require "RTASYMAER(I,J,L,IWV,NRT) = ASYMAA(IWV,1,N,State_Chm%Phot%DRg)" "${aerosol}"
-require "AOD after the same wavelength interpolation used by AODHyg." "${aerosol}"
+require "USE BRC_Optics_Mod, ONLY : BRC_DRY_AOD_AT_WAVELENGTH" "${aerosol}"
+require "BrCDryAOD = BRC_DRY_AOD_AT_WAVELENGTH" "${aerosol}"
 require "State_Diag%BrCDryAODWL1" "${aerosol}"
-require "ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)**" "${aerosol}"
+require "Returning zero also" "${brc_optics}"
+require "BRC_DRY_AOD_AT_WAVELENGTH = 0.0D0" "${brc_optics}"
 
 # The family mass diagnostics are consistently carbon mass: FSOAS is OM and
 # must be converted before aggregation; flux diagnostics retain their own
@@ -102,6 +105,8 @@ require "Units = 'kgC'" "${state_diag}"
 # hygroscopic bins.
 require "NRHAER+1" "${cldj}"
 require "NRHAER+2" "${cldj}"
+require "LSTRATOD controls every optical consumer" "${aerosol}"
+forbid "ODAER(:,:,:,:,NRHAER+1) = 0.d0" "${aerosol}"
 
 # Cloud-J organic mode maps wet BrC to OC records and dry DBRC to OC00.
 # Dedicated mode requires identified wet, persistent, and dry BrC records.

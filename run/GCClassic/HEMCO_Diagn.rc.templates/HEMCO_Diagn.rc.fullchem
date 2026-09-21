@@ -893,5 +893,15 @@ EmisPBRCPOA_TotalColumn PBRCPOA -1 -1 -1 2 kg/m2/s PBRCPOA_column_emission_flux_
 #InvFINNv25Inject_DBRCPOA DBRCPOA 165 -1 -1 3 kg/m2/s DBRCPOA_emission_flux_from_FINNv25_injection
 #InvFINNv25Inject_NPBRCPOA NPBRCPOA 165 -1 -1 3 kg/m2/s NPBRCPOA_emission_flux_from_FINNv25_injection
 #InvFINNv25Inject_PBRCPOA PBRCPOA 165 -1 -1 3 kg/m2/s PBRCPOA_emission_flux_from_FINNv25_injection
+# Optional QFED2 BrC sensitivity profiles (dimension 3) and their vertically
+# summed columns (dimension 2). Selector 0/5/2 matches QFED row category/hierarchy.
+#InvQFED2_FSOAP FSOAP 0 5 2 3 kg/m2/s FSOAP_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_DBRCPOA DBRCPOA 0 5 2 3 kg/m2/s DBRCPOA_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_NPBRCPOA NPBRCPOA 0 5 2 3 kg/m2/s NPBRCPOA_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_PBRCPOA PBRCPOA 0 5 2 3 kg/m2/s PBRCPOA_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_FSOAPColumn FSOAP 0 5 2 2 kg/m2/s FSOAP_column_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_DBRCPOAColumn DBRCPOA 0 5 2 2 kg/m2/s DBRCPOA_column_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_NPBRCPOAColumn NPBRCPOA 0 5 2 2 kg/m2/s NPBRCPOA_column_emission_flux_from_QFED2_harmonized_sensitivity
+#InvQFED2_PBRCPOAColumn PBRCPOA 0 5 2 2 kg/m2/s PBRCPOA_column_emission_flux_from_QFED2_harmonized_sensitivity
 
 #EOC

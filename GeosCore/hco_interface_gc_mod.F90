@@ -4149,8 +4149,8 @@ CONTAINS
     INTEGER            :: HMRC
     LOGICAL            :: LTMP
     LOGICAL            :: FOUND
-    LOGICAL            :: L_GFED, L_GFAS, L_FINNV25, L_FINNV25_INJECT
-    LOGICAL            :: L_FINN_BRC_HS, L_GFAS_BRC_HS
+    LOGICAL            :: L_GFED, L_GFAS, L_QFED2, L_FINNV25, L_FINNV25_INJECT
+    LOGICAL            :: L_FINN_BRC_HS, L_GFAS_BRC_HS, L_QFED_BRC_HS
 
     ! Strings
     CHARACTER(LEN=31 ) :: OptName
@@ -4170,10 +4170,12 @@ CONTAINS
 
     L_GFED           = .FALSE.
     L_GFAS           = .FALSE.
+    L_QFED2          = .FALSE.
     L_FINNV25        = .FALSE.
     L_FINNV25_INJECT = .FALSE.
     L_FINN_BRC_HS    = .FALSE.
     L_GFAS_BRC_HS    = .FALSE.
+    L_QFED_BRC_HS    = .FALSE.
 
     !-----------------------------------------------------------------------
     ! If chemistry is turned off, do not read chemistry input data
@@ -4233,6 +4235,9 @@ CONTAINS
     !-----------------------------------------------------------------------
     L_GFED = GetExtNr( HcoConfig%ExtList, 'GFED' ) > 0
     L_GFAS = GetExtNr( HcoConfig%ExtList, 'GFAS' ) > 0
+    CALL GetExtOpt( HcoConfig, -999, 'QFED2', OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
+    IF ( HMRC /= HCO_SUCCESS ) GOTO 900
+    IF ( FOUND ) L_QFED2 = LTMP
     CALL GetExtOpt( HcoConfig, -999, 'FINNv25', OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
     IF ( HMRC /= HCO_SUCCESS ) GOTO 900
     IF ( FOUND ) L_FINNV25 = LTMP
@@ -4245,9 +4250,13 @@ CONTAINS
                     OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
     IF ( HMRC /= HCO_SUCCESS ) GOTO 900
     IF ( FOUND ) L_GFAS_BRC_HS = LTMP
+    CALL GetExtOpt( HcoConfig, -999, 'QFED2_BRC_HARMONIZED_SENSITIVITY', &
+                    OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
+    IF ( HMRC /= HCO_SUCCESS ) GOTO 900
+    IF ( FOUND ) L_QFED_BRC_HS = LTMP
 
-    IF ( COUNT( (/ L_GFED, L_GFAS, L_FINNV25 /) ) > 1 ) THEN
-       ErrMsg = 'Select only one biomass-burning inventory: GFED, GFAS, or FINNv25!'
+    IF ( COUNT( (/ L_GFED, L_GFAS, L_QFED2, L_FINNV25 /) ) > 1 ) THEN
+       ErrMsg = 'Select only one biomass-burning inventory: GFED, GFAS, QFED2, or FINNv25!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
@@ -4256,7 +4265,7 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
-    IF ( ( L_FINN_BRC_HS .OR. L_GFAS_BRC_HS ) .AND. .NOT. Input_Opt%LBRC ) THEN
+    IF ( ( L_FINN_BRC_HS .OR. L_GFAS_BRC_HS .OR. L_QFED_BRC_HS ) .AND. .NOT. Input_Opt%LBRC ) THEN
        ErrMsg = 'A BrC harmonized fire sensitivity requires brown_carbon: true!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
@@ -4268,6 +4277,11 @@ CONTAINS
     ENDIF
     IF ( L_GFAS_BRC_HS .AND. .NOT. L_GFAS ) THEN
        ErrMsg = 'GFAS_BRC_HARMONIZED_SENSITIVITY requires GFAS: true!'
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
+    IF ( L_QFED_BRC_HS .AND. .NOT. L_QFED2 ) THEN
+       ErrMsg = 'QFED2_BRC_HARMONIZED_SENSITIVITY requires QFED2: true!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF

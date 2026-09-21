@@ -71,6 +71,7 @@ require "INTEGER :: Map_NRHAER(NRHAER)" "${aerosol}"
 require "IF ( State_Chm%nHygGrth > NRHAER ) THEN" "${aerosol}"
 require "CALL VALIDATE_BRC_AEROSOL_MAP(" "${aerosol}"
 require "IF ( Seen(Bins(N)) ) THEN" "${brc_map}"
+require "PURE INTEGER FUNCTION BRC_FASTJX_RH_BIN" "${brc_map}"
 require "brown_carbon has duplicate hygroscopic species" "${aerosol}"
 require "brown_carbon is missing canonical aerosol bin" "${aerosol}"
 require "DO N = 1, State_Chm%nHygGrth" "${aerosol}"
@@ -96,6 +97,13 @@ require "BrCDryAOD = BRC_DRY_AOD_AT_WAVELENGTH" "${aerosol}"
 require "State_Diag%BrCDryAODWL1" "${aerosol}"
 require "Returning zero also" "${brc_optics}"
 require "BRC_DRY_AOD_AT_WAVELENGTH = 0.0D0" "${brc_optics}"
+
+# Fast-JX's online-LUT solver reads the aerosol/RH slot directly.  Route the
+# dry DBRC carrier to IR=1 before it reaches that solver.
+fjx_interface="${geos_root}/GeosCore/fjx_interface_mod.F90"
+require "USE BRC_AEROSOL_MAP_MOD, ONLY : BRC_FASTJX_RH_BIN" "${fjx_interface}"
+require "IR_OPT = BRC_FASTJX_RH_BIN( N, IRHARR(NLON,NLAT,L) )" "${fjx_interface}"
+require "IOPT,    IR_OPT, J" "${fjx_interface}"
 
 # The family mass diagnostics are consistently carbon mass: FSOAS is OM and
 # must be converted before aggregation; flux diagnostics retain their own

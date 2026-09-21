@@ -247,6 +247,7 @@ CONTAINS
 !
     USE CMN_FJX_Mod,     ONLY : AN_, L_, L1_, W_, JVN_, JXL_, JXL1_
     USE CMN_FJX_Mod,     ONLY : NRATJ, JIND, JFACTA, FL
+    USE BRC_AEROSOL_MAP_MOD, ONLY : BRC_FASTJX_RH_BIN
     USE CMN_SIZE_MOD,    ONLY : NDUST, NRH, NRHAER, NSTRATAER
     USE ErrCode_Mod
     USE ERROR_MOD,       ONLY : ERROR_STOP, ALLOC_ERR
@@ -312,7 +313,7 @@ CONTAINS
 !
     INTEGER, SAVE :: LASTMONTH = -1
     INTEGER       :: NLON, NLAT, DAY,  MONTH, DAY_OF_YR, L, N, J
-    INTEGER       :: IOPT, LCHEM
+    INTEGER       :: IOPT, IR_OPT, LCHEM
     REAL(fp)      :: U0, PRES, RFL, YLAT,  O3_TOMS, SZA, SOLF
     REAL(fp)      :: O3_CTM(State_Grid%NZ+1)
     REAL(fp)      :: T_CTM(State_Grid%NZ+1), OPTD(State_Grid%NZ)
@@ -442,7 +443,7 @@ CONTAINS
     !$OMP DEFAULT( SHARED ) &
     !$OMP PRIVATE( NLAT,    NLON,   YLAT,      U0,      L       ) &
     !$OMP PRIVATE( P_CTM ,  T_CTM,  RFL,       O3_TOMS, O3_CTM  ) &
-    !$OMP PRIVATE( LCHEM,   OPTAER, N,         IOPT,    J       ) &
+    !$OMP PRIVATE( LCHEM,   OPTAER, N,         IOPT,    IR_OPT, J       ) &
     !$OMP PRIVATE( OPTDUST, OPTD,   CLDF1D                      ) &
 #ifdef USE_MAXIMUM_RANDOM_OVERLAP
     !$OMP PRIVATE( FMAX,    KK,     NUMB,      KBOT             ) &
@@ -497,16 +498,13 @@ CONTAINS
        ! and at 1000nm, IWV1000 (DAR)
        OPTAER = 0.0e+0_fp
 
-       ! OD profiles for aerosols undergoing hygroscopic growth. The OD
-       ! profile array has 5 columns for each of these aerosols, one for each
-       ! humidity in the optical properties LUT used by Fast-JX. For each grid
-       ! cell and aerosol, assign OD based on humidity in the grid box; values for
-       ! that grid cell and aerosol will be zero for all other humidity bins,
-       ! e.g. if RH<50% at L=1 then OPTAER(1,1) will contain SO4 OD and OPTAER(1,2:5)
-       ! will be all zeros.
+       ! OD profiles are held in the Fast-JX online-LUT RH slot for each
+       ! aerosol. The DBRC carrier is physically dry in aerosol_mod, so it is
+       ! always routed to IR=1; all other bins use their ambient-RH slot.
        DO N = 1, NRHAER
        DO L = 1, State_Grid%NZ
-          IOPT = ( (N-1) * NRH ) + IRHARR(NLON,NLAT,L)
+          IR_OPT = BRC_FASTJX_RH_BIN( N, IRHARR(NLON,NLAT,L) )
+          IOPT = ( (N-1) * NRH ) + IR_OPT
           OPTAER(L,IOPT) = ODAER(NLON,NLAT,L,State_Chm%Phot%IWV1000,N)
        ENDDO
        ENDDO

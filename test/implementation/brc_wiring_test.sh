@@ -12,7 +12,10 @@ set -euo pipefail
 this_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 geos_root=$(git -C "${this_dir}" rev-parse --show-toplevel)
 repo_root=$(cd "${geos_root}/../.." && pwd)
-hemco_root="${repo_root}/src/HEMCO"
+# An isolated GEOS-Chem worktree is not nested below the GCClassic wrapper.
+# Keep the wrapper-relative path for ordinary CI, but allow its HEMCO sibling
+# to be supplied explicitly when reviewing a core-only worktree.
+hemco_root="${GEOSCHEM_HEMCO_ROOT:-${repo_root}/src/HEMCO}"
 
 require() {
     local pattern="${1}"
@@ -39,6 +42,8 @@ brc_map="${geos_root}/GeosCore/brc_aerosol_map_mod.F90"
 brc_cloudj_map="${geos_root}/GeosCore/brc_cloudj_map_mod.F90"
 brc_optics="${geos_root}/GeosCore/brc_optics_mod.F90"
 photolysis="${geos_root}/GeosCore/photolysis_mod.F90"
+fastjx="${geos_root}/GeosCore/fast_jx_mod.F90"
+fullchem_config="${geos_root}/run/GCClassic/geoschem_config.yml.templates/geoschem_config.yml.fullchem"
 hco_interface="${geos_root}/GeosCore/hco_interface_gc_mod.F90"
 gfed="${hemco_root}/src/Extensions/hcox_gfed_mod.F90"
 
@@ -126,6 +131,15 @@ require "(/ 'PB00', 'PB50', 'PB70', 'PB80', 'PB90' /)" "${brc_cloudj_map}"
 require "IF ( MieTitle(1:4) /= 'DB00' ) THEN" "${brc_cloudj_map}"
 require "Cloud-J BrC optics: organic-equivalence records" "${photolysis}"
 forbid "wet-BrC fallback records 57-61" "${photolysis}"
+
+# FAST-JX receives every expanded hygroscopic bin.  Its v2024-05 table
+# reads only 56 records, so BrC must retain the portable OC-equivalence map.
+require "DO M=1,NRHAER" "${fastjx}"
+forbid "DO M=1,5" "${fastjx}"
+forbid "LBRC" "${fastjx}"
+require "FAST-JX BrC optics: organic-equivalence OC records 36-40" "${photolysis}"
+require "fast-jx:" "${fullchem_config}"
+require "FAST_JX/v2024-05/" "${fullchem_config}"
 
 require "GEOSCHEM_BROWN_CARBON" "${hco_interface}"
 require "GEOSCHEM_BROWN_CARBON" "${gfed}"

@@ -104,6 +104,9 @@ operations:
       sphere_correction: 1
       num_wavelength_bins: 18
       use_H2O_UV_absorption: true
+    fast-jx:
+      # Used only by a FASTJX build; organic BrC maps to existing OC records.
+      fastjx_input_dir: ${RUNDIR_DATA_ROOT}/CHEM_INPUTS/FAST_JX/v2024-05/
     overhead_O3:
       use_online_O3_from_model: ${RUNDIR_USE_ONLINE_O3}
       use_column_O3_from_met: true

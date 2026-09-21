@@ -852,9 +852,17 @@ CONTAINS
 
     IF ( Input_Opt%LBRC .AND. Input_Opt%amIRoot ) THEN
        IF ( TRIM(Input_Opt%CloudJ_BrC_Optics) == 'ORGANIC' ) THEN
+#ifdef FASTJX
+          WRITE(6,'(a)') 'FAST-JX BrC optics: organic-equivalence OC records 36-40'
+#else
           WRITE(6,'(a)') 'Cloud-J BrC optics: organic-equivalence records'
+#endif
        ELSE
+#ifdef FASTJX
+          WRITE(6,'(a)') 'FAST-JX BrC optics: dedicated records 64-74'
+#else
           WRITE(6,'(a)') 'Cloud-J BrC optics: dedicated records 64-74'
+#endif
        ENDIF
     ENDIF
 

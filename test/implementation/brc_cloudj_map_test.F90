@@ -18,6 +18,16 @@ PROGRAM BRC_CLOUDJ_MAP_TEST
      IF ( AerMap(11,J) /= 36 ) ERROR STOP 3
   ENDDO
 
+  ! FAST-JX v2024-05 reads 56 records.  Organic BrC must therefore use
+  ! the existing OC records 36-40, rather than unread BrC records 57-63.
+  CALL BUILD_BRC_CLOUDJ_MAP( .TRUE., 'ORGANIC', 56, Titles, &
+                             AerMap, RC, ErrMsg )
+  IF ( RC /= 0 ) ERROR STOP 14
+  DO J = 1, 5
+     IF ( ANY( AerMap(6:10,J) /= 35 + J ) ) ERROR STOP 15
+     IF ( AerMap(11,J) /= 36 ) ERROR STOP 16
+  ENDDO
+
   Titles(64:68) = (/ 'WB00', 'WB50', 'WB70', 'WB80', 'WB90' /)
   Titles(69:73) = (/ 'PB00', 'PB50', 'PB70', 'PB80', 'PB90' /)
   Titles(74)    = 'DB00'

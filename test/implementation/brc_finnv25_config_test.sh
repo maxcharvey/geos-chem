@@ -37,29 +37,36 @@ check_sensitivity_condition_balance() {
     local file="${1}"
     awk '
         /^\(\(\(FINNv25$/ { in_finn=1 }
+        in_finn && /^\(\(\(\.not\.FINNv25_Inject$/ { surface_open++ }
+        in_finn && /^\)\)\)\.not\.FINNv25_Inject$/ { surface_close++ }
+        in_finn && /^\(\(\(FINNv25_Inject$/ { inject_open++ }
+        in_finn && /^\)\)\)FINNv25_Inject$/ { inject_close++ }
         in_finn && /^\(\(\(\.not\.FINNV25_BRC_HARMONIZED_SENSITIVITY$/ {
-            if (off_open || on_open || off_close || on_close) bad=1
             off_open++
         }
         in_finn && /^\)\)\)\.not\.FINNV25_BRC_HARMONIZED_SENSITIVITY$/ {
-            if (off_open != 1 || off_close || on_open || on_close) bad=1
             off_close++
         }
         in_finn && /^\(\(\(FINNV25_BRC_HARMONIZED_SENSITIVITY$/ {
-            if (off_close != 1 || on_open || on_close) bad=1
             on_open++
         }
         in_finn && /^\)\)\)FINNV25_BRC_HARMONIZED_SENSITIVITY$/ {
-            if (on_open != 1 || on_close) bad=1
             on_close++
         }
         in_finn && /^\)\)\)FINNv25$/ {
-            if (off_open != 1 || off_close != 1 || on_open != 1 || on_close != 1) bad=1
+            # One sensitivity pair is required for each mutually exclusive
+            # surface and injection path.
+            if (surface_open != 1 || surface_close != 1 ||
+                inject_open != 1 || inject_close != 1 ||
+                off_open != 2 || off_close != 2 ||
+                on_open != 2 || on_close != 2) bad=1
             in_finn=0
         }
         END {
-            if (in_finn || off_open != 1 || off_close != 1 ||
-                on_open != 1 || on_close != 1 || bad) exit 1
+            if (in_finn || surface_open != 1 || surface_close != 1 ||
+                inject_open != 1 || inject_close != 1 ||
+                off_open != 2 || off_close != 2 ||
+                on_open != 2 || on_close != 2 || bad) exit 1
         }
     ' "${file}" || {
         echo "FAIL: unbalanced FINNv2.5 sensitivity conditions in ${file}" >&2
@@ -72,6 +79,7 @@ check_config() {
 
     # Opt-in only; ordinary FINNv2.5 OC mapping remains explicit.
     require "--> FINNV25_BRC_HARMONIZED_SENSITIVITY : false" "${config}"
+    require "165     FINNv25_Inject          : off" "${config}"
     require "(((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY" "${config}"
     [[ $(entry_scale "${config}" FINNv25_OCPI) == "75/72" ]]
     [[ $(entry_scale "${config}" FINNv25_OCPO) == "75/73" ]]
@@ -79,9 +87,13 @@ check_config() {
     # Controlled mappings and molecule-to-mass correction are explicit.
     for name in FSOAP DBRCPOA NPBRCPOA PBRCPOA; do
         require "0 FINNv25_${name}_BRC_HS " "${config}"
+        require "165 FINNV25_INJECT_${name}" "${config}"
     done
     [[ $(entry_scale "${config}" FINNv25_OCPI_BRC_HS) == "75/282/72" ]]
     [[ $(entry_scale "${config}" FINNv25_OCPO_BRC_HS) == "75/282/73" ]]
+    require "165 FINNV25_INJECT_OCPI " "${config}"
+    require "165 FINNV25_INJECT_OCPO " "${config}"
+    require "165 FINNV25_INJECT_FSOAP 0 -" "${config}"
 
     for id in 282 283 284 285 286 287; do
         if [[ $(awk -v id="${id}" '$1 == id { n++ } END { print n+0 }' "${config}") -ne 1 ]]; then
@@ -124,15 +136,19 @@ check_config() {
 check_config "${fullchem_config}"
 check_config "${aerosol_config}"
 
-for diagn in "${fullchem_diagn}" "${aerosol_diagn}"; do
-    for species in BCPI BCPO OCPI OCPO FSOAP_BRC_HS DBRCPOA_BRC_HS \
-                   NPBRCPOA_BRC_HS PBRCPOA_BRC_HS; do
-        require "InvFINNv25_${species}" "${diagn}"
-    done
+for species in BCPI BCPO OCPI OCPO FSOAP_BRC_HS DBRCPOA_BRC_HS \
+               NPBRCPOA_BRC_HS PBRCPOA_BRC_HS; do
+    require "InvFINNv25_${species}" "${aerosol_diagn}"
 done
-require "InvFINNv25_CO" "${fullchem_diagn}"
 require "InvFINNv25_SOAP" "${aerosol_diagn}"
 require "FINNv25_CO_field_scaled_to_SOAP_mass_flux_existing_path" "${aerosol_diagn}"
+
+# Both templates expose all-source BrC diagnostics plus optional injection
+# examples.  Detailed surface FINN diagnostics are aerosol-template-specific.
+for diagn in "${fullchem_diagn}" "${aerosol_diagn}"; do
+    require "EmisFSOAP_Total" "${diagn}"
+    require "InvFINNv25Inject_FSOAP" "${diagn}"
+done
 
 for species in FSOAS BRCSOA WTC DBRCPOA FSOAP NPBRCPOA PBRCPOA; do
     require "      - ${species}" "${aerosol_geoschem}"

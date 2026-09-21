@@ -9,5 +9,6 @@ trap 'rm -rf "${tmp_dir}"' EXIT
 geos_root=$(git -C "${this_dir}" rev-parse --show-toplevel)
 "${FC:-gfortran}" "${geos_root}/GeosCore/brc_optics_mod.F90" \
     "${this_dir}/brc_optics_math_test.F90" \
+    -J "${tmp_dir}" -I "${tmp_dir}" \
     -o "${tmp_dir}/brc_optics_math_test"
 "${tmp_dir}/brc_optics_math_test"

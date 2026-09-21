@@ -21,6 +21,7 @@ add_library(GeosCore
   brc_aerosol_map_mod.F90
   brc_cloudj_map_mod.F90
   brc_optics_mod.F90
+  brc_species_mod.F90
   aerosol_mod.F90
   aerosol_thermodynamics_mod.F90
   airs_ch4_mod.F90

@@ -196,13 +196,17 @@ EmisSOAP_Ship      SOAP   0      10  -1   2   kg/m2/s  SOAP_emission_flux_from_s
 ###############################################################################
 EmisSOAS_Biogenic  SOAS   0      3   -1   2   kg/m2/s  SOAS_emission_flux_from_biogenic_sources
 
-# BrC-family source diagnostics. Total columns remain valid for every inventory.
+# BrC-family source diagnostics: paired profiles and vertically summed columns.
 # Select ExtNr 111 (GFED), 112 (GFAS), or 165 (FINNv25_Inject) for BioBurn.
 # FINNv25 surface records use ExtNr=0, Cat=5, Hier=3; do not confuse the paths.
 EmisFSOAP_Total FSOAP -1 -1 -1 3 kg/m2/s FSOAP_emission_flux_from_all_sources
 EmisDBRCPOA_Total DBRCPOA -1 -1 -1 3 kg/m2/s DBRCPOA_emission_flux_from_all_sources
 EmisNPBRCPOA_Total NPBRCPOA -1 -1 -1 3 kg/m2/s NPBRCPOA_emission_flux_from_all_sources
 EmisPBRCPOA_Total PBRCPOA -1 -1 -1 3 kg/m2/s PBRCPOA_emission_flux_from_all_sources
+EmisFSOAP_TotalColumn FSOAP -1 -1 -1 2 kg/m2/s FSOAP_column_emission_flux_from_all_sources
+EmisDBRCPOA_TotalColumn DBRCPOA -1 -1 -1 2 kg/m2/s DBRCPOA_column_emission_flux_from_all_sources
+EmisNPBRCPOA_TotalColumn NPBRCPOA -1 -1 -1 2 kg/m2/s NPBRCPOA_column_emission_flux_from_all_sources
+EmisPBRCPOA_TotalColumn PBRCPOA -1 -1 -1 2 kg/m2/s PBRCPOA_column_emission_flux_from_all_sources
 #InvGFAS_FSOAP FSOAP 112 -1 -1 3 kg/m2/s FSOAP_emission_flux_from_GFAS_variable_height
 #InvGFAS_DBRCPOA DBRCPOA 112 -1 -1 3 kg/m2/s DBRCPOA_emission_flux_from_GFAS_variable_height
 #InvGFAS_NPBRCPOA NPBRCPOA 112 -1 -1 3 kg/m2/s NPBRCPOA_emission_flux_from_GFAS_variable_height

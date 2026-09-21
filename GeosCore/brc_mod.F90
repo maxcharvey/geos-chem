@@ -548,8 +548,9 @@ CONTAINS
 ! !IROUTINE: chembrc
 !
 ! !DESCRIPTION: Subroutine ChemBrC is the top-level driver for brown carbon
-!  chemistry.  It looks up species indices at runtime using Ind\_() so that
-!  the code does nothing if BrC species are not defined in the simulation.
+!  chemistry, called only when brown_carbon is enabled. Species indices
+!  are resolved at runtime using Ind\_(); missing required species produce
+!  an explicit configuration error instead of silently disabling chemistry.
 !
 !  The full chain is:
 !    Step 0: FSOAP -> FSOAS   (gas-to-particle, tau ~ 1 day)
@@ -559,8 +560,10 @@ CONTAINS
 !    Step 2c: PBRCPOA persists as emitted primary BrC-POA
 !    Step 3: WTC receives bleached mass from BRCSOA and NPBRCPOA
 !
-!  FSOAP and NPBRCPOA are optional: if not defined in the simulation,
-!  their steps are skipped and the remaining chain operates as before.
+!  FSOAS, BRCSOA and WTC are required by this chemistry driver. FSOAP and
+!  NPBRCPOA are optional: absent pathways are skipped. PBRCPOA and DBRCPOA
+!  are optional passive species here. The online aerosol mapping can impose
+!  additional species requirements independently of this chemistry guard.
 !\\
 !\\
 ! !INTERFACE:
@@ -571,6 +574,7 @@ CONTAINS
 ! !USES:
 !
    USE ErrCode_Mod
+   USE BRC_Species_Mod, ONLY : BRC_REQUIRED_SPECIES_ERROR
    USE ERROR_MOD,      ONLY : DEBUG_MSG
    USE Input_Opt_Mod,  ONLY : OptInput
    USE State_Chm_Mod,  ONLY : ChmState
@@ -619,7 +623,7 @@ CONTAINS
    ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
 
    !-----------------------------------------------------------------
-   ! Look up species IDs - exit gracefully if not defined
+   ! Look up species IDs - reject missing required chemistry species
    ! FSOAP and NPBRCPOA are optional; FSOAS, BRCSOA, WTC are required
    !-----------------------------------------------------------------
    id_FSOAP    = Ind_('FSOAP'   )
@@ -630,10 +634,12 @@ CONTAINS
    id_DBRCPOA  = Ind_('DBRCPOA' )
    id_PBRCPOA  = Ind_('PBRCPOA' )
 
-   ! Required species: if any missing, return silently
-   IF ( id_FSOAS  <= 0 ) RETURN
-   IF ( id_BRCSOA <= 0 ) RETURN
-   IF ( id_WTC    <= 0 ) RETURN
+   ! Fail before allocating arrays or advancing any BrC chemistry.
+   ErrMsg = BRC_REQUIRED_SPECIES_ERROR( (/ id_FSOAS, id_BRCSOA, id_WTC /) )
+   IF ( LEN_TRIM( ErrMsg ) > 0 ) THEN
+      CALL GC_Error( ErrMsg, RC, ThisLoc )
+      RETURN
+   ENDIF
 
    !-----------------------------------------------------------------
    ! Lazy initialisation of conversion arrays on first call
@@ -672,7 +678,7 @@ CONTAINS
    ENDIF
 
    !-----------------------------------------------------------------
-   ! Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 0.25 day)
+   ! Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 1 day)
    !   Also receives condensed mass from FSOAP (if present)
    !-----------------------------------------------------------------
    CALL CHEM_FSOAS( Input_Opt,  State_Chm, State_Diag, &

@@ -554,12 +554,15 @@ CONTAINS
           ! B R O W N   C A R B O N   A E R O S O L   M A S S
           !
           ! Each BrC species has its own AerMass field and WAERSL bin:
-          !   BRCPI  -> WAERSL(6), brc.dat  (BRCSOA, N=6)
-          !   NPBRC  -> WAERSL(7), brc.dat  (NPBRCPOA, N=7)
-          !   WTCPI  -> WAERSL(8), org.dat  (WTC, N=8)
-          !   FSOAS  -> WAERSL(9),  brc.dat  (FSOAS, N=9)
-          !   PBRC   -> WAERSL(10), pbrc.dat (PBRCPOA, N=10)
-          !   BRCPO  -> DAERSL(3), add-on to N=11 (DBRCPOA, dbrc.dat)
+          !   BRCPI  -> WAERSL(6)  (BRCSOA, N=6)
+          !   NPBRC  -> WAERSL(7)  (NPBRCPOA, N=7)
+          !   WTCPI  -> WAERSL(8)  (WTC, N=8)
+          !   FSOAS  -> WAERSL(9)  (FSOAS, N=9)
+          !   PBRC   -> WAERSL(10) (PBRCPOA, N=10)
+          !   BRCPO  -> DAERSL(3), add-on to N=11 (DBRCPOA)
+          ! All six default to org.dat, a portable organic placeholder.
+          ! brc.dat/pbrc.dat/dbrc.dat apply only in dedicated optics mode;
+          ! RD_AOD selects the files, not this mass-carrier assignment.
           !
           ! All BrC species transported in kgC (MW=12.01), except
           ! FSOAS which is transported as kg_OM (MW=150, no OM:OC).
@@ -577,7 +580,7 @@ CONTAINS
 
           IF ( Input_Opt%LBRC ) THEN
 
-          ! BRCSOA -> BRCPI (bin N=6, brc.dat)
+          ! BRCSOA -> BRCPI (bin N=6)
           IF ( id_BRC_SOA > 0 ) THEN
              State_Chm%AerMass%BRCPI(I,J,L) =                      &
                 Spc(id_BRC_SOA)%Conc(I,J,L)                        &
@@ -585,7 +588,7 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          ! NPBRCPOA -> NPBRC (bin N=7, brc.dat)
+          ! NPBRCPOA -> NPBRC (bin N=7)
           IF ( id_BRC_NPBRC > 0 ) THEN
              State_Chm%AerMass%NPBRC(I,J,L) =                      &
                 Spc(id_BRC_NPBRC)%Conc(I,J,L)                      &
@@ -601,13 +604,13 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          ! FSOAS -> FSOAS (bin N=9, brc.dat; already kg_OM, no OM:OC)
+          ! FSOAS -> FSOAS (bin N=9; already kg_OM, no OM:OC)
           IF ( id_FSOAS > 0 ) THEN
              State_Chm%AerMass%FSOAS(I,J,L) =                      &
                 Spc(id_FSOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
           ENDIF
 
-          ! PBRCPOA -> PBRC (bin N=10, pbrc.dat)
+          ! PBRCPOA -> PBRC (bin N=10)
           IF ( id_BRC_PBRC > 0 ) THEN
              State_Chm%AerMass%PBRC(I,J,L) =                       &
                 Spc(id_BRC_PBRC)%Conc(I,J,L)                       &
@@ -1518,24 +1521,24 @@ CONTAINS
           State_Chm%AerMass%WAERSL(I,J,L,3) = State_Chm%AerMass%OCPISOA(I,J,L)
 
           IF ( Input_Opt%LBRC ) THEN
-             ! BRCSOA (N=6, brc.dat) [kg_OM/m3]
+             ! BRCSOA (N=6) [kg_OM/m3]
              State_Chm%AerMass%WAERSL(I,J,L,6) = State_Chm%AerMass%BRCPI(I,J,L)
 
-             ! NPBRCPOA (N=7, brc.dat) [kg_OM/m3]
+             ! NPBRCPOA (N=7) [kg_OM/m3]
              State_Chm%AerMass%WAERSL(I,J,L,7) = State_Chm%AerMass%NPBRC(I,J,L)
 
-             ! WTC (N=8, org.dat) [kg_OM/m3]
+             ! WTC (N=8) [kg_OM/m3]
              State_Chm%AerMass%WAERSL(I,J,L,8) = State_Chm%AerMass%WTCPI(I,J,L)
 
-             ! FSOAS (N=9, brc.dat) [kg_OM/m3]
+             ! FSOAS (N=9) [kg_OM/m3]
              State_Chm%AerMass%WAERSL(I,J,L,9) = State_Chm%AerMass%FSOAS(I,J,L)
 
-             ! PBRCPOA (N=10, pbrc.dat) [kg_OM/m3]
+             ! PBRCPOA (N=10) [kg_OM/m3]
              State_Chm%AerMass%WAERSL(I,J,L,10) = State_Chm%AerMass%PBRC(I,J,L)
 
              ! DBRCPOA is listed as Is_HygroGrowth in species_database.yml only
              ! to expose DBRCPOA-tagged AOD/area diagnostics.  Its optics stay
-             ! dry here: no WAERSL wet mass, dry DAERSL(3), dbrc.dat.
+             ! dry here: no WAERSL wet mass, dry DAERSL(3), RH=0 optics.
              State_Chm%AerMass%WAERSL(I,J,L,11) = 0.0_fp
           ELSE
              State_Chm%AerMass%WAERSL(I,J,L,6:11) = 0.0_fp
@@ -2040,7 +2043,7 @@ CONTAINS
                 ENDIF
 
                 ! BRCPO (DBRCPOA hydrophobic, DAERSL(3)): add to dry
-                ! DBRC carrier bin N=11 (dbrc.dat), keeping BRCSOA clean
+                ! DBRC carrier bin N=11, keeping BRCSOA separate
                 ! while making DBRCPOA available to RRTMG.
                 !
                 ! NOTE: IsWL1/2/3 are not set in this loop (only in the AODHyg

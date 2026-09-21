@@ -816,13 +816,15 @@ CONTAINS
                    R_interp_factor = RAA_eff / RAA(K_rhx)
                    Q_interp_factor = QAA_eff / QAA(ind_1000,K_rhx)
 
-                   ! BRCSOA (N=6, brc.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   ! BrC optics here use the separately configured Cloud-J
+                   ! OC or dedicated WB/PB/DB record map, not online LUT files.
+                   ! BRCSOA (N=6) [dry kg_OM/m3] -> [wet g/m2]
                    AERSP(L,S_rhx) = ( State_Chm%AerMass%BRCPI(I,J,L)                &
                         * dry_to_wet_factor * Q_interp_factor / R_interp_factor )   &
                         * 1.d3 * BoxHt
 
                    !----------------------------------------------------
-                   ! NPBRCPOA (N=7, brc.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   ! NPBRCPOA (N=7) [dry kg_OM/m3] -> [wet g/m2]
                    !----------------------------------------------------
                    S_rh0 = 3 + NDUST + NRH*(7-1) + 1
                    S_rhx = S_rh0 + RH_ind - 1
@@ -846,7 +848,7 @@ CONTAINS
                         * 1.d3 * BoxHt
 
                    !----------------------------------------------------
-                   ! WTC (N=8, org.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   ! WTC (N=8, OC records) [dry kg_OM/m3] -> [wet g/m2]
                    !----------------------------------------------------
                    S_rh0 = 3 + NDUST + NRH*(8-1) + 1
                    S_rhx = S_rh0 + RH_ind - 1
@@ -870,7 +872,7 @@ CONTAINS
                         * 1.d3 * BoxHt
 
                    !----------------------------------------------------
-                   ! FSOAS (N=9, brc.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   ! FSOAS (N=9) [dry kg_OM/m3] -> [wet g/m2]
                    !----------------------------------------------------
                    S_rh0 = 3 + NDUST + NRH*(9-1) + 1
                    S_rhx = S_rh0 + RH_ind - 1
@@ -894,7 +896,7 @@ CONTAINS
                         * 1.d3 * BoxHt
 
                    !----------------------------------------------------
-                   ! PBRCPOA (N=10, pbrc.dat) [dry kg_OM/m3] -> [wet g/m2]
+                   ! PBRCPOA (N=10) [dry kg_OM/m3] -> [wet g/m2]
                    !----------------------------------------------------
                    S_rh0 = 3 + NDUST + NRH*(10-1) + 1
                    S_rhx = S_rh0 + RH_ind - 1
@@ -918,7 +920,7 @@ CONTAINS
                         * 1.d3 * BoxHt
 
                    !----------------------------------------------------
-                   ! DBRCPOA (N=11, dbrc.dat) [dry kg_OM/m3] -> [g/m2]
+                   ! DBRCPOA (N=11) [dry kg_OM/m3] -> [g/m2]
                    !----------------------------------------------------
                    S_rh0 = 3 + NDUST + NRH*(11-1) + 1
                    S_rhx = S_rh0 + RH_ind - 1

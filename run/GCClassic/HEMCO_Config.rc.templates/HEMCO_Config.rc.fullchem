@@ -123,6 +123,7 @@ VerboseOnCores:              root       # Accepted values: root all
     --> CMIP6_SHIP             :       ${RUNDIR_CMIP6_FIELDS}    # 1850-2100
 # ----- BIOMASS BURNING EMISSIONS ---------------------------------------------
     --> QFED2                  :       false    # 2000-2020
+    --> QFED2_BRC_HARMONIZED_SENSITIVITY : false # Controlled proxy sensitivity; default off
     --> BB4MIPS                :       ${RUNDIR_CMIP6_FIELDS}    # 1850-2100
     --> GFED4_CLIMATOLOGY      :       false    # If true, turn off GFED ext below
     --> FINNv25                :       false    # 2012-2023
@@ -2949,12 +2950,24 @@ VerboseOnCores:              root       # Accepted values: root all
 0 QFED_BCPO_PBL  -                                                                 -       -                             -   -             -       BCPO 71/75/311     5 2
 0 QFED_BCPI_FT   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_bc.006.$YYYY$MM$DD.nc4   biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s BCPI 70/75/312     5 2
 0 QFED_BCPO_FT   -                                                                 -       -                             -   -             -       BCPO 71/75/312     5 2
+(((.not.QFED2_BRC_HARMONIZED_SENSITIVITY
 0 QFED_OCPI_PBL  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4   biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL     kg/m2/s OCPI 72/75/311     5 2
 0 QFED_OCPO_PBL  -                                                                 -       -                             -   -             -       OCPO 73/75/311     5 2
 0 QFED_POG1_PBL  -                                                                 -       -                             -   -             -       POG1 74/76/75/311  5 2
 0 QFED_POG2_PBL  -                                                                 -       -                             -   -             -       POG2 74/77/75/311  5 2
 0 QFED_OCPI_FT   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4   biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s OCPI 72/75/312     5 2
 0 QFED_OCPO_FT   -                                                                 -       -                             -   -             -       OCPO 73/75/312     5 2
+))).not.QFED2_BRC_HARMONIZED_SENSITIVITY
+(((QFED2_BRC_HARMONIZED_SENSITIVITY
+0 QFED_OCPI_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s OCPI 72/288/311 5 2
+0 QFED_OCPI_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s OCPI 72/288/312 5 2
+0 QFED_OCPO_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s OCPO 73/288/311 5 2
+0 QFED_OCPO_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s OCPO 73/288/312 5 2
+0 QFED_POG1_BRC_HS_PBL - - - - - - POG1 74/76/75/311 5 2
+0 QFED_POG2_BRC_HS_PBL - - - - - - POG2 74/77/75/311 5 2
+0 QFED_POG1_BRC_HS_FT  - - - - - - POG1 74/76/75/312 5 2
+0 QFED_POG2_BRC_HS_FT  - - - - - - POG2 74/77/75/312 5 2
+)))QFED2_BRC_HARMONIZED_SENSITIVITY
 0 QFED_POG1_FT   -                                                                 -       -                             -   -             -       POG1 74/76/75/312  5 2
 0 QFED_POG2_FT   -                                                                 -       -                             -   -             -       POG2 74/77/75/312  5 2
 0 QFED_C2H6_PBL  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_c2h6.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL     kg/m2/s C2H6 75/311        5 2
@@ -2983,6 +2996,16 @@ VerboseOnCores:              root       # Accepted values: root all
 0 QFED_pFe_FT    -                                                                 -       -                             -   -             -       pF3  75/312/66     5 2
 0 QFED_C3H6_PBL  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_c3h6.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL     kg/m2/s PRPE 75/311        5 2
 0 QFED_C3H6_FT   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_c3h6.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s PRPE 75/312        5 2
+(((QFED2_BRC_HARMONIZED_SENSITIVITY
+0 QFED_FSOAP_BRC_HS_PBL   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_co.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s FSOAP 54/292/311 5 2
+0 QFED_FSOAP_BRC_HS_FT    $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_co.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s FSOAP 54/292/312 5 2
+0 QFED_DBRCPOA_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_bc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s DBRCPOA 70/291/311 5 2
+0 QFED_DBRCPOA_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_bc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s DBRCPOA 70/291/312 5 2
+0 QFED_NPBRCPOA_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s NPBRCPOA 72/289/311 5 2
+0 QFED_NPBRCPOA_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s NPBRCPOA 72/289/312 5 2
+0 QFED_PBRCPOA_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s PBRCPOA 72/290/311 5 2
+0 QFED_PBRCPOA_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s PBRCPOA 72/290/312 5 2
+)))QFED2_BRC_HARMONIZED_SENSITIVITY
 )))QFED2
 
 #==============================================================================
@@ -4389,6 +4412,11 @@ ${RUNDIR_TES_CLIM_N2O}
 286 FINNv25_BRC_CO_TO_FSOAP    0.013           - - - xy unitless 1
 # molecules input is converted using target MW; 28.01/150 preserves mass ratio.
 287 FINNv25_BRC_CO_FSOAP_MWCORR 0.186733333333  - - - xy unitless 1
+288 QFED_BRC_OC_REMAIN      0.5   - - - xy unitless 1
+289 QFED_BRC_OC_TO_NPBRCPOA 0.375 - - - xy unitless 1
+290 QFED_BRC_OC_TO_PBRCPOA  0.125 - - - xy unitless 1
+291 QFED_BRC_BC_TO_DBRCPOA  4.0   - - - xy unitless 1
+292 QFED_BRC_CO_TO_FSOAP    0.013 - - - xy unitless 1
 
 #==============================================================================
 # --- Diurnal scale factors for biomass burning ---

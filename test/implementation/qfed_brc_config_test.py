@@ -139,6 +139,9 @@ def check_mutations(text: str, has_pog: bool) -> None:
         must_fail(text.replace(before, after, 1), has_pog)
 
 
+if len(sys.argv) < 2:
+    raise SystemExit("usage: qfed_brc_config_test.py HEMCO_Config.rc [...]")
+
 for arg in sys.argv[1:]:
     source = Path(arg).read_text()
     has_pog = Path(arg).name.endswith("fullchem")

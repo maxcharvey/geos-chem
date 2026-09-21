@@ -1576,6 +1576,7 @@ CONTAINS
 !
 ! !USES:
 !
+    USE Charpak_Mod,   ONLY : To_UpperCase
     USE ErrCode_Mod
     USE Input_Opt_Mod, ONLY : OptInput
     USE RoundOff_Mod,  ONLY : Cast_and_RoundOff

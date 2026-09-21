@@ -77,3 +77,16 @@ target_compile_options(GeosRad
 		$<$<STREQUAL:"${CMAKE_Fortran_COMPILER_ID}","Intel">:-r8 -O1 -qoverride-limits>
 		$<$<STREQUAL:"${CMAKE_Fortran_COMPILER_ID}","GNU">:-fdefault-real-8 -fdefault-double-8 -O1 -override-limits -fno-range-check>
 )
+
+# GEOSChemBuildProperties contributes Release -O3/-funroll-loops through an
+# INTERFACE dependency after target-wide options.  Source COMPILE_OPTIONS are
+# emitted last, so keep only the two very large RRTMG coefficient initializers
+# at the intended lower optimization level.  Do not affect Debug (-O0).
+IF ( CMAKE_Fortran_COMPILER_ID STREQUAL "GNU" )
+   SET( RRTMG_COEFF_RELEASE_OPTIONS
+        "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-O1>"
+        "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-fno-unroll-loops>" )
+   SET_SOURCE_FILES_PROPERTIES(
+        rrtmg_lw_k_g.F90 rrtmg_sw_k_g.F90
+        PROPERTIES COMPILE_OPTIONS "${RRTMG_COEFF_RELEASE_OPTIONS}" )
+ENDIF()

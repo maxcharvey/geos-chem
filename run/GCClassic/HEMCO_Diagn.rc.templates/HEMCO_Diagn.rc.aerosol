@@ -124,6 +124,21 @@ EmisOCPO_BioBurn   OCPO   112    -1  -1   2   kg/m2/s  OCPO_emission_flux_from_b
 EmisOCPO_Ship      OCPO   0      10  -1   2   kg/m2/s  OCPO_emission_flux_from_ships
 
 ###############################################################################
+#####  FINNv2.5 config inventory and harmonized BrC sensitivity           #####
+# Cat 5/Hier 3 identifies config-driven biomass burning; run one fire
+# inventory at a time. BC and OC source totals are component sums.
+###############################################################################
+InvFINNv25_SOAP           SOAP     0   5   3  2   kg/m2/s  FINNv25_CO_field_scaled_to_SOAP_mass_flux_existing_path
+InvFINNv25_BCPI           BCPI     0   5   3  2   kg/m2/s  FINNv25_native_hydrophilic_BC_emission_mass_flux
+InvFINNv25_BCPO           BCPO     0   5   3  2   kg/m2/s  FINNv25_native_hydrophobic_BC_emission_mass_flux
+InvFINNv25_OCPI           OCPI     0   5   3  2   kg/m2/s  FINNv25_residual_hydrophilic_OC_emission_mass_flux
+InvFINNv25_OCPO           OCPO     0   5   3  2   kg/m2/s  FINNv25_residual_hydrophobic_OC_emission_mass_flux
+InvFINNv25_FSOAP_BRC_HS   FSOAP    0   5   3  2   kg/m2/s  FINNv25_CO_proxy_FSOAP_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_DBRCPOA_BRC_HS DBRCPOA  0   5   3  2   kg/m2/s  FINNv25_BC_proxy_DBRCPOA_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_NPBRCPOA_BRC_HS NPBRCPOA 0  5   3  2   kg/m2/s  FINNv25_OC_proxy_NPBRCPOA_emission_mass_flux_harmonized_sensitivity
+InvFINNv25_PBRCPOA_BRC_HS PBRCPOA  0   5   3  2   kg/m2/s  FINNv25_OC_proxy_PBRCPOA_emission_mass_flux_harmonized_sensitivity
+
+###############################################################################
 #####  pFe emissions                                                      ##### 
 ###############################################################################
 EmispFe_Total      pFe    -1     -1  -1   3   kg/m2/s  pFe_emission_flux_from_all_sectors
@@ -180,5 +195,26 @@ EmisSOAP_Ship      SOAP   0      10  -1   2   kg/m2/s  SOAP_emission_flux_from_s
 #####  SOAS sources                                                       ##### 
 ###############################################################################
 EmisSOAS_Biogenic  SOAS   0      3   -1   2   kg/m2/s  SOAS_emission_flux_from_biogenic_sources
+
+# BrC-family source diagnostics. Total columns remain valid for every inventory.
+# Select ExtNr 111 (GFED), 112 (GFAS), or 165 (FINNv25_Inject) for BioBurn.
+# FINNv25 surface records use ExtNr=0, Cat=5, Hier=3; do not confuse the paths.
+EmisFSOAP_Total FSOAP -1 -1 -1 3 kg/m2/s FSOAP_emission_flux_from_all_sources
+EmisDBRCPOA_Total DBRCPOA -1 -1 -1 3 kg/m2/s DBRCPOA_emission_flux_from_all_sources
+EmisNPBRCPOA_Total NPBRCPOA -1 -1 -1 3 kg/m2/s NPBRCPOA_emission_flux_from_all_sources
+EmisPBRCPOA_Total PBRCPOA -1 -1 -1 3 kg/m2/s PBRCPOA_emission_flux_from_all_sources
+#InvGFAS_FSOAP FSOAP 112 -1 -1 3 kg/m2/s FSOAP_emission_flux_from_GFAS_variable_height
+#InvGFAS_DBRCPOA DBRCPOA 112 -1 -1 3 kg/m2/s DBRCPOA_emission_flux_from_GFAS_variable_height
+#InvGFAS_NPBRCPOA NPBRCPOA 112 -1 -1 3 kg/m2/s NPBRCPOA_emission_flux_from_GFAS_variable_height
+#InvGFAS_PBRCPOA PBRCPOA 112 -1 -1 3 kg/m2/s PBRCPOA_emission_flux_from_GFAS_variable_height
+#InvFINNv25Inject_CO CO 165 -1 -1 3 kg/m2/s CO_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_BCPI BCPI 165 -1 -1 3 kg/m2/s BCPI_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_BCPO BCPO 165 -1 -1 3 kg/m2/s BCPO_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_OCPI OCPI 165 -1 -1 3 kg/m2/s OCPI_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_OCPO OCPO 165 -1 -1 3 kg/m2/s OCPO_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_FSOAP FSOAP 165 -1 -1 3 kg/m2/s FSOAP_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_DBRCPOA DBRCPOA 165 -1 -1 3 kg/m2/s DBRCPOA_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_NPBRCPOA NPBRCPOA 165 -1 -1 3 kg/m2/s NPBRCPOA_emission_flux_from_FINNv25_injection
+#InvFINNv25Inject_PBRCPOA PBRCPOA 165 -1 -1 3 kg/m2/s PBRCPOA_emission_flux_from_FINNv25_injection
 
 #EOC

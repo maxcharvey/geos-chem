@@ -735,6 +735,98 @@ MODULE State_Diag_Mod
      REAL(f4),           POINTER :: ProdOCPIfromOCPO(:,:,:)
      LOGICAL                     :: Archive_ProdOCPIfromOCPO
 
+     REAL(f4),           POINTER :: ProdFFOCPIfromFFOCPO(:,:,:)
+     LOGICAL                     :: Archive_ProdFFOCPIfromFFOCPO
+
+     !%%%%% Brown carbon aerosol diagnostics %%%%%
+
+     REAL(f4),           POINTER :: BrCTauBleach(:,:,:)
+     LOGICAL                     :: Archive_BrCTauBleach
+
+     REAL(f4),           POINTER :: BrCKBleach(:,:,:)
+     LOGICAL                     :: Archive_BrCKBleach
+
+     REAL(f4),           POINTER :: BrCEtaBBOA(:,:,:)
+     LOGICAL                     :: Archive_BrCEtaBBOA
+
+     REAL(f4),           POINTER :: BrCTemp(:,:,:)
+     LOGICAL                     :: Archive_BrCTemp
+
+     REAL(f4),           POINTER :: BrCRH(:,:,:)
+     LOGICAL                     :: Archive_BrCRH
+
+     REAL(f4),           POINTER :: BrCO3ppbv(:,:,:)
+     LOGICAL                     :: Archive_BrCO3ppbv
+
+     REAL(f4),           POINTER :: BrCAbsMass(:,:,:)
+     LOGICAL                     :: Archive_BrCAbsMass
+
+     REAL(f4),           POINTER :: BrCTotMass(:,:,:)
+     LOGICAL                     :: Archive_BrCTotMass
+
+     REAL(f4),           POINTER :: BrCBleachedFrac(:,:,:)
+     LOGICAL                     :: Archive_BrCBleachedFrac
+
+     REAL(f4),           POINTER :: BrCFluxFSOAP2FSOAS(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxFSOAP2FSOAS
+
+     REAL(f4),           POINTER :: BrCFluxFSOAS2BRC(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxFSOAS2BRC
+
+     REAL(f4),           POINTER :: BrCFluxBRC2WTC(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxBRC2WTC
+
+     REAL(f4),           POINTER :: BrCFluxNPBRC2WTC(:,:,:)
+     LOGICAL                     :: Archive_BrCFluxNPBRC2WTC
+
+     REAL(f4),           POINTER :: BrCDryAODWL1(:,:,:)
+     LOGICAL                     :: Archive_BrCDryAODWL1
+
+     REAL(f4),           POINTER :: BrCDryAODWL2(:,:,:)
+     LOGICAL                     :: Archive_BrCDryAODWL2
+
+     REAL(f4),           POINTER :: BrCDryAODWL3(:,:,:)
+     LOGICAL                     :: Archive_BrCDryAODWL3
+
+     REAL(f4),           POINTER :: N2O5GammaSNAOrg(:,:,:)
+     LOGICAL                     :: Archive_N2O5GammaSNAOrg
+
+     REAL(f4),           POINTER :: N2O5GammaORCOnly(:,:,:)
+     LOGICAL                     :: Archive_N2O5GammaORCOnly
+
+     REAL(f4),           POINTER :: N2O5DeltaGammaBrC(:,:,:)
+     LOGICAL                     :: Archive_N2O5DeltaGammaBrC
+
+     REAL(f4),           POINTER :: N2O5YieldClNO2SNAOrg(:,:,:)
+     LOGICAL                     :: Archive_N2O5YieldClNO2SNAOrg
+
+     REAL(f4),           POINTER :: N2O5EffRadiusSNAOrg(:,:,:)
+     LOGICAL                     :: Archive_N2O5EffRadiusSNAOrg
+
+     REAL(f4),           POINTER :: N2O5SurfAreaSNAOrg(:,:,:)
+     LOGICAL                     :: Archive_N2O5SurfAreaSNAOrg
+
+     REAL(f4),           POINTER :: N2O5OrgVol(:,:,:)
+     LOGICAL                     :: Archive_N2O5OrgVol
+
+     REAL(f4),           POINTER :: N2O5OrgVolBrC(:,:,:)
+     LOGICAL                     :: Archive_N2O5OrgVolBrC
+
+     REAL(f4),           POINTER :: N2O5OrgH2O(:,:,:)
+     LOGICAL                     :: Archive_N2O5OrgH2O
+
+     REAL(f4),           POINTER :: N2O5OrgH2OBrC(:,:,:)
+     LOGICAL                     :: Archive_N2O5OrgH2OBrC
+
+     REAL(f4),           POINTER :: N2O5InorgH2O(:,:,:)
+     LOGICAL                     :: Archive_N2O5InorgH2O
+
+     REAL(f4),           POINTER :: N2O5BrCOrgVolFrac(:,:,:)
+     LOGICAL                     :: Archive_N2O5BrCOrgVolFrac
+
+     REAL(f4),           POINTER :: N2O5BrCOrgH2OFrac(:,:,:)
+     LOGICAL                     :: Archive_N2O5BrCOrgH2OFrac
+
      !%%%%%  Sulfur aerosols prod & loss %%%%%
      REAL(f4),           POINTER :: ProdSO2fromDMSandOH(:,:,:)
      LOGICAL                     :: Archive_ProdSO2fromDMSandOH
@@ -2185,6 +2277,98 @@ CONTAINS
 
     State_Diag%ProdOCPIfromOCPO                    => NULL()
     State_Diag%Archive_ProdOCPIfromOCPO            = .FALSE.
+
+    State_Diag%ProdFFOCPIfromFFOCPO                => NULL()
+    State_Diag%Archive_ProdFFOCPIfromFFOCPO        = .FALSE.
+
+    !%%%%% Brown carbon aerosol diagnostics %%%%%
+
+    State_Diag%BrCTauBleach                       => NULL()
+    State_Diag%Archive_BrCTauBleach               = .FALSE.
+
+    State_Diag%BrCKBleach                         => NULL()
+    State_Diag%Archive_BrCKBleach                 = .FALSE.
+
+    State_Diag%BrCEtaBBOA                         => NULL()
+    State_Diag%Archive_BrCEtaBBOA                 = .FALSE.
+
+    State_Diag%BrCTemp                            => NULL()
+    State_Diag%Archive_BrCTemp                    = .FALSE.
+
+    State_Diag%BrCRH                              => NULL()
+    State_Diag%Archive_BrCRH                      = .FALSE.
+
+    State_Diag%BrCO3ppbv                          => NULL()
+    State_Diag%Archive_BrCO3ppbv                  = .FALSE.
+
+    State_Diag%BrCAbsMass                         => NULL()
+    State_Diag%Archive_BrCAbsMass                 = .FALSE.
+
+    State_Diag%BrCTotMass                         => NULL()
+    State_Diag%Archive_BrCTotMass                 = .FALSE.
+
+    State_Diag%BrCBleachedFrac                    => NULL()
+    State_Diag%Archive_BrCBleachedFrac            = .FALSE.
+
+    State_Diag%BrCFluxFSOAP2FSOAS                 => NULL()
+    State_Diag%Archive_BrCFluxFSOAP2FSOAS         = .FALSE.
+
+    State_Diag%BrCFluxFSOAS2BRC                   => NULL()
+    State_Diag%Archive_BrCFluxFSOAS2BRC           = .FALSE.
+
+    State_Diag%BrCFluxBRC2WTC                     => NULL()
+    State_Diag%Archive_BrCFluxBRC2WTC             = .FALSE.
+
+    State_Diag%BrCFluxNPBRC2WTC                   => NULL()
+    State_Diag%Archive_BrCFluxNPBRC2WTC           = .FALSE.
+
+    State_Diag%BrCDryAODWL1                       => NULL()
+    State_Diag%Archive_BrCDryAODWL1               = .FALSE.
+
+    State_Diag%BrCDryAODWL2                       => NULL()
+    State_Diag%Archive_BrCDryAODWL2               = .FALSE.
+
+    State_Diag%BrCDryAODWL3                       => NULL()
+    State_Diag%Archive_BrCDryAODWL3               = .FALSE.
+
+    State_Diag%N2O5GammaSNAOrg                    => NULL()
+    State_Diag%Archive_N2O5GammaSNAOrg            = .FALSE.
+
+    State_Diag%N2O5GammaORCOnly                   => NULL()
+    State_Diag%Archive_N2O5GammaORCOnly           = .FALSE.
+
+    State_Diag%N2O5DeltaGammaBrC                  => NULL()
+    State_Diag%Archive_N2O5DeltaGammaBrC          = .FALSE.
+
+    State_Diag%N2O5YieldClNO2SNAOrg               => NULL()
+    State_Diag%Archive_N2O5YieldClNO2SNAOrg       = .FALSE.
+
+    State_Diag%N2O5EffRadiusSNAOrg                => NULL()
+    State_Diag%Archive_N2O5EffRadiusSNAOrg        = .FALSE.
+
+    State_Diag%N2O5SurfAreaSNAOrg                 => NULL()
+    State_Diag%Archive_N2O5SurfAreaSNAOrg         = .FALSE.
+
+    State_Diag%N2O5OrgVol                         => NULL()
+    State_Diag%Archive_N2O5OrgVol                 = .FALSE.
+
+    State_Diag%N2O5OrgVolBrC                      => NULL()
+    State_Diag%Archive_N2O5OrgVolBrC              = .FALSE.
+
+    State_Diag%N2O5OrgH2O                         => NULL()
+    State_Diag%Archive_N2O5OrgH2O                 = .FALSE.
+
+    State_Diag%N2O5OrgH2OBrC                      => NULL()
+    State_Diag%Archive_N2O5OrgH2OBrC              = .FALSE.
+
+    State_Diag%N2O5InorgH2O                       => NULL()
+    State_Diag%Archive_N2O5InorgH2O               = .FALSE.
+
+    State_Diag%N2O5BrCOrgVolFrac                  => NULL()
+    State_Diag%Archive_N2O5BrCOrgVolFrac          = .FALSE.
+
+    State_Diag%N2O5BrCOrgH2OFrac                  => NULL()
+    State_Diag%Archive_N2O5BrCOrgH2OFrac          = .FALSE.
 
     !%%%%% Aerosol prod and loss diagnostics %%%%%
 
@@ -9146,6 +9330,664 @@ CONTAINS
        ENDIF
 
        !--------------------------------------------------------------------
+       ! Production of Hydrophilic FF-OC (FFOCPI) from Hydrophobic FF-OC
+       ! (FFOCPO)
+       !--------------------------------------------------------------------
+       diagID = 'ProdFFOCPIfromFFOCPO'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%ProdFFOCPIfromFFOCPO,                &
+            archiveData    = State_Diag%Archive_ProdFFOCPIfromFFOCPO,        &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BrC bleaching rate constant [s^-1]
+       !--------------------------------------------------------------------
+       diagID = 'BrCKBleach'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCKBleach,                          &
+            archiveData    = State_Diag%Archive_BrCKBleach,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BBOA viscosity (for BrC calcualtion)
+       !--------------------------------------------------------------------
+       diagID = 'BrCEtaBBOA'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCEtaBBOA,                          &
+            archiveData    = State_Diag%Archive_BrCEtaBBOA,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BrC bleaching lifetime [s]
+       !--------------------------------------------------------------------
+       diagID = 'BrCTauBleach'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCTauBleach,                        &
+            archiveData    = State_Diag%Archive_BrCTauBleach,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! Temperature used by BrC bleaching [K]
+       !--------------------------------------------------------------------
+       diagID = 'BrCTemp'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCTemp,                             &
+            archiveData    = State_Diag%Archive_BrCTemp,                     &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! RH used by BrC bleaching [%]
+       !--------------------------------------------------------------------
+       diagID = 'BrCRH'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCRH,                               &
+            archiveData    = State_Diag%Archive_BrCRH,                       &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! O3 used by BrC bleaching [ppbv]
+       !--------------------------------------------------------------------
+       diagID = 'BrCO3ppbv'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCO3ppbv,                           &
+            archiveData    = State_Diag%Archive_BrCO3ppbv,                   &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! Absorbing BrC-family carbon mass [kgC/grid box]
+       !--------------------------------------------------------------------
+       diagID = 'BrCAbsMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCAbsMass,                          &
+            archiveData    = State_Diag%Archive_BrCAbsMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! Total BrC-family carbon mass, including WTC [kgC/grid box]
+       !--------------------------------------------------------------------
+       diagID = 'BrCTotMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCTotMass,                          &
+            archiveData    = State_Diag%Archive_BrCTotMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! WTC fraction of total BrC-family mass [1]
+       !--------------------------------------------------------------------
+       diagID = 'BrCBleachedFrac'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCBleachedFrac,                     &
+            archiveData    = State_Diag%Archive_BrCBleachedFrac,             &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! FSOAP --> FSOAS flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxFSOAP2FSOAS'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxFSOAP2FSOAS,                  &
+            archiveData    = State_Diag%Archive_BrCFluxFSOAP2FSOAS,          &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! FSOAS --> BRCSOA Flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxFSOAS2BRC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxFSOAS2BRC,                    &
+            archiveData    = State_Diag%Archive_BrCFluxFSOAS2BRC,            &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BRCSOA --> WTC Flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxBRC2WTC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxBRC2WTC,                      &
+            archiveData    = State_Diag%Archive_BrCFluxBRC2WTC,              &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! NPBRCPOA --> WTC Flux
+       !--------------------------------------------------------------------
+       diagID = 'BrCFluxNPBRC2WTC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCFluxNPBRC2WTC,                    &
+            archiveData    = State_Diag%Archive_BrCFluxNPBRC2WTC,            &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! DBRCPOA dry AOD (hydrophobic, dry carrier bin N=11)
+       !--------------------------------------------------------------------
+       TmpWL  = RadWL(1)
+       diagID = 'BrCDryAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCDryAODWL1,                        &
+            archiveData    = State_Diag%Archive_BrCDryAODWL1,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       TmpWL  = RadWL(2)
+       diagID = 'BrCDryAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCDryAODWL2,                        &
+            archiveData    = State_Diag%Archive_BrCDryAODWL2,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       TmpWL  = RadWL(3)
+       diagID = 'BrCDryAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCDryAODWL3,                        &
+            archiveData    = State_Diag%Archive_BrCDryAODWL3,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG effective uptake probability with ORC+BrC coating [1]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5GammaSNAOrg'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5GammaSNAOrg,                     &
+            archiveData    = State_Diag%Archive_N2O5GammaSNAOrg,             &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG effective uptake probability with ORC-only coating [1]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5GammaORCOnly'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5GammaORCOnly,                    &
+            archiveData    = State_Diag%Archive_N2O5GammaORCOnly,            &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 gamma difference caused by adding BrC to ORC coating [1]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5DeltaGammaBrC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5DeltaGammaBrC,                   &
+            archiveData    = State_Diag%Archive_N2O5DeltaGammaBrC,           &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG ClNO2 yield [1]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5YieldClNO2SNAOrg'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5YieldClNO2SNAOrg,                &
+            archiveData    = State_Diag%Archive_N2O5YieldClNO2SNAOrg,        &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG effective particle radius [cm]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5EffRadiusSNAOrg'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5EffRadiusSNAOrg,                 &
+            archiveData    = State_Diag%Archive_N2O5EffRadiusSNAOrg,         &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG effective surface area [cm2/cm3]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5SurfAreaSNAOrg'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5SurfAreaSNAOrg,                  &
+            archiveData    = State_Diag%Archive_N2O5SurfAreaSNAOrg,          &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG organic coating volume [cm3/cm3]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5OrgVol'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5OrgVol,                          &
+            archiveData    = State_Diag%Archive_N2O5OrgVol,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BrC-only contribution to N2O5 organic coating volume [cm3/cm3]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5OrgVolBrC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5OrgVolBrC,                       &
+            archiveData    = State_Diag%Archive_N2O5OrgVolBrC,               &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! N2O5 SNA+ORG organic coating water [cm3/cm3]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5OrgH2O'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5OrgH2O,                          &
+            archiveData    = State_Diag%Archive_N2O5OrgH2O,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BrC-only contribution to N2O5 organic coating water [cm3/cm3]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5OrgH2OBrC'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5OrgH2OBrC,                       &
+            archiveData    = State_Diag%Archive_N2O5OrgH2OBrC,               &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! Inorganic water used by the N2O5 SNA+ORG calculation [cm3/cm3]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5InorgH2O'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5InorgH2O,                        &
+            archiveData    = State_Diag%Archive_N2O5InorgH2O,                &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BrC fraction of N2O5 organic coating volume [1]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5BrCOrgVolFrac'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5BrCOrgVolFrac,                   &
+            archiveData    = State_Diag%Archive_N2O5BrCOrgVolFrac,           &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
+       ! BrC fraction of N2O5 organic coating water [1]
+       !--------------------------------------------------------------------
+       diagID = 'N2O5BrCOrgH2OFrac'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%N2O5BrCOrgH2OFrac,                   &
+            archiveData    = State_Diag%Archive_N2O5BrCOrgH2OFrac,           &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       !--------------------------------------------------------------------
        ! Production of SO4 from aqueous oxidation of H2O2 in cloud
        !--------------------------------------------------------------------
        diagID = 'ProdSO4fromH2O2inCloud'
@@ -9927,7 +10769,7 @@ CONTAINS
        ! being requested as diagnostic output when the corresponding
        ! array has not been allocated.
        !-------------------------------------------------------------------
-       DO N = 1, 25
+       DO N = 1, 26
 
           ! Select the diagnostic ID
           SELECT CASE( N )
@@ -9936,53 +10778,55 @@ CONTAINS
              CASE( 2  )
                 diagID = 'ProdOCPIfromOCPO'
              CASE( 3  )
-                diagID = 'AODDust'
+                diagID = 'ProdFFOCPIfromFFOCPO'
              CASE( 4  )
+                diagID = 'AODDust'
+             CASE( 5  )
                 TmpWL  = RadWL(1)
                 diagID = 'AODDust' // TRIM( TmpWL ) // 'nm'
-             CASE( 5  )
+             CASE( 6  )
                 TmpWL  = RadWL(2)
                 diagID = 'AODDust' // TRIM( TmpWL ) // 'nm'
-             CASE( 6  )
+             CASE( 7  )
                 TmpWL  = RadWL(3)
                 diagID = 'AODDust' // TRIM( TmpWL ) // 'nm'
-             CASE( 7  )
-                diagID = 'ProdSO4fromH2O2inCloud'
              CASE( 8  )
-                diagID = 'ProdSO4fromO3inCloud'
+                diagID = 'ProdSO4fromH2O2inCloud'
              CASE( 9  )
-                diagID = 'ProdSO4fromO2inCloudMetal'
+                diagID = 'ProdSO4fromO3inCloud'
              CASE( 10 )
-                diagID = 'ProdSO4fromO3inSeaSalt'
+                diagID = 'ProdSO4fromO2inCloudMetal'
              CASE( 11 )
-                diagID = 'ProdSO4fromSRO3'
+                diagID = 'ProdSO4fromO3inSeaSalt'
              CASE( 12 )
-                diagID = 'ProdSO4fromO3s'
+                diagID = 'ProdSO4fromSRO3'
              CASE( 13 )
-                diagID = 'LossHNO3onSeaSalt'
+                diagID = 'ProdSO4fromO3s'
              CASE( 14 )
-                diagID = 'PM25'
+                diagID = 'LossHNO3onSeaSalt'
              CASE( 15 )
-                diagID = 'AerMassBC'
+                diagID = 'PM25'
              CASE( 16 )
-                diagID = 'AerMassNH4'
+                diagID = 'AerMassBC'
              CASE( 17 )
-                diagID = 'AerMassNIT'
+                diagID = 'AerMassNH4'
              CASE( 18 )
-                diagID = 'AerMassSAL'
+                diagID = 'AerMassNIT'
              CASE( 19 )
-                diagID = 'AerMassSO4'
+                diagID = 'AerMassSAL'
              CASE( 20 )
-                diagID = 'TotalOA'
+                diagID = 'AerMassSO4'
              CASE( 21 )
+                diagID = 'TotalOA'
+             CASE( 22 )
                 diagID = 'TotalOC'
-             CASE( 22 ) ! (jmm, 06/29/18)
-                diagID = 'ProdSO4fromHMSinCloud'
              CASE( 23 ) ! (jmm, 06/29/18)
-                diagID = 'ProdHMSfromSO2andHCHOinCloud'
+                diagID = 'ProdSO4fromHMSinCloud'
              CASE( 24 ) ! (jmm, 06/29/18)
-                diagID = 'AerMassHMS'
+                diagID = 'ProdHMSfromSO2andHCHOinCloud'
              CASE( 25 ) ! (jmm, 06/29/18)
+                diagID = 'AerMassHMS'
+             CASE( 26 ) ! (jmm, 06/29/18)
                 diagID = 'ProdSO2andHCHOfromHMSinCloud'
           END SELECT
 
@@ -13260,6 +14104,11 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'ProdFFOCPIfromFFOCPO',                        &
+                   Ptr2Data = State_Diag%ProdFFOCPIfromFFOCPO,               &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
     CALL Finalize( diagId   = 'OHconcAfterChem',                             &
                    Ptr2Data = State_Diag%OHconcAfterChem,                    &
                    RC       = RC                                            )
@@ -14252,6 +15101,150 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'BrCTauBleach',                                &
+                   Ptr2Data = State_Diag%BrCTauBleach,                       &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCKBleach',                                  &
+                   Ptr2Data = State_Diag%BrCKBleach,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCEtaBBOA',                                  &
+                   Ptr2Data = State_Diag%BrCEtaBBOA,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCTemp',                                     &
+                   Ptr2Data = State_Diag%BrCTemp,                            &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCRH',                                       &
+                   Ptr2Data = State_Diag%BrCRH,                              &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCO3ppbv',                                   &
+                   Ptr2Data = State_Diag%BrCO3ppbv,                          &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCAbsMass',                                  &
+                   Ptr2Data = State_Diag%BrCAbsMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCTotMass',                                  &
+                   Ptr2Data = State_Diag%BrCTotMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCBleachedFrac',                             &
+                   Ptr2Data = State_Diag%BrCBleachedFrac,                    &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxFSOAP2FSOAS',                          &
+                   Ptr2Data = State_Diag%BrCFluxFSOAP2FSOAS,                 &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxFSOAS2BRC',                            &
+                   Ptr2Data = State_Diag%BrCFluxFSOAS2BRC,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxBRC2WTC',                              &
+                   Ptr2Data = State_Diag%BrCFluxBRC2WTC,                     &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCFluxNPBRC2WTC',                            &
+                   Ptr2Data = State_Diag%BrCFluxNPBRC2WTC,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCDryAOD' // TRIM(RadWL(1)) // 'nm',         &
+                   Ptr2Data = State_Diag%BrCDryAODWL1,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCDryAOD' // TRIM(RadWL(2)) // 'nm',         &
+                   Ptr2Data = State_Diag%BrCDryAODWL2,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCDryAOD' // TRIM(RadWL(3)) // 'nm',         &
+                   Ptr2Data = State_Diag%BrCDryAODWL3,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5GammaSNAOrg',                            &
+                   Ptr2Data = State_Diag%N2O5GammaSNAOrg,                   &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5GammaORCOnly',                           &
+                   Ptr2Data = State_Diag%N2O5GammaORCOnly,                  &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5DeltaGammaBrC',                          &
+                   Ptr2Data = State_Diag%N2O5DeltaGammaBrC,                 &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5YieldClNO2SNAOrg',                       &
+                   Ptr2Data = State_Diag%N2O5YieldClNO2SNAOrg,              &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5EffRadiusSNAOrg',                        &
+                   Ptr2Data = State_Diag%N2O5EffRadiusSNAOrg,               &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5SurfAreaSNAOrg',                         &
+                   Ptr2Data = State_Diag%N2O5SurfAreaSNAOrg,                &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5OrgVol',                                 &
+                   Ptr2Data = State_Diag%N2O5OrgVol,                        &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5OrgVolBrC',                              &
+                   Ptr2Data = State_Diag%N2O5OrgVolBrC,                     &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5OrgH2O',                                 &
+                   Ptr2Data = State_Diag%N2O5OrgH2O,                        &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5OrgH2OBrC',                              &
+                   Ptr2Data = State_Diag%N2O5OrgH2OBrC,                     &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5InorgH2O',                               &
+                   Ptr2Data = State_Diag%N2O5InorgH2O,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5BrCOrgVolFrac',                          &
+                   Ptr2Data = State_Diag%N2O5BrCOrgVolFrac,                 &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'N2O5BrCOrgH2OFrac',                          &
+                   Ptr2Data = State_Diag%N2O5BrCOrgH2OFrac,                 &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
 
 #ifdef MODEL_GEOS
     !=======================================================================
@@ -15428,6 +16421,12 @@ CONTAINS
     ELSE IF ( TRIM( Name_AllCaps ) == 'PRODOCPIFROMOCPO' ) THEN
        IF ( isDesc    ) Desc  = 'Production of hydrophilic organic ' // &
                                 'carbon from hydrophobic organic carbon'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  = 3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'PRODFFOCPIFROMFFOCPO' ) THEN
+       IF ( isDesc    ) Desc  = 'Production of hydrophilic fossil-fuel ' // &
+                                'organic carbon from hydrophobic fossil-fuel organic carbon'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  = 3
 
@@ -16788,6 +17787,159 @@ CONTAINS
     ELSE IF ( TRIM( Name_AllCaps ) == 'AERMASSSOAGX' ) THEN
        IF ( isDesc    ) Desc  = 'Mass of aerosol-phase glyoxal'
        IF ( isUnits   ) Units = 'ug m-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCTAUBLEACH' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC photobleaching lifetime'
+       IF ( isUnits   ) Units = 's'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCKBLEACH' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC photobleaching rate constant'
+       IF ( isUnits   ) Units = 's-1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCETABBOA' ) THEN
+       IF ( isDesc    ) Desc  = 'BBOA viscosity'
+       IF ( isUnits   ) Units = 'Pa s'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCTEMP' ) THEN
+       IF ( isDesc    ) Desc  = 'Temperature used by BrC bleaching'
+       IF ( isUnits   ) Units = 'K'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCRH' ) THEN
+       IF ( isDesc    ) Desc  = 'Relative humidity used by BrC bleaching'
+       IF ( isUnits   ) Units = '%'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCO3PPBV' ) THEN
+       IF ( isDesc    ) Desc  = 'O3 mixing ratio used by BrC bleaching'
+       IF ( isUnits   ) Units = 'ppbv'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCABSMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'Absorbing BrC-family species carbon mass'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCTOTMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'Total BrC-family species carbon mass including WTC'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCBLEACHEDFRAC' ) THEN
+       IF ( isDesc    ) Desc  = 'WTC fraction of total BrC-family species mass'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAP2FSOAS' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from FSOAP to FSOAS'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAS2BRC' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from FSOAS to BRCSOA'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXBRC2WTC' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from BRCSOA to WTC'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXNPBRC2WTC' ) THEN
+       IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to WTC'
+       IF ( isUnits   ) Units = 'kg'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCDRYAOD' // &
+                                    TRIM(RadWL(1)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'DBRCPOA dry aerosol optical depth at ' // &
+                                TRIM(RadWL(1)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCDRYAOD' // &
+                                    TRIM(RadWL(2)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'DBRCPOA dry aerosol optical depth at ' // &
+                                TRIM(RadWL(2)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCDRYAOD' // &
+                                    TRIM(RadWL(3)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'DBRCPOA dry aerosol optical depth at ' // &
+                                TRIM(RadWL(3)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5GAMMASNAORG' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 effective uptake probability on ' // &
+                                'SNA+ORG aerosol with ORC+BrC coating'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5GAMMAORCONLY' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 effective uptake probability on ' // &
+                                'SNA+ORG aerosol with ORC-only coating'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5DELTAGAMMABRC' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 gamma difference from BrC organic coating'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5YIELDCLNO2SNAORG' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 ClNO2 yield on SNA+ORG aerosol'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5EFFRADIUSSNAORG' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 SNA+ORG effective particle radius'
+       IF ( isUnits   ) Units = 'cm'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5SURFAREASNAORG' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 SNA+ORG effective particle surface area'
+       IF ( isUnits   ) Units = 'cm2 cm-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5ORGVOL' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 SNA+ORG organic coating volume'
+       IF ( isUnits   ) Units = 'cm3 cm-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5ORGVOLBRC' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC contribution to N2O5 organic coating volume'
+       IF ( isUnits   ) Units = 'cm3 cm-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5ORGH2O' ) THEN
+       IF ( isDesc    ) Desc  = 'N2O5 SNA+ORG organic coating water'
+       IF ( isUnits   ) Units = 'cm3 cm-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5ORGH2OBRC' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC contribution to N2O5 organic coating water'
+       IF ( isUnits   ) Units = 'cm3 cm-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5INORGH2O' ) THEN
+       IF ( isDesc    ) Desc  = 'Inorganic water used by N2O5 SNA+ORG calculation'
+       IF ( isUnits   ) Units = 'cm3 cm-3'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5BRCORGVOLFRAC' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC fraction of N2O5 organic coating volume'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'N2O5BRCORGH2OFRAC' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC fraction of N2O5 organic coating water'
+       IF ( isUnits   ) Units = '1'
        IF ( isRank    ) Rank  =  3
 
    ELSE
@@ -18754,7 +19906,8 @@ CONTAINS
     !   0=BASE and then...
     !   1=O3  2=O3T 3=ME  4=H2O  5=CO2  6=CFC  7=N2O
     !   8=SU  9=NI 10=AM  11=BC  12=OA  13=SS  14=DU
-    !  15=PM  16=ST
+    !  15=PM  16=ST  17=BRC 18=BSOA 19=NPBR 20=WTC
+    !  21=FSOA 22=PBRC 23=DBRC 24=BRCT
     !
     ! See wiki.geos-chem.org/Coupling_GEOS-Chem_with_RRTMG.
     !
@@ -18807,6 +19960,22 @@ CONTAINS
              State_Diag%RadOutInd(N) = 15
           CASE( 'ST' )
              State_Diag%RadOutInd(N) = 16
+          CASE( 'BRC' )
+             State_Diag%RadOutInd(N) = 17
+          CASE( 'BSOA' )
+             State_Diag%RadOutInd(N) = 18
+          CASE( 'NPBR' )
+             State_Diag%RadOutInd(N) = 19
+          CASE( 'WTC' )
+             State_Diag%RadOutInd(N) = 20
+          CASE( 'FSOA' )
+             State_Diag%RadOutInd(N) = 21
+          CASE( 'PBRC' )
+             State_Diag%RadOutInd(N) = 22
+          CASE( 'DBRC' )
+             State_Diag%RadOutInd(N) = 23
+          CASE( 'BRCT' )
+             State_Diag%RadOutInd(N) = 24
           CASE DEFAULT
              ! Nothing
        END SELECT

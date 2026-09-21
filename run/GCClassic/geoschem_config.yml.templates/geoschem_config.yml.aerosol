@@ -110,6 +110,13 @@ operations:
       - SO4s
       - SOAP
       - SOAS
+      - FSOAS
+      - BRCSOA
+      - WTC
+      - DBRCPOA
+      - FSOAP
+      - NPBRCPOA
+      - PBRCPOA
 
   wet_deposition:
     activate: true
@@ -125,6 +132,8 @@ aerosols:
   carbon:
     activate: true
     brown_carbon: false
+    # organic is the portable placeholder; dedicated requires BrC tables.
+    brc_optics: organic
     enhance_black_carbon_absorption:
       activate: true
       hydrophilic: 1.5

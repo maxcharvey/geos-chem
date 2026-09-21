@@ -34,6 +34,9 @@ MODULE PHOTOLYSIS_MOD
 !
 ! !REVISION HISTORY:
 !  20 Mar 2023 - E. Lundgren - initial version, adapted from fast_jx_mod.F90
+!  21 Jul 2026 - M. Harvey - Add optional dry-DBRCPOA Cloud-J FJX mapping
+!  22 Jul 2026 - M. Harvey - Validate optional dry-DBRCPOA FJX records
+!  23 Jul 2026 - M. Harvey - Add explicit organic/dedicated BrC optics modes
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -792,12 +795,13 @@ CONTAINS
 !
 ! !USES:
 !
+    USE BrC_CloudJ_Map_Mod, ONLY : BUILD_BRC_CLOUDJ_MAP
 #ifdef FASTJX
     USE CMN_FJX_Mod,    ONLY : AN_, NAA, TITLAA
 #else
     USE Cldj_Cmn_Mod,   ONLY : AN_, NAA, TITLAA
 #endif
-    USE CMN_SIZE_Mod,   ONLY : NRHAER, NRH
+    USE CMN_SIZE_Mod,   ONLY : NRHAER, NRH, NSTRATAER
     USE ErrCode_Mod
     USE Input_Opt_Mod,  ONLY : OptInput
     USE State_Chm_Mod,  ONLY : ChmState
@@ -816,6 +820,7 @@ CONTAINS
 !
 ! !REVISION HISTORY:
 !  31 Mar 2013 - S. D. Eastham - Adapted from J. Mao FJX v6.2 implementation
+!  21 Jul 2026 - M. Harvey - Map DBRCPOA to dedicated FJX records when present
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -825,7 +830,7 @@ CONTAINS
 !
     CHARACTER(LEN=255) :: ErrMsg, ThisLoc
     INTEGER            :: I, J, K
-    INTEGER            :: IND(NRHAER)
+    INTEGER            :: AerMap(NRHAER,NRH)
     INTEGER,   POINTER :: MIEDX(:)
 
     !=================================================================
@@ -837,12 +842,34 @@ CONTAINS
     ErrMsg = ''
     ThisLoc = ' -> at Set_Aer (in module GeosCore/photolysis_mod.F90)'
 
+    CALL BUILD_BRC_CLOUDJ_MAP( Input_Opt%LBRC,                         &
+                               Input_Opt%CloudJ_BrC_Optics, NAA,      &
+                               TITLAA, AerMap, RC, ErrMsg )
+    IF ( RC /= GC_SUCCESS ) THEN
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
+
+    IF ( Input_Opt%LBRC .AND. Input_Opt%amIRoot ) THEN
+       IF ( TRIM(Input_Opt%CloudJ_BrC_Optics) == 'ORGANIC' ) THEN
+          WRITE(6,'(a)') 'Cloud-J BrC optics: organic-equivalence records'
+       ELSE
+          WRITE(6,'(a)') 'Cloud-J BrC optics: dedicated records 64-74'
+       ENDIF
+    ENDIF
+
 
     ! Set pointer
     MIEDX => State_Chm%Phot%MIEDX
 
-    ! Taken from aerosol_mod.F
-    IND = (/22,29,36,43,50/)
+    ! BUILD_BRC_CLOUDJ_MAP defines every aerosol/RH pair explicitly.
+
+    IF ( AN_ /= 10 + ( NRHAER * NRH ) + NSTRATAER ) THEN
+       WRITE( ErrMsg, '(a,i0,a,i0)' ) 'Cloud-J slot mismatch: AN_=', AN_, &
+                                      ', expected=', 10 + ( NRHAER * NRH ) + NSTRATAER
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
 
     DO I=1,AN_
        MIEDX(I) = 0
@@ -868,7 +895,7 @@ CONTAINS
     ! Aerosols
     DO I=1,NRHAER
        DO J=1,NRH
-          MIEDX(10+((I-1)*NRH)+J)=IND(I)+J-1
+          MIEDX(10+((I-1)*NRH)+J)=AerMap(I,J)
        ENDDO
     ENDDO
 
@@ -882,7 +909,6 @@ CONTAINS
 
     ! Ensure all 'AN_' types are valid selections
     do i=1,AN_
-       IF (Input_Opt%amIRoot) write(6,1000) MIEDX(i),TITLAA(MIEDX(i))
        if (MIEDX(i).gt.NAA.or.MIEDX(i).le.0) then
           if (Input_Opt%amIRoot) then
              write(6,1200) MIEDX(i),NAA
@@ -891,6 +917,7 @@ CONTAINS
           call GC_Error( ErrMsg, RC, ThisLoc )
           return
        endif
+       IF (Input_Opt%amIRoot) write(6,1000) MIEDX(i),TITLAA(MIEDX(i))
     enddo
 
     ! Free pointer

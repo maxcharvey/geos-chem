@@ -174,8 +174,8 @@ CONTAINS
     FILENAME = TRIM( DATA_DIR ) // 'jv_spec_mie.dat'
 
     ! Read data
-    CALL RD_MIE( Input_Opt%amIRoot, Input_Opt%DryRun, Input_Opt%LBRC, &
-                 JXUNIT, TRIM( FILENAME ), RC )
+    CALL RD_MIE( Input_Opt%amIRoot, Input_Opt%DryRun, JXUNIT, &
+                 TRIM( FILENAME ), RC )
 
     ! Trap potential errors
     IF ( RC /= GC_SUCCESS ) THEN

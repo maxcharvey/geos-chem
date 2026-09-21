@@ -737,7 +737,7 @@ CONTAINS
     CHARACTER(LEN=255)      :: chmId,      thisLoc
 
     ! String arrays
-    CHARACTER(LEN=31)       :: fieldId(14)
+    CHARACTER(LEN=31)       :: fieldId(20)
 
     ! Objects
     TYPE(Species),  POINTER :: ThisSpc
@@ -1078,7 +1078,10 @@ CONTAINS
                     'AeroAreaMDUST7   ', 'AeroAreaSULF     ',                &
                     'AeroAreaBC       ', 'AeroAreaOC       ',                &
                     'AeroAreaSSA      ', 'AeroAreaSSC      ',                &
-                    'AeroAreaBGSULF   ', 'AeroAreaICEI     '                /)
+                    'AeroAreaBRC      ', 'AeroAreaNPBRC    ',                &
+                    'AeroAreaWTC      ', 'AeroAreaFSOAS    ',                &
+                    'AeroAreaPBRC     ', 'AeroAreaDBRC     ',                &
+                    'AeroAreaBGSULF   ', 'AeroAreaICEI     '                 /)
 
        ! Allocate and register each field individually
        DO N = 1, State_Chm%nAeroType
@@ -1108,7 +1111,10 @@ CONTAINS
                     'AeroRadiMDUST7   ', 'AeroRadiSULF     ',                &
                     'AeroRadiBC       ', 'AeroRadiOC       ',                &
                     'AeroRadiSSA      ', 'AeroRadiSSC      ',                &
-                    'AeroRadiBGSULF   ', 'AeroRadiICEI     '               /)
+                    'AeroRadiBRC      ', 'AeroRadiNPBRC    ',                &
+                    'AeroRadiWTC      ', 'AeroRadiFSOAS    ',                &
+                    'AeroRadiPBRC     ', 'AeroRadiDBRC     ',                &
+                    'AeroRadiBGSULF   ', 'AeroRadiICEI     '                 /)
 
        ! Allocate and register each field individually
        DO N = 1, State_Chm%nAeroType
@@ -1138,7 +1144,10 @@ CONTAINS
                     'WetAeroAreaMDUST7', 'WetAeroAreaSULF  ',                &
                     'WetAeroAreaBC    ', 'WetAeroAreaOC    ',                &
                     'WetAeroAreaSSA   ', 'WetAeroAreaSSC   ',                &
-                    'WetAeroAreaBGSULF', 'WetAeroAreaICEI  '               /)
+                    'WetAeroAreaBRC   ', 'WetAeroAreaNPBRC ',                &
+                    'WetAeroAreaWTC   ', 'WetAeroAreaFSOAS ',                &
+                    'WetAeroAreaPBRC  ', 'WetAeroAreaDBRC  ',                &
+                    'WetAeroAreaBGSULF', 'WetAeroAreaICEI  '                 /)
 
        ! Allocate and register each field individually
        DO N = 1, State_Chm%nAeroType
@@ -1168,7 +1177,10 @@ CONTAINS
                     'WetAeroRadiMDUST7', 'WetAeroRadiSULF  ',                &
                     'WetAeroRadiBC    ', 'WetAeroRadiOC    ',                &
                     'WetAeroRadiSSA   ', 'WetAeroRadiSSC   ',                &
-                    'WetAeroRadiBGSULF', 'WetAeroRadiICEI  '               /)
+                    'WetAeroRadiBRC   ', 'WetAeroRadiNPBRC ',                &
+                    'WetAeroRadiWTC   ', 'WetAeroRadiFSOAS ',                &
+                    'WetAeroRadiPBRC  ', 'WetAeroRadiDBRC  ',                &
+                    'WetAeroRadiBGSULF', 'WetAeroRadiICEI  '                 /)
 
        ! Allocate and register each field individually
        DO N = 1, State_Chm%nAeroType
@@ -1198,7 +1210,10 @@ CONTAINS
                     'AeroH2OMDUST7    ', 'AeroH2OSNA       ',                &
                     'AeroH2OBC        ', 'AeroH2OOC        ',                &
                     'AeroH2OSSA       ', 'AeroH2OSSC       ',                &
-                    'AeroH2OBGSULF    ', 'AeroH2OICEI      '               /)
+                    'AeroH2OBRC       ', 'AeroH2ONPBRC     ',                &
+                    'AeroH2OWTC       ', 'AeroH2OFSOAS     ',                &
+                    'AeroH2OPBRC      ', 'AeroH2ODBRC      ',                &
+                    'AeroH2OBGSULF    ', 'AeroH2OICEI      '                 /)
 
        ! Allocate and register each field individually
        DO N = 1, State_Chm%nAeroType
@@ -2000,7 +2015,10 @@ CONTAINS
                     'KhetiSLABrNO3HCl ', 'KhetiSLAHOClHCl  ',             &
                     'KhetiSLAHOClHBr  ', 'KhetiSLAHOBrHCl  ',             &
                     'KhetiSLAHOBrHBr  ', '                 ',             &
-                    '                 ', '                 '            /)
+                    '                 ', '                 ',             &
+                    '                 ', '                 ',             &
+                    '                 ', '                 ',             &
+                    '                 ', '                 '              /)
 
        ! Allocate and register each field individually
        nKHLSA = 11
@@ -4355,6 +4373,36 @@ CONTAINS
           IF ( isUnits ) Units = 'cm2 cm-3'
           IF ( isRank  ) Rank  = 3
 
+       CASE ( 'AEROAREABRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol area for brown carbon (BRCSOA)'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROAREANPBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol area for NPBRCPOA'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROAREAWTC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol area for white carbon (WTC)'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROAREAFSOAS' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol area for fire SOA (FSOAS)'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROAREAPBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol area for PBRCPOA'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROAREADBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol area for DBRCPOA'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
        CASE ( 'AEROAREABGSULF' )
           IF ( isDesc  ) Desc  = 'Dry aerosol area for background' &
                                    // ' stratospheric sulfate'
@@ -4431,6 +4479,36 @@ CONTAINS
           IF ( isUnits ) Units = 'cm'
           IF ( isRank  ) Rank  = 3
 
+       CASE ( 'AERORADIBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol radius for brown carbon (BRCSOA)'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AERORADINPBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol radius for NPBRCPOA'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AERORADIWTC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol radius for white carbon (WTC)'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AERORADIFSOAS' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol radius for fire SOA (FSOAS)'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AERORADIPBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol radius for PBRCPOA'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AERORADIDBRC' )
+          IF ( isDesc  ) Desc  = 'Dry aerosol radius for DBRCPOA'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
        CASE ( 'AERORADIBGSULF' )
           IF ( isDesc  ) Desc  = 'Dry aerosol radius for background' &
                                  // ' stratospheric sulfate'
@@ -4504,6 +4582,36 @@ CONTAINS
           IF ( isUnits ) Units = 'cm2 cm-3'
           IF ( isRank  ) Rank  = 3
 
+       CASE ( 'WETAEROAREABRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol area for brown carbon (BRCSOA)'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAEROAREANPBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol area for NPBRCPOA'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAEROAREAWTC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol area for white carbon (WTC)'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAEROAREAFSOAS' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol area for fire SOA (FSOAS)'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAEROAREAPBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol area for PBRCPOA'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAEROAREADBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol area for DBRCPOA dry carrier'
+          IF ( isUnits ) Units = 'cm2 cm-3'
+          IF ( isRank  ) Rank  = 3
+
        CASE ( 'WETAEROAREABGSULF' )
           IF ( isDesc  ) Desc  = 'Wet aerosol area for background' &
                                  // ' stratospheric sulfate'
@@ -4574,6 +4682,36 @@ CONTAINS
 
        CASE ( 'WETAERORADISSC' )
           IF ( isDesc  ) Desc  = 'Wet aerosol radius for sea salt, coarse mode'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAERORADIBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol radius for brown carbon (BRCSOA)'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAERORADINPBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol radius for NPBRCPOA'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAERORADIWTC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol radius for white carbon (WTC)'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAERORADIFSOAS' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol radius for fire SOA (FSOAS)'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAERORADIPBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol radius for PBRCPOA'
+          IF ( isUnits ) Units = 'cm'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'WETAERORADIDBRC' )
+          IF ( isDesc  ) Desc  = 'Wet aerosol radius for DBRCPOA dry carrier'
           IF ( isUnits ) Units = 'cm'
           IF ( isRank  ) Rank  = 3
 
@@ -4671,6 +4809,36 @@ CONTAINS
 
        CASE ( 'AEROH2OSSC' )
           IF ( isDesc  ) Desc  = 'Aerosol H2O content for sea salt, coarse mode'
+          IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROH2OBRC' )
+          IF ( isDesc  ) Desc  = 'Aerosol H2O content for brown carbon (BRCSOA)'
+          IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROH2ONPBRC' )
+          IF ( isDesc  ) Desc  = 'Aerosol H2O content for NPBRCPOA'
+          IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROH2OWTC' )
+          IF ( isDesc  ) Desc  = 'Aerosol H2O content for white carbon (WTC)'
+          IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROH2OFSOAS' )
+          IF ( isDesc  ) Desc  = 'Aerosol H2O content for fire SOA (FSOAS)'
+          IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROH2OPBRC' )
+          IF ( isDesc  ) Desc  = 'Aerosol H2O content for PBRCPOA'
+          IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
+          IF ( isRank  ) Rank  = 3
+
+       CASE ( 'AEROH2ODBRC' )
+          IF ( isDesc  ) Desc  = 'Aerosol H2O content for DBRCPOA dry carrier'
           IF ( isUnits ) Units = 'cm3(H2O) cm-3(air)'
           IF ( isRank  ) Rank  = 3
 

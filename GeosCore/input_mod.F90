@@ -1650,7 +1650,7 @@ CONTAINS
     !------------------------------------------------------------------------
     ! Use brown carbon aerosols?
     !------------------------------------------------------------------------
-    key    = "aerosols%carbon%use_brown_carbon"
+    key    = "aerosols%carbon%brown_carbon"
     v_bool = MISSING_BOOL
     CALL QFYAML_Add_Get( Config, TRIM( key ), v_bool, "", RC )
     IF ( RC /= GC_SUCCESS ) THEN
@@ -1659,6 +1659,47 @@ CONTAINS
        RETURN
     ENDIF
     Input_Opt%LBRC = v_bool
+
+    !------------------------------------------------------------------------
+    ! Brown carbon bleaching scheme?
+    !------------------------------------------------------------------------
+    key   = "aerosols%carbon%bleach_scheme"
+    v_int = 4
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_int, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    IF ( v_int < 0 .OR. v_int > 4 ) THEN
+       errMsg = 'aerosols%carbon%bleach_scheme must be 0, 1, 2, 3, or 4!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Input_Opt%BrC_Bleach_Scheme = v_int
+
+    !------------------------------------------------------------------------
+    ! Brown carbon aerosol optical tables.  The portable default uses the
+    ! existing organic tables.  Dedicated BrC tables require an explicit
+    ! opt-in because they are not distributed with the standard input data.
+    !------------------------------------------------------------------------
+    key   = "aerosols%carbon%brc_optics"
+    v_str = MISSING_STR
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_str, "", RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error parsing ' // TRIM( key ) // '!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    IF ( TRIM( v_str ) == MISSING_STR ) v_str = 'organic'
+    Input_Opt%BrC_Aerosol_Optics = To_UpperCase( TRIM( v_str ) )
+    SELECT CASE ( TRIM( Input_Opt%BrC_Aerosol_Optics ) )
+       CASE ( 'ORGANIC', 'DEDICATED' )
+       CASE DEFAULT
+          errMsg = 'aerosols%carbon%brc_optics must be "organic" or "dedicated"!'
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+    END SELECT
 
     !------------------------------------------------------------------------
     ! Include BC absorption enhancement due to coating?
@@ -1963,6 +2004,7 @@ CONTAINS
        WRITE( 6, 100 ) 'Metal catalyzed SO2 ox.?    : ', Input_Opt%LMETALCATSO2
        WRITE( 6, 100 ) 'Online CARBON AEROSOLS?     : ', Input_Opt%LCARB
        WRITE( 6, 100 ) 'Brown Carbon Aerosol?       : ', Input_Opt%LBRC
+       WRITE( 6, 115 ) 'BrC bleaching scheme        : ', Input_Opt%BrC_Bleach_Scheme
        WRITE( 6, 100 ) 'BC Absorption Enhancement?  : ', Input_Opt%LBCAE
        WRITE( 6, 105 ) 'Hydrophilic BC AE factor    : ', Input_Opt%BCAE_1
        WRITE( 6, 105 ) 'Hydrophobic BC AE factor    : ', Input_Opt%BCAE_2
@@ -1994,6 +2036,7 @@ CONTAINS
 100 FORMAT( A, L5                )
 105 FORMAT( A, f8.2              )
 110 FORMAT( A, f8.2, ' - ', f8.2 )
+115 FORMAT( A, I5                )
 120 FORMAT( A, f8.2, 'K'         )
 125 FORMAT( A, A    )
 
@@ -2763,6 +2806,7 @@ CONTAINS
 !
 ! !USES:
 !
+    USE Charpak_Mod,   ONLY : To_UpperCase
     USE ErrCode_Mod
     USE Input_Opt_Mod, ONLY : OptInput
     USE RoundOff_Mod,  ONLY : Cast_and_RoundOff
@@ -2849,12 +2893,17 @@ CONTAINS
     key   = "operations%photolysis%cloud-j%verbose"
     v_bool = MISSING_BOOL
     CALL QFYAML_Add_Get( Config, TRIM( key ), v_bool, "", RC )
+
+    ! BrC optical mapping: organic for equivalence tests, dedicated for
+    ! generated Cloud-J BrC records.  Default preserves old run directories.
+    key   = "operations%photolysis%cloud-j%brc_optics"
+    v_str = MISSING_STR
+    CALL QFYAML_Add_Get( Config, TRIM( key ), v_str, "", RC )
     IF ( RC /= GC_SUCCESS ) THEN
        errMsg = 'Error parsing ' // TRIM( key ) // '!'
        CALL GC_Error( errMsg, RC, thisLoc )
        RETURN
     ENDIF
-
     ! Should Cloud-J verbose output be printed only on root or on all cores?
     SELECT CASE ( TRIM( Input_Opt%VerboseOnCores ) )
        CASE( 'ROOT' )
@@ -2867,6 +2916,9 @@ CONTAINS
           CALL GC_Error( errMsg, RC, thisLoc )
           RETURN
     END SELECT
+
+    IF ( TRIM( v_str ) == MISSING_STR ) v_str = 'organic'
+    Input_Opt%CloudJ_BrC_Optics = To_UpperCase( TRIM( v_str ) )
 
     ! Number levels with clouds to use in photolysis (Cloud-J var LWEPAR)
     key   = "operations%photolysis%cloud-j%num_levs_with_cloud"
@@ -3162,6 +3214,8 @@ CONTAINS
                        TRIM( Input_Opt%FAST_JX_DIR )
        WRITE( 6,120 ) 'Cloud-J input directory     : ',                      &
                        TRIM( Input_Opt%CloudJ_Dir )
+       WRITE( 6,120 ) 'Cloud-J BrC optics          : ',                      &
+                       TRIM( Input_Opt%CloudJ_BrC_Optics )
        WRITE( 6,130 ) 'Number levels with cloud    : ',                      &
                        Input_Opt%Nlevs_Phot_Cloud
        WRITE( 6,130 ) 'Cloud-J cloud flag          : ', Input_Opt%Cloud_Flag

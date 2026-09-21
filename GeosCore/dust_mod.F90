@@ -1163,7 +1163,7 @@ CONTAINS
 !
 ! !USES:
 !
-    USE CMN_Size_MOD,       ONLY : NDUST
+    USE CMN_Size_MOD,       ONLY : NDUST, NRHAER, NSTRATAER
 #ifdef RRTMG
     USE CMN_Size_MOD,       ONLY : NAER
 #endif
@@ -1269,7 +1269,7 @@ CONTAINS
     DUST      => State_Chm%SoilDust     ! Dust aerosol Conc. [kg/m3]
 
     ! Index for dust in ODAER and LUT arrays
-    IDST      = 8
+    IDST      = NRHAER + NSTRATAER + 1
 
     ! Get dust density from species database (assume dust bin ID is contiguous)
     DO N = 1, NDUST

@@ -17,6 +17,7 @@ MODULE AEROSOL_MOD
 !
 ! !USES:
 !
+  USE CMN_SIZE_MOD, ONLY : NRHAER
   USE PRECISION_MOD
 
   IMPLICIT NONE
@@ -40,6 +41,8 @@ MODULE AEROSOL_MOD
   ! Logical flags
   LOGICAL,  PUBLIC  :: IS_OCPI
   LOGICAL,  PUBLIC  :: IS_OCPO
+  LOGICAL,  PUBLIC  :: IS_FFOCPI
+  LOGICAL,  PUBLIC  :: IS_FFOCPO
   LOGICAL,  PUBLIC  :: IS_BC
   LOGICAL,  PUBLIC  :: IS_SO4
   LOGICAL,  PUBLIC  :: IS_HMS
@@ -75,6 +78,10 @@ MODULE AEROSOL_MOD
 !
 ! !REVISION HISTORY:
 !  20 Jul 2004 - R. Yantosca - Initial version
+!  21 Jul 2026 - M. Harvey - Gate BrC optical inputs on brown_carbon setting
+!  22 Jul 2026 - M. Harvey - Safeguard ordinary brown_carbon:false map
+!  22 Jul 2026 - M. Harvey - Validate enabled BrC aerosol-bin mapping
+!  23 Jul 2026 - M. Harvey - Use executable BrC map validator
 !  See https://github.com/geoschem/geos-chem for complete history
 !------------------------------------------------------------------------------
 !BOC
@@ -93,11 +100,19 @@ MODULE AEROSOL_MOD
   INTEGER :: id_SOAS,    id_SALACL,  id_HMS,     id_SOAGX
   INTEGER :: id_SOAIE,   id_INDIOL,  id_LVOCOA
 
+  ! BrC species IDs (M. Harvey, 19 Mar 2026)
+  INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_BRC_PBRC
+  INTEGER :: id_FSOAS  ! darkened fire SOA precursor piggybacks SOAS optics
+
+  ! FF-OC species IDs
+  INTEGER :: id_FFOCPI, id_FFOCPO
+
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
   ! a new hygroscopic species) requires manual update of this mapping
   ! (ewl, 1/23/17)
-  INTEGER :: Map_NRHAER(5)
+  INTEGER :: Map_NRHAER(NRHAER)
 
   
 CONTAINS
@@ -535,6 +550,97 @@ CONTAINS
           State_Chm%AerMass%BCPO(I,J,L)    = MAX( State_Chm%AerMass%BCPO(I,J,L), 1e-35_fp )
           State_Chm%AerMass%OCPO(I,J,L)    = MAX( State_Chm%AerMass%OCPO(I,J,L), 1e-35_fp )
 
+          !===========================================================
+          ! B R O W N   C A R B O N   A E R O S O L   M A S S
+          !
+          ! Each BrC species has its own AerMass field and WAERSL bin:
+          !   BRCPI  -> WAERSL(6), brc.dat  (BRCSOA, N=6)
+          !   NPBRC  -> WAERSL(7), brc.dat  (NPBRCPOA, N=7)
+          !   WTCPI  -> WAERSL(8), org.dat  (WTC, N=8)
+          !   FSOAS  -> WAERSL(9),  brc.dat  (FSOAS, N=9)
+          !   PBRC   -> WAERSL(10), pbrc.dat (PBRCPOA, N=10)
+          !   BRCPO  -> DAERSL(3), add-on to N=11 (DBRCPOA, dbrc.dat)
+          !
+          ! All BrC species transported in kgC (MW=12.01), except
+          ! FSOAS which is transported as kg_OM (MW=150, no OM:OC).
+          ! OM:OC: OCFOPOA (~2.1) hydrophilic; OCFPOA (~1.4) hydrophobic.
+          ! (M. Harvey, May 2026)
+          !===========================================================
+
+          ! Zero all BrC mass fields before accumulation
+          State_Chm%AerMass%BRCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%BRCPO(I,J,L) = 0.0_fp
+          State_Chm%AerMass%NPBRC(I,J,L) = 0.0_fp
+          State_Chm%AerMass%WTCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%FSOAS(I,J,L) = 0.0_fp
+          State_Chm%AerMass%PBRC(I,J,L)  = 0.0_fp
+
+          IF ( Input_Opt%LBRC ) THEN
+
+          ! BRCSOA -> BRCPI (bin N=6, brc.dat)
+          IF ( id_BRC_SOA > 0 ) THEN
+             State_Chm%AerMass%BRCPI(I,J,L) =                      &
+                Spc(id_BRC_SOA)%Conc(I,J,L)                        &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! NPBRCPOA -> NPBRC (bin N=7, brc.dat)
+          IF ( id_BRC_NPBRC > 0 ) THEN
+             State_Chm%AerMass%NPBRC(I,J,L) =                      &
+                Spc(id_BRC_NPBRC)%Conc(I,J,L)                      &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! WTC -> WTCPI (bin N=8, org.dat; bleached, transparent OC)
+          IF ( id_BRC_WTC > 0 ) THEN
+             State_Chm%AerMass%WTCPI(I,J,L) =                      &
+                Spc(id_BRC_WTC)%Conc(I,J,L)                        &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! FSOAS -> FSOAS (bin N=9, brc.dat; already kg_OM, no OM:OC)
+          IF ( id_FSOAS > 0 ) THEN
+             State_Chm%AerMass%FSOAS(I,J,L) =                      &
+                Spc(id_FSOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
+          ENDIF
+
+          ! PBRCPOA -> PBRC (bin N=10, pbrc.dat)
+          IF ( id_BRC_PBRC > 0 ) THEN
+             State_Chm%AerMass%PBRC(I,J,L) =                       &
+                Spc(id_BRC_PBRC)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! DBRCPOA -> BRCPO (DAERSL(3), hydrophobic add-on to N=11)
+          IF ( id_BRC_DBRC > 0 ) THEN
+             State_Chm%AerMass%BRCPO(I,J,L) =                      &
+                Spc(id_BRC_DBRC)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFPOA(I,J)                    &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ENDIF ! LBRC
+
+          IF ( Input_Opt%LBRC .AND. IS_FFOCPI ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_FFOCPI)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          IF ( Input_Opt%LBRC .AND. IS_FFOCPO ) THEN
+             State_Chm%AerMass%OCPO(I,J,L) =                       &
+                State_Chm%AerMass%OCPO(I,J,L)                      &
+                + Spc(id_FFOCPO)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFPOA(I,J)                    &
+                / AIRVOL(I,J,L)
+          ENDIF
+
        ENDIF ! LCARB
 
        !===========================================================
@@ -673,6 +779,9 @@ CONTAINS
 
           ! Simple SOA [kg/m3]
           State_Chm%AerMass%SOAS(I,J,L) = Spc(id_SOAS)%Conc(I,J,L) / AIRVOL(I,J,L)
+
+          ! FSOAS now has its own bin N=9 (see BrC section above);
+          ! no longer folded into SOAS (maxcharvey/geos-chem#7)
 
        ENDIF
 
@@ -872,6 +981,20 @@ CONTAINS
           ENDIF
        ENDIF
 
+       ! BrC is fine organic aerosol in both simple- and complex-SOA runs.
+       ! WTC is classified as primary OC here: it is the bleached product of
+       ! primary BrC, rather than a secondary-organic production pathway.
+       ! DBRCPOA is a dry carrier, so do not apply hygroscopic OM growth.
+       IF ( Input_Opt%LBRC ) THEN
+          State_Chm%AerMass%PM25(I,J,L) = State_Chm%AerMass%PM25(I,J,L)      &
+             + State_Chm%AerMass%BRCPI(I,J,L) * ORG_GROWTH                   &
+             + State_Chm%AerMass%NPBRC(I,J,L) * ORG_GROWTH                   &
+             + State_Chm%AerMass%WTCPI(I,J,L) * ORG_GROWTH                   &
+             + State_Chm%AerMass%FSOAS(I,J,L) * ORG_GROWTH                   &
+             + State_Chm%AerMass%PBRC(I,J,L)  * ORG_GROWTH                   &
+             + State_Chm%AerMass%BRCPO(I,J,L)
+       ENDIF
+
        !---------------------------------------------------------------------
        ! Particulate matter < 10um [kg/m3]
        !
@@ -909,14 +1032,24 @@ CONTAINS
       ! Parameterized dry effective radius for SNA and OM
       !===========================================================
       IF ( State_Chm%AerMass%SO4_NH4_NIT(I,J,L) > 0e+0_fp ) THEN
-         ! dry SNA and OM mass, in unit of ug/m3
+         ! dry SNA and OM mass [ug/m3] (include BrC hygroscopic bins)
          State_Chm%AerMass%SNAOM(I,J,L) = ( State_Chm%AerMass%SO4_NH4_NIT(I,J,L) + &
                                             State_Chm%AerMass%OCPO(I,J,L) + &
-                                            State_Chm%AerMass%OCPISOA(I,J,L) ) * 1.0e+9_fp
+                                            State_Chm%AerMass%OCPISOA(I,J,L) + &
+                                            State_Chm%AerMass%BRCPI(I,J,L) + &
+                                            State_Chm%AerMass%NPBRC(I,J,L) + &
+                                            State_Chm%AerMass%WTCPI(I,J,L) + &
+                                            State_Chm%AerMass%FSOAS(I,J,L) + &
+                                            State_Chm%AerMass%PBRC(I,J,L) ) * 1.0e+9_fp
 
-         ! ratio between OM and SNA, unitless
+         ! ratio between OM and SNA, unitless (include BrC hygroscopic bins)
          State_Chm%AerMass%R_OMSNA(I,J,L) = ( State_Chm%AerMass%OCPO(I,J,L) + &
-                                              State_Chm%AerMass%OCPISOA(I,J,L) ) / &
+                                              State_Chm%AerMass%OCPISOA(I,J,L) + &
+                                              State_Chm%AerMass%BRCPI(I,J,L) + &
+                                              State_Chm%AerMass%NPBRC(I,J,L) + &
+                                              State_Chm%AerMass%WTCPI(I,J,L) + &
+                                              State_Chm%AerMass%FSOAS(I,J,L) + &
+                                              State_Chm%AerMass%PBRC(I,J,L) ) / &
                                               State_Chm%AerMass%SO4_NH4_NIT(I,J,L)
 
          ! Parameterized dry effective radius, in unit of um
@@ -969,7 +1102,11 @@ CONTAINS
        IF ( State_Diag%Archive_PM25oc  ) THEN
           State_Diag%PM25oc(I,J,L)                                           &
                = ( State_Chm%AerMass%OCPO(I,J,L)                             &
-               +   State_Chm%AerMass%OCPI(I,J,L)   * ORG_GROWTH  )           &
+               +   State_Chm%AerMass%OCPI(I,J,L)   * ORG_GROWTH              &
+               +   State_Chm%AerMass%NPBRC(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%WTCPI(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%PBRC(I,J,L)   * ORG_GROWTH              &
+               +   State_Chm%AerMass%BRCPO(I,J,L)                )           &
                * ( P_SFC_STD                       / PMID(I,J,L) )           &
                * ( T(I,J,L)                        / T_298_K     )           &
                * 1.0e+9_fp
@@ -1002,7 +1139,9 @@ CONTAINS
                = ( State_Chm%AerMass%TSOA(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%ASOA(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%SOAS(I,J,L)   * ORG_GROWTH              &
-               +   State_Chm%AerMass%ISOAAQ(I,J,L) * ORG_GROWTH  )           &
+               +   State_Chm%AerMass%ISOAAQ(I,J,L) * ORG_GROWTH              &
+               +   State_Chm%AerMass%BRCPI(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%FSOAS(I,J,L)  * ORG_GROWTH  )           &
                * ( P_SFC_STD                       / PMID(I,J,L) )           &
                * ( T(I,J,L)                        / T_298_K     )           &
                * 1.0e+9_fp
@@ -1089,7 +1228,7 @@ CONTAINS
 !
 ! !USES:
 !
-    USE CMN_SIZE_Mod,   ONLY : NAER, NRH, NDUST, NRHAER, NSTRATAER
+    USE CMN_SIZE_Mod,   ONLY : NAER, NRH, NDUST, NSTRATAER
     USE ErrCode_Mod
     USE ERROR_MOD,      ONLY : ERROR_STOP, Safe_Div
     USE Input_Opt_Mod,  ONLY : OptInput
@@ -1142,11 +1281,13 @@ CONTAINS
     CHARACTER(LEN=16)   :: STAMP
     INTEGER             :: I, J, L, N, R, IRH, W, IRHN, NA, SpcID, g
     INTEGER             :: AA, IWV, IIWV, NWVS, IR, NRT, S
+    INTEGER             :: DBG_NA(6), DBG_SLOT
     REAL*4              :: TEMP( State_Grid%NX,State_Grid%NY,State_Grid%NZ)
     REAL(fp)            :: TEMP2(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
     REAL(fp)            :: MSDENS(NAER), DRYAREA, VDRY, VH2O
     REAL(f8)            :: XTAU
     REAL*8              :: BCSCAT_AE  !(xnw, 8/24/15)
+    REAL*8              :: DBG_AOD_STD(6)
 
     ! Variables for speed diagnostics
     INTEGER             :: ITIMEVALS(8)
@@ -1374,11 +1515,42 @@ CONTAINS
           ! Hydrophilic OC [kg/m3]
           State_Chm%AerMass%WAERSL(I,J,L,3) = State_Chm%AerMass%OCPISOA(I,J,L)
 
+          IF ( Input_Opt%LBRC ) THEN
+             ! BRCSOA (N=6, brc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,6) = State_Chm%AerMass%BRCPI(I,J,L)
+
+             ! NPBRCPOA (N=7, brc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,7) = State_Chm%AerMass%NPBRC(I,J,L)
+
+             ! WTC (N=8, org.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,8) = State_Chm%AerMass%WTCPI(I,J,L)
+
+             ! FSOAS (N=9, brc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,9) = State_Chm%AerMass%FSOAS(I,J,L)
+
+             ! PBRCPOA (N=10, pbrc.dat) [kg_OM/m3]
+             State_Chm%AerMass%WAERSL(I,J,L,10) = State_Chm%AerMass%PBRC(I,J,L)
+
+             ! DBRCPOA is listed as Is_HygroGrowth in species_database.yml only
+             ! to expose DBRCPOA-tagged AOD/area diagnostics.  Its optics stay
+             ! dry here: no WAERSL wet mass, dry DAERSL(3), dbrc.dat.
+             State_Chm%AerMass%WAERSL(I,J,L,11) = 0.0_fp
+          ELSE
+             State_Chm%AerMass%WAERSL(I,J,L,6:11) = 0.0_fp
+          ENDIF
+
           ! Hydrophobic BC (a.k.a EC) [kg/m3]
           State_Chm%AerMass%DAERSL(I,J,L,1) = State_Chm%AerMass%BCPO(I,J,L)
 
           ! Hydrophobic OC [kg/m3]
           State_Chm%AerMass%DAERSL(I,J,L,2) = State_Chm%AerMass%OCPO(I,J,L)
+
+          ! Hydrophobic BrC (DBRCPOA) [kg_OM/m3]
+          IF ( Input_Opt%LBRC ) THEN
+             State_Chm%AerMass%DAERSL(I,J,L,3) = State_Chm%AerMass%BRCPO(I,J,L)
+          ELSE
+             State_Chm%AerMass%DAERSL(I,J,L,3) = 0.0_fp
+          ENDIF
 
        ENDDO
        ENDDO
@@ -1386,6 +1558,7 @@ CONTAINS
        !$OMP END PARALLEL DO
 
     ENDIF
+
 
     !=================================================================
     ! S E A S A L T   A E R O S O L S
@@ -1460,6 +1633,37 @@ CONTAINS
     ENDIF
     MSDENS(4) = State_Chm%SpcData(id_SALA)%Info%Density
     MSDENS(5) = State_Chm%SpcData(id_SALC)%Info%Density
+    ! BrC bin densities
+    IF ( id_BRC_SOA > 0 ) THEN
+       MSDENS(6) = State_Chm%SpcData(id_BRC_SOA)%Info%Density
+    ELSE
+       MSDENS(6) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
+    IF ( id_BRC_NPBRC > 0 ) THEN
+       MSDENS(7) = State_Chm%SpcData(id_BRC_NPBRC)%Info%Density
+    ELSE
+       MSDENS(7) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
+    IF ( id_BRC_WTC > 0 ) THEN
+       MSDENS(8) = State_Chm%SpcData(id_BRC_WTC)%Info%Density
+    ELSE
+       MSDENS(8) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
+    IF ( id_FSOAS > 0 ) THEN
+       MSDENS(9) = State_Chm%SpcData(id_FSOAS)%Info%Density
+    ELSE
+       MSDENS(9) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
+    IF ( id_BRC_PBRC > 0 ) THEN
+       MSDENS(10) = State_Chm%SpcData(id_BRC_PBRC)%Info%Density
+    ELSE
+       MSDENS(10) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
+    IF ( id_BRC_DBRC > 0 ) THEN
+       MSDENS(11) = State_Chm%SpcData(id_BRC_DBRC)%Info%Density
+    ELSE
+       MSDENS(11) = State_Chm%SpcData(id_OCPI)%Info%Density
+    ENDIF
 
     ! These default values unused (actively retrieved from ucx_mod)
     MSDENS(NRHAER+1) = 1700.0d0 ! SSA/STS
@@ -1833,6 +2037,23 @@ CONTAINS
                                    ( MSDENS(N) * State_Chm%AerMass%PDER(I,J,L) * 1.0D-6 )
                 ENDIF
 
+                ! BRCPO (DBRCPOA hydrophobic, DAERSL(3)): add to dry
+                ! DBRC carrier bin N=11 (dbrc.dat), keeping BRCSOA clean
+                ! while making DBRCPOA available to RRTMG.
+                !
+                ! NOTE: IsWL1/2/3 are not set in this loop (only in the AODHyg
+                ! loop below), so gate on the current LUT wavelength index IWV
+                ! matching the requested AOD wavelength IWVSELECT(1,W) instead.
+                ! IWVSELECT is always dimensioned (2,3); unconfigured columns
+                ! are 0 and never equal IWV (>=1). (M. Harvey, Jun 2026)
+                IF ( N == 11 ) THEN
+                   ODAER(I,J,L,IWV,N) = ODAER(I,J,L,IWV,N) + &
+                      0.75d0 * BXHEIGHT(I,J,L) * &
+                      State_Chm%AerMass%DAERSL(I,J,L,3) * QW(1) / &
+                      ( MSDENS(N) * REAA(1,N,State_Chm%Phot%DRg) * 1.0D-6 )
+
+                ENDIF
+
              ELSE
 
                 !--------------------------------------------------------
@@ -1872,13 +2093,20 @@ CONTAINS
                 !This will automatically be added after the standard aerosol
                 !(NRHAER+1,2) but before dust
                 RTODAER(I,J,L,IWV,NRT)     = ODAER(I,J,L,IWV,N)
-                RTSSAER(I,J,L,IWV,NRT)     = SCALESSA*SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                IF ( N == 11 ) THEN
+                   ! DBRCPOA is deliberately dry: do not apply RH-scaled
+                   ! SSA or asymmetry while carrying its dry AOD to RRTMG.
+                   RTSSAER(I,J,L,IWV,NRT)  = SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                   RTASYMAER(I,J,L,IWV,NRT) = ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
+                ELSE
+                   RTSSAER(I,J,L,IWV,NRT) = SCALESSA*SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                   RTASYMAER(I,J,L,IWV,NRT) = SCALEASY*ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
+                ENDIF
                 !for BC SSA with absorption enhancement (xnw 8/24/15)
                 IF ((N .EQ. 2) .AND. (LBCAE)) THEN
                    RTSSAER(I,J,L,IWV,NRT)  = BCSCAT_AE / &
                                              ODAER(I,J,L,IWV,N)
                 ENDIF
-                RTASYMAER(I,J,L,IWV,NRT)   = SCALEASY*ASYMAA(IWV,1,N,State_Chm%Phot%DRg)
              ENDIF
 #endif
 
@@ -1893,7 +2121,8 @@ CONTAINS
                 !  Hygroscopic growth of Organic Carbon     [unitless]
                 !  Hygroscopic growth of Sea Salt (accum)   [unitless]
                 !  Hygroscopic growth of Sea Salt (coarse)  [unitless]
-                IF ( State_Diag%Archive_AerHygGrowth .AND. &
+                IF ( NA <= State_Chm%nHygGrth .AND. &
+                     State_Diag%Archive_AerHygGrowth .AND. &
                      L <= State_Met%MaxChemLev       .AND. &
                      ODSWITCH.EQ.1 ) THEN
                    S = State_Diag%Map_AerHygGrowth%id2slot(NA)
@@ -2015,6 +2244,16 @@ CONTAINS
                                             ( WTAREA(I,J,L,N+NDUST)   +   &
                                               DRYAREA )
                 ENDIF !Hydrophobic aerosol surface area
+
+                ! Hydrophobic BrC (BRCPO, DAERSL(3)) contributes to DBRC bin (N=11)
+                IF ( N.eq.11 ) THEN
+                   DRYAREA = 3.D0 * State_Chm%AerMass%DAERSL(I,J,L,3) / ( RW(1) * &
+                             1.0D-4 * MSDENS(N) )
+                   TAREA(I,J,L,N+NDUST) = WTAREA(I,J,L,N+NDUST) + DRYAREA
+                   IF ( DRYAREA > 0.0d0 ) THEN
+                      ERADIUS(I,J,L,NDUST+N) = RW(1) * 1.0D-4
+                   ENDIF
+                ENDIF !Hydrophobic BrC surface area
 
                 !----------------------------------------------------
                 ! Netcdf diagnostics computed here:
@@ -2157,8 +2396,10 @@ CONTAINS
        !$OMP DEFAULT( SHARED                                               ) &
        !$OMP PRIVATE( I, J, L, N, W, LINTERP, IsWL1, IsWL2, IsWL3, S       ) &
        !$OMP SCHEDULE( DYNAMIC                                             )
-       ! Loop over hydroscopic aerosols
-       DO NA = 1, NRHAER
+       ! Loop over state-backed hygroscopic aerosols.  In an ordinary
+       ! brown_carbon:false state, inactive bins 6:11 have no HYG
+       ! diagnostic entry even though the optics layout retains them.
+       DO NA = 1, State_Chm%nHygGrth
 
           ! Get ID following ordering of aerosol densities in RD_AOD
           N = Map_NRHAER(NA)
@@ -2256,6 +2497,39 @@ CONTAINS
                    ENDIF
                 ENDIF
 
+                ! DBRCPOA uses the dry carrier N=11.  Archive its requested
+                ! AOD after the same wavelength interpolation used by AODHyg.
+                IF ( N == 11 ) THEN
+                   IF ( .NOT. LINTERP ) THEN
+                      IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) &
+                         State_Diag%BrCDryAODWL1(I,J,L) = &
+                         ODAER(I,J,L,IWVSELECT(1,W),N)
+                      IF ( State_Diag%Archive_BrCDryAODWL2 .AND. IsWL2 ) &
+                         State_Diag%BrCDryAODWL2(I,J,L) = &
+                         ODAER(I,J,L,IWVSELECT(1,W),N)
+                      IF ( State_Diag%Archive_BrCDryAODWL3 .AND. IsWL3 ) &
+                         State_Diag%BrCDryAODWL3(I,J,L) = &
+                         ODAER(I,J,L,IWVSELECT(1,W),N)
+                   ELSE IF ( ODAER(I,J,L,IWVSELECT(1,W),N) > 0.0_fp .AND. &
+                             ODAER(I,J,L,IWVSELECT(2,W),N) > 0.0_fp ) THEN
+                      IF ( State_Diag%Archive_BrCDryAODWL1 .AND. IsWL1 ) &
+                         State_Diag%BrCDryAODWL1(I,J,L) = &
+                         ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)** &
+                         ( BCOEF_WV(W) * LOG( ODAER(I,J,L,IWVSELECT(1,W),N) / &
+                                               ODAER(I,J,L,IWVSELECT(2,W),N) ) )
+                      IF ( State_Diag%Archive_BrCDryAODWL2 .AND. IsWL2 ) &
+                         State_Diag%BrCDryAODWL2(I,J,L) = &
+                         ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)** &
+                         ( BCOEF_WV(W) * LOG( ODAER(I,J,L,IWVSELECT(1,W),N) / &
+                                               ODAER(I,J,L,IWVSELECT(2,W),N) ) )
+                      IF ( State_Diag%Archive_BrCDryAODWL3 .AND. IsWL3 ) &
+                         State_Diag%BrCDryAODWL3(I,J,L) = &
+                         ODAER(I,J,L,IWVSELECT(2,W),N) * ACOEF_WV(W)** &
+                         ( BCOEF_WV(W) * LOG( ODAER(I,J,L,IWVSELECT(1,W),N) / &
+                                               ODAER(I,J,L,IWVSELECT(2,W),N) ) )
+                   ENDIF
+                ENDIF
+
                 !----------------------------------------------------
                 ! Netcdf diagnostics computed here:
                 !  AOD for SOA from aq isoprene (lambda1,2,3 nm) [unitless]
@@ -2287,6 +2561,69 @@ CONTAINS
 
     ENDIF
 
+    IF ( Input_Opt%amIRoot .AND. PRESENT( ODSWITCH ) ) THEN
+       IF ( ODSWITCH == 1 .AND. Input_Opt%NWVSELECT >= 1 ) THEN
+          DBG_NA(:) = 0
+          DO NA = 1, State_Chm%nHygGrth
+             SELECT CASE ( Map_NRHAER(NA) )
+             CASE ( 6 )
+                DBG_NA(1) = NA
+             CASE ( 7 )
+                DBG_NA(2) = NA
+             CASE ( 8 )
+                DBG_NA(3) = NA
+             CASE ( 9 )
+                DBG_NA(4) = NA
+             CASE ( 10 )
+                DBG_NA(5) = NA
+             CASE ( 11 )
+                DBG_NA(6) = NA
+             END SELECT
+          ENDDO
+          DO W = 1, Input_Opt%NWVSELECT
+             DBG_AOD_STD(:) = 0.0D0
+             SELECT CASE ( W )
+             CASE ( 1 )
+                IF ( State_Diag%Archive_AODHygWL1 ) THEN
+                   DO N = 1, 6
+                      DBG_SLOT = 0
+                      IF ( DBG_NA(N) > 0 ) DBG_SLOT = State_Diag%Map_AODHygWL1%id2slot(DBG_NA(N))
+                      IF ( DBG_SLOT > 0 ) THEN
+                         DBG_AOD_STD(N) = SUM( State_Diag%AODHygWL1(:,:,:,DBG_SLOT) )
+                      ENDIF
+                   ENDDO
+                ENDIF
+             CASE ( 2 )
+                IF ( State_Diag%Archive_AODHygWL2 ) THEN
+                   DO N = 1, 6
+                      DBG_SLOT = 0
+                      IF ( DBG_NA(N) > 0 ) DBG_SLOT = State_Diag%Map_AODHygWL2%id2slot(DBG_NA(N))
+                      IF ( DBG_SLOT > 0 ) THEN
+                         DBG_AOD_STD(N) = SUM( State_Diag%AODHygWL2(:,:,:,DBG_SLOT) )
+                      ENDIF
+                   ENDDO
+                ENDIF
+             CASE ( 3 )
+                IF ( State_Diag%Archive_AODHygWL3 ) THEN
+                   DO N = 1, 6
+                      DBG_SLOT = 0
+                      IF ( DBG_NA(N) > 0 ) DBG_SLOT = State_Diag%Map_AODHygWL3%id2slot(DBG_NA(N))
+                      IF ( DBG_SLOT > 0 ) THEN
+                         DBG_AOD_STD(N) = SUM( State_Diag%AODHygWL3(:,:,:,DBG_SLOT) )
+                      ENDIF
+                   ENDDO
+                ENDIF
+             END SELECT
+             WRITE( 6, '(a,i0,1x,a,f8.1,6(1x,a,es12.4))' )                &
+                'BRC_DEBUG AOD standard WL=', W,                           &
+                'nm=', Input_Opt%WVSELECT(W),                              &
+                'BRCSOA=', DBG_AOD_STD(1), 'NPBRC=', DBG_AOD_STD(2),      &
+                'WTC=',    DBG_AOD_STD(3), 'FSOAS=', DBG_AOD_STD(4),      &
+                'PBRC=',   DBG_AOD_STD(5), 'DBRC=',  DBG_AOD_STD(6)
+          ENDDO
+       ENDIF
+    ENDIF
+
     !------------------------------------
     ! Aerosol Surface Areas
     !------------------------------------
@@ -2296,8 +2633,9 @@ CONTAINS
        !$OMP DEFAULT( SHARED        ) &
        !$OMP PRIVATE( I, J, L, N, S ) &
        !$OMP SCHEDULE( DYNAMIC      )
-       ! Loop over hydroscopic aerosols
-       DO NA = 1, NRHAER
+       ! Loop over state-backed hygroscopic aerosols.  See Init_Aerosol for
+       ! the fixed-layout handling of inactive brown_carbon:false bins.
+       DO NA = 1, State_Chm%nHygGrth
 
           ! Get ID following ordering of aerosol densities in RD_AOD
           N = Map_NRHAER(NA)
@@ -2329,8 +2667,8 @@ CONTAINS
 
     ! Turn off radiative effects of stratospheric aerosols?
     IF ( .not. LSTRATOD ) THEN
-       ODAER(:,:,:,:,NRH+1) = 0.d0
-       ODAER(:,:,:,:,NRH+2) = 0.d0
+       ODAER(:,:,:,:,NRHAER+1) = 0.d0
+       ODAER(:,:,:,:,NRHAER+2) = 0.d0
     ENDIF
 
     !=================================================================
@@ -2406,7 +2744,8 @@ CONTAINS
 !
 ! !USES:
 !
-    USE CMN_SIZE_MOD,   ONLY : NAER, NDUST, NRHAER
+    USE CMN_SIZE_MOD,   ONLY : NAER, NDUST
+    USE BRC_AEROSOL_MAP_MOD, ONLY : VALIDATE_BRC_AEROSOL_MAP
     USE ErrCode_Mod
     USE Input_Opt_Mod,  ONLY : OptInput
     USE Species_Mod,    ONLY : Species
@@ -2439,6 +2778,7 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
     INTEGER                :: N, SpcID
+    INTEGER                :: DuplicateEntry, MissingBin
     CHARACTER(LEN=255)     :: ThisLoc
     CHARACTER(LEN=512)     :: ErrMsg
 
@@ -2497,10 +2837,22 @@ CONTAINS
        id_SOAIE      = Ind_( 'SOAIE'   )
        id_INDIOL     = Ind_( 'INDIOL'  )
        id_LVOCOA     = Ind_( 'LVOCOA'  )
+
+       ! BrC species IDs (M. Harvey, 19 Mar 2026)
+       id_BRC_WTC    = Ind_( 'WTC'     )
+       id_BRC_SOA    = Ind_( 'BRCSOA'  )
+       id_BRC_DBRC   = Ind_( 'DBRCPOA' )
+       id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
+       id_BRC_PBRC   = Ind_( 'PBRCPOA' )
+       id_FSOAS      = Ind_( 'FSOAS'   )
+       id_FFOCPI     = Ind_( 'FFOCPI'  )
+       id_FFOCPO     = Ind_( 'FFOCPO'  )
        
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )
        IS_OCPO       = ( id_OCPO     > 0                                    )
+       IS_FFOCPI     = ( id_FFOCPI   > 0                                    )
+       IS_FFOCPO     = ( id_FFOCPO   > 0                                    )
        IS_BC         = ( id_BCPI     > 0 .and. id_BCPO    > 0               )
        IS_SO4        = ( id_SO4      > 0                                    )
        IS_HMS        = ( id_HMS      > 0                                    )
@@ -2523,7 +2875,23 @@ CONTAINS
        ! Initialize the mapping between hygroscopic species in the
        ! species database and the species order in NRHAER
        !---------------------------------------------------------------------
-       DO N = 1, NRHAER
+       ! The inactive BrC bins remain distinct, zero-mass optical bins when
+       ! brown_carbon is false and the ordinary state has only five entries.
+       ! Do not alias them to OCPI: downstream aerosol, Fast-J, and RRTMG
+       ! code still requires the expanded 11-bin layout.
+       Map_NRHAER(:) = (/ ( N, N = 1, NRHAER ) /)
+
+       ! A larger state map cannot be represented by the fixed optical
+       ! layout.  Stop instead of silently truncating a caller's species map.
+       IF ( State_Chm%nHygGrth > NRHAER ) THEN
+          ErrMsg = 'State_Chm%nHygGrth exceeds the fixed NRHAER aerosol layout!'
+          CALL GC_ERROR( ErrMsg, RC, 'Init_Aerosol in aerosol_mod.F90' )
+          RETURN
+       ENDIF
+
+       ! Map all active species entries.  Canonical fallback slots above
+       ! remain in place only for inactive BrC bins in the ordinary state.
+       DO N = 1, State_Chm%nHygGrth
 
           ! Get the species database index from the species database
           ! mapping array for hygroscopic growth species
@@ -2544,9 +2912,21 @@ CONTAINS
                 Map_NRHAER(N) = 4
              CASE ( 'SALC' )
                 Map_NRHAER(N) = 5
+             CASE ( 'BRCSOA' )
+                Map_NRHAER(N) = 6
+             CASE ( 'NPBRCPOA' )
+                Map_NRHAER(N) = 7
+             CASE ( 'WTC' )
+                Map_NRHAER(N) = 8
+             CASE ( 'FSOAS' )
+                Map_NRHAER(N) = 9
+             CASE ( 'PBRCPOA' )
+                Map_NRHAER(N) = 10
+             CASE ( 'DBRCPOA' )
+                Map_NRHAER(N) = 11
              CASE DEFAULT
                 ErrMsg = 'WARNING: aerosol diagnostics not defined' // &
-                         ' for NRHAER greater than 5!'
+                         ' for NRHAER greater than 11!'
                 CALL GC_ERROR( ErrMsg, RC, 'Init_Aerosol in aerosol_mod.F90' )
                 SpcInfo => NULL()
                 RETURN
@@ -2556,6 +2936,36 @@ CONTAINS
           SpcInfo => NULL()
 
        ENDDO
+
+       ! Reject duplicate and missing canonical optical bins when BrC is
+       ! enabled.  The state species may be in any order.
+       IF ( Input_Opt%LBRC ) THEN
+          CALL VALIDATE_BRC_AEROSOL_MAP(                                &
+             Map_NRHAER(1:State_Chm%nHygGrth), NRHAER,                 &
+             DuplicateEntry, MissingBin )
+
+          IF ( DuplicateEntry > 0 ) THEN
+             SpcID   = State_Chm%Map_HygGrth(DuplicateEntry)
+             SpcInfo => State_Chm%SpcData(SpcID)%Info
+             WRITE( ErrMsg, '(a,a,a,i0,a)' )                            &
+                'brown_carbon has duplicate hygroscopic species "',    &
+                TRIM(SpcInfo%Name), '" for canonical aerosol bin ',     &
+                Map_NRHAER(DuplicateEntry), '!'
+             CALL GC_ERROR( ErrMsg, RC,                                 &
+                            'Init_Aerosol in aerosol_mod.F90' )
+             SpcInfo => NULL()
+             RETURN
+          ENDIF
+
+          IF ( MissingBin > 0 ) THEN
+             WRITE( ErrMsg, '(a,i0,a)' )                                &
+                'brown_carbon is missing canonical aerosol bin ',       &
+                MissingBin, '!'
+             CALL GC_ERROR( ErrMsg, RC,                                 &
+                            'Init_Aerosol in aerosol_mod.F90' )
+             RETURN
+          ENDIF
+       ENDIF
     ENDIF
 
     !========================================================================
@@ -2683,7 +3093,7 @@ CONTAINS
     CHARACTER(LEN=255) :: ThisLoc
 
     ! String arrays
-    CHARACTER(LEN=30)  :: SPECFIL(8)
+    CHARACTER(LEN=30)  :: SPECFIL(14)
 
     ! Pointers
     REAL*8, POINTER :: WVAA  (:,:)
@@ -2738,8 +3148,18 @@ CONTAINS
     ! but for now we are just treating the NAT like the sulfate... limited
     ! info but ref index is similar e.g. Scarchilli et al. (2005)
     !(DAR 05/2015)
-    SPECFIL = (/ "so4.dat  ", "soot.dat ", "org.dat  ", "ssa.dat  ",         &
-                 "ssc.dat  ", "h2so4.dat", "h2so4.dat", "dust.dat "        /)
+    SPECFIL = (/ "so4.dat  ", "soot.dat ", "org.dat  ", "ssa.dat  ",  &
+                 "ssc.dat  ", "org.dat  ", "org.dat  ", "org.dat  ",  &
+                 "org.dat  ", "org.dat  ", "org.dat  ", "h2so4.dat",  &
+                 "h2so4.dat", "dust.dat "                              /)
+
+    ! The default is a portable organic placeholder.  Dedicated BrC optical
+    ! tables are an explicit scientific opt-in and are never selected merely
+    ! because brown_carbon is enabled.  Inactive BrC bins remain zero mass.
+    IF ( LBRC .AND. TRIM(Input_Opt%BrC_Aerosol_Optics) == 'DEDICATED' ) THEN
+       SPECFIL(6:11) = (/ "brc.dat  ", "brc.dat  ", "org.dat  ",           &
+                          "brc.dat  ", "pbrc.dat ", "dbrc.dat " /)
+    ENDIF
 
     ! Loop over the array of filenames
     DO k = 1, State_Chm%Phot%NSPAA
@@ -2804,9 +3224,9 @@ CONTAINS
        READ(  NJ1, '(A)' ) TITLE0
 110    FORMAT( 3x, a20 )
 
-       IF (k == 1 .OR. k == 3) THEN
-       ! for SO4 and ORGANICS, dry aerosol size varies, therefore all
-       ! opt properties vary.
+       IF ( k == 1 .OR. k == 3 .OR. ( k >= 6 .AND. k <= 11 ) ) THEN
+       ! For SO4 and BrC/OA-like bins, dry aerosol size varies;
+       ! therefore read optical properties for every dry-radius bin.
        DO g = 1, State_Chm%Phot%NDRg
        DO i = 1, State_Chm%Phot%NRAA
        DO j = 1, State_Chm%Phot%NWVAA

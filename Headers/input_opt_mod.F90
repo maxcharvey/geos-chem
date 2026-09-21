@@ -103,6 +103,8 @@ MODULE Input_Opt_Mod
      LOGICAL                     :: LMETALCATSO2
      LOGICAL                     :: LCARB
      LOGICAL                     :: LBRC
+     INTEGER                     :: BrC_Bleach_Scheme
+     CHARACTER(LEN=10)           :: BrC_Aerosol_Optics
      LOGICAL                     :: LSOA
      LOGICAL                     :: LMPOA
      LOGICAL                     :: LSVPOA
@@ -187,6 +189,7 @@ MODULE Input_Opt_Mod
      LOGICAL                     :: Do_Photolysis
      CHARACTER(LEN=255)          :: FAST_JX_DIR
      CHARACTER(LEN=255)          :: CloudJ_Dir
+     CHARACTER(LEN=16)           :: CloudJ_BrC_Optics
      INTEGER                     :: Nlevs_Phot_Cloud   ! Cloud-J var LWEPAR
      INTEGER                     :: Cloud_Flag         ! Cloud-J var CLDFLAG
      REAL(fp)                    :: OD_Increase_Factor ! Cloud-J var ATAU
@@ -613,6 +616,8 @@ CONTAINS
     Input_Opt%LMETALCATSO2           = .FALSE.
     Input_Opt%LCARB                  = .FALSE.
     Input_Opt%LBRC                   = .FALSE.
+    Input_Opt%BrC_Bleach_Scheme      = 4
+    Input_Opt%BrC_Aerosol_Optics     = 'ORGANIC'
     Input_Opt%LSOA                   = .FALSE.
     Input_Opt%LMPOA                  = .FALSE.
     Input_Opt%LSVPOA                 = .FALSE.
@@ -689,6 +694,7 @@ CONTAINS
     Input_Opt%Do_Photolysis         = .FALSE.
     Input_Opt%FAST_JX_DIR           = ''
     Input_Opt%CloudJ_Dir            = ''
+    Input_Opt%CloudJ_BrC_Optics     = 'ORGANIC'
     Input_Opt%Nlevs_Phot_Cloud      = 0
     Input_Opt%Cloud_Flag            = 0
     Input_Opt%OD_Increase_Factor    = 0.0_fp
@@ -727,7 +733,7 @@ CONTAINS
     IF ( RC /= GC_SUCCESS ) RETURN
 
     ! Number of RRTMG outputs (change as necessary)
-    Input_Opt%NSpecRadMenu           = 17
+    Input_Opt%NSpecRadMenu           = 24
 
     arrayId = 'Input_Opt%LSPECRADMENU'
     ALLOCATE( Input_Opt%LSPECRADMENU( Input_Opt%NSpecRadMenu ), STAT=RC )

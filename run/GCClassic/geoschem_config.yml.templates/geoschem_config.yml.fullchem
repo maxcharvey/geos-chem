@@ -92,6 +92,9 @@ operations:
     cloud-j:
       cloudj_input_dir: ${RUNDIR_DATA_ROOT}/CHEM_INPUTS/CLOUD_J/v2025-01/
       verbose: false
+
+      # organic: OC-equivalence test; dedicated: generated WB/PB/DB records
+      brc_optics: organic
       num_levs_with_cloud: ${RUNDIR_PHOT_CLD_NLEV}
       cloud_scheme_flag: 3
       opt_depth_increase_factor: 1.050
@@ -400,6 +403,15 @@ operations:
       - TMB
       - TOLU
       - XYLE
+      - FFOCPI
+      - FFOCPO
+      - FSOAS
+      - BRCSOA
+      - WTC
+      - DBRCPOA
+      - FSOAP
+      - NPBRCPOA
+      - PBRCPOA
 
   wet_deposition:
     activate: true
@@ -415,6 +427,10 @@ aerosols:
   carbon:
     activate: true
     brown_carbon: false
+    bleach_scheme: 4
+    # organic is the portable placeholder; dedicated requires brc.dat,
+    # pbrc.dat, and dbrc.dat supplied by the user.
+    brc_optics: organic
     enhance_black_carbon_absorption:
       activate: true
       hydrophilic: 1.5

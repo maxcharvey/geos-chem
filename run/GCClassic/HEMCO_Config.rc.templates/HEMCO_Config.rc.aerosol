@@ -116,6 +116,9 @@ VerboseOnCores:              root       # Accepted values: root all
     --> BB4MIPS                :       ${RUNDIR_CMIP6_FIELDS}    # 1850-2100
     --> GFED4_CLIMATOLOGY      :       false    # If true, turn off GFED ext below
     --> FINNv25                :       false    # 2012-2023
+# Enable only with geoschem_config.yml brown_carbon: true.
+    --> FINNV25_BRC_HARMONIZED_SENSITIVITY : false # Controlled proxy sensitivity; not inventory-native/validated/production
+    --> GFAS_BRC_HARMONIZED_SENSITIVITY : false # Requires brown_carbon: true; controlled proxy sensitivity
 # ----- OFFLINE EMISSIONS -----------------------------------------------------
 # To use online emissions instead set the offline emissions to 'false' and the
 # corresponding HEMCO extension to 'on':
@@ -180,8 +183,14 @@ VerboseOnCores:              root       # Accepted values: root all
     --> fraction POG1          :       0.49
     --> CO to SOAP             :       0.013
     --> GFED_subgrid_coag      :       false
-112     GFAS                   : ${RUNDIR_GFAS_EXT}   ACET/ACR/ACTA/ALD2/ALK4/BCPI/BCPO/BENZ/C2H2/C2H4/C2H6/C3H8/C4H6/CH2O/CO/DMS/EOH/FURA/GLYX/HCOOH/ISOP/MEK/MGLY/MOH/MTPA/MVK/NAP/NH3/NO/OCPI/OCPO/pFe/PHEN/POG1/POG2/PRPE/RCHO/SO2/SOAP/STYR/TOLU/XYLE
+    --> GFED_vertical_injection_fraction : 0.0
+    --> GFED_vertical_injection_levels   : 0
+112     GFAS                   : ${RUNDIR_GFAS_EXT}   ACET/ACR/ACTA/ALD2/ALK4/BCPI/BCPO/BENZ/C2H2/C2H4/C2H6/C3H8/C4H6/CH2O/CO/DMS/EOH/FURA/GLYX/HCOOH/ISOP/MEK/MGLY/MOH/MTPA/MVK/NAP/NH3/NO/OCPI/OCPO/pFe/PHEN/POG1/POG2/PRPE/RCHO/SO2/SOAP/STYR/TOLU/XYLE/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA
     --> Vertical Profile Species:      CO
+# FINNv25 file inventory must also be true. Disable GFED/GFAS when selecting it.
+165     FINNv25_Inject          : off   SOAP/BCPI/BCPO/OCPI/OCPO/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA/SO2/NH3/ACET/ALK4/PRPE/C2H2/C2H4/C2H6/C3H8/CH2O/ISOP/BENZ/TOLU/XYLE/GLYC/MGLY/HAC/MEK/HCOOH/HNO2/ALD2/EOH/MOH/ACTA/MVK/MACR
+    --> FINNv25_vertical_injection_fraction : 0.0
+    --> FINNv25_vertical_injection_levels   : 0
 117     Volcano                : on    SO2
     --> Volcano_Source         :       AeroCom
     --> Volcano_Table          :       ${RUNDIR_VOLC_TABLE}
@@ -1621,11 +1630,26 @@ VerboseOnCores:              root       # Accepted values: root all
 #       https://gmd.copernicus.org/articles/16/3873/2023/
 #==============================================================================
 (((FINNv25
+(((.not.FINNv25_Inject
 0 FINNv25_SOAP  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_CO              2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s SOAP   75/281 5 3
 0 FINNv25_BCPI  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_BC              2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s BCPI   75/70  5 3
 0 FINNv25_BCPO  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_BC              2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s BCPO   75/71  5 3
+(((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY
 0 FINNv25_OCPI  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_OC              2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPI   75/72  5 3
 0 FINNv25_OCPO  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_OC              2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPO   75/73  5 3
+))).not.FINNV25_BRC_HARMONIZED_SENSITIVITY
+# Controlled harmonized proxy sensitivity. OC closure is exact:
+# 0.5 residual OC + 0.375 NPBRCPOA + 0.125 PBRCPOA = 1.0 input OC.
+# FINNv2.5 is molecule-based. Scale 287 cancels target/source MW conversion,
+# so scale 286 remains the requested 0.013 kg FSOAP per kg CO.
+(((FINNV25_BRC_HARMONIZED_SENSITIVITY
+0 FINNv25_FSOAP_BRC_HS   $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_CO 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s FSOAP    75/286/287 5 3
+0 FINNv25_DBRCPOA_BRC_HS $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s DBRCPOA  75/285     5 3
+0 FINNv25_OCPI_BRC_HS    $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPI     75/282/72  5 3
+0 FINNv25_OCPO_BRC_HS    $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPO     75/282/73  5 3
+0 FINNv25_NPBRCPOA_BRC_HS $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s NPBRCPOA 75/283     5 3
+0 FINNv25_PBRCPOA_BRC_HS  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s PBRCPOA  75/284     5 3
+)))FINNV25_BRC_HARMONIZED_SENSITIVITY
 0 FINNv25_SO2   $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_SO2_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc             fire_modisviirs_SO2             2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s SO2    75     5 3
 0 FINNv25_NH3   $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-NH3_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc      fire_modisviirs_MOZART-NH3      2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s NH3    75     5 3
 0 FINNv25_ACET  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-ACET_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc   fire_modisviirs_GEOSCHEM-ACET   2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ACET   75     5 3
@@ -1652,6 +1676,60 @@ VerboseOnCores:              root       # Accepted values: root all
 0 FINNv25_ACTA  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-CH3COOH_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc  fire_modisviirs_MOZART-CH3COOH  2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ACTA   75     5 3
 0 FINNv25_MVK   $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-MVK_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc      fire_modisviirs_MOZART-MVK      2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MVK    75     5 3
 0 FINNv25_MACR  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-MACR_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc     fire_modisviirs_MOZART-MACR     2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MACR   75     5 3
+))).not.FINNv25_Inject
+# Optional injection path evaluates the same inventory and scale factors.
+# Extension records replace (never add to) the surface records above.
+(((FINNv25_Inject
+165 FINNV25_INJECT_SOAP $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_CO 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s SOAP 75/281 5 3
+165 FINNV25_INJECT_BCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s BCPI 75/70 5 3
+165 FINNV25_INJECT_BCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s BCPO 75/71 5 3
+(((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY
+165 FINNV25_INJECT_OCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPI 75/72 5 3
+165 FINNV25_INJECT_OCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPO 75/73 5 3
+165 FINNV25_INJECT_FSOAP 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s FSOAP - 5 3
+165 FINNV25_INJECT_DBRCPOA 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s DBRCPOA - 5 3
+165 FINNV25_INJECT_NPBRCPOA 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s NPBRCPOA - 5 3
+165 FINNV25_INJECT_PBRCPOA 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s PBRCPOA - 5 3
+))).not.FINNV25_BRC_HARMONIZED_SENSITIVITY
+# Controlled harmonized proxy sensitivity. OC closure is exact:
+# 0.5 residual OC + 0.375 NPBRCPOA + 0.125 PBRCPOA = 1.0 input OC.
+# FINNv2.5 is molecule-based. Scale 287 cancels target/source MW conversion,
+# so scale 286 remains the requested 0.013 kg FSOAP per kg CO.
+(((FINNV25_BRC_HARMONIZED_SENSITIVITY
+165 FINNV25_INJECT_FSOAP $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_CO 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s FSOAP 75/286/287 5 3
+165 FINNV25_INJECT_DBRCPOA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s DBRCPOA 75/285 5 3
+165 FINNV25_INJECT_OCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPI 75/282/72 5 3
+165 FINNV25_INJECT_OCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s OCPO 75/282/73 5 3
+165 FINNV25_INJECT_NPBRCPOA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s NPBRCPOA 75/283 5 3
+165 FINNV25_INJECT_PBRCPOA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s PBRCPOA 75/284 5 3
+)))FINNV25_BRC_HARMONIZED_SENSITIVITY
+165 FINNV25_INJECT_SO2 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_SO2_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_SO2 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s SO2 75 5 3
+165 FINNV25_INJECT_NH3 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-NH3_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-NH3 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s NH3 75 5 3
+165 FINNV25_INJECT_ACET $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-ACET_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-ACET 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ACET 75 5 3
+165 FINNV25_INJECT_ALK4 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-ALK4_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-ALK4 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ALK4 75 5 3
+165 FINNV25_INJECT_PRPE $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-PRPE_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-PRPE 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s PRPE 75 5 3
+165 FINNV25_INJECT_C2H2 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-C2H2_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-C2H2 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s C2H2 75 5 3
+165 FINNV25_INJECT_C2H4 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-C2H4_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-C2H4 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s C2H4 75 5 3
+165 FINNV25_INJECT_C2H6 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-C2H6_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-C2H6 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s C2H6 75 5 3
+165 FINNV25_INJECT_C3H8 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-C3H8_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-C3H8 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s C3H8 75 5 3
+165 FINNV25_INJECT_CH2O $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-CH2O_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-CH2O 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s CH2O 75 5 3
+165 FINNV25_INJECT_ISOP $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-ISOP_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-ISOP 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ISOP 75 5 3
+165 FINNV25_INJECT_BENZ $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-BENZ_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-BENZ 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s BENZ 75 5 3
+165 FINNV25_INJECT_TOLU $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-TOLU_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-TOLU 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s TOLU 75 5 3
+165 FINNV25_INJECT_XYLE $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-XYLE_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-XYLE 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s XYLE 75 5 3
+165 FINNV25_INJECT_GLYC $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-GLYC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-GLYC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s GLYC 75 5 3
+165 FINNV25_INJECT_MGLY $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-MGLY_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-MGLY 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MGLY 75 5 3
+165 FINNV25_INJECT_HAC $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-HAC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-HAC 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s HAC 75 5 3
+165 FINNV25_INJECT_MEK $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_GEOSCHEM-MEK_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_GEOSCHEM-MEK 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MEK 75 5 3
+165 FINNV25_INJECT_HCOOH $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-HCOOH_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-HCOOH 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s HCOOH 75 5 3
+165 FINNV25_INJECT_HNO2 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-HONO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-HONO 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s HNO2 75 5 3
+165 FINNV25_INJECT_ALD2 $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-CH3CHO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-CH3CHO 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ALD2 75 5 3
+165 FINNV25_INJECT_EOH $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-C2H5OH_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-C2H5OH 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s EOH 75 5 3
+165 FINNV25_INJECT_MOH $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-CH3OH_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-CH3OH 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MOH 75 5 3
+165 FINNV25_INJECT_ACTA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-CH3COOH_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-CH3COOH 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s ACTA 75 5 3
+165 FINNV25_INJECT_MVK $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-MVK_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-MVK 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MVK 75 5 3
+165 FINNV25_INJECT_MACR $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-MACR_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-MACR 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MACR 75 5 3
+)))FINNv25_Inject
 )))FINNv25
 
 #==============================================================================
@@ -1898,8 +1976,25 @@ VerboseOnCores:              root       # Accepted values: root all
 112 GFAS_BCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 71/75    1 1
 112 GFAS_DMS_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h6sfire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
 112 GFAS_NH3_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc nh3fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
+# Ordinary GFAS remains unchanged when the controlled BrC proxy is off.
+(((.not.GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_OCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 72/75    1 1
 112 GFAS_OCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 73/75    1 1
+112 GFAS_FSOAP_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
+112 GFAS_DBRCPOA_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
+112 GFAS_NPBRCPOA_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
+112 GFAS_PBRCPOA_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
+))).not.GFAS_BRC_HARMONIZED_SENSITIVITY
+# Preserve 0.5 residual OC + 0.375 NPBRC + 0.125 PBRC carbon closure.
+# GFAS is already mass-based: do not apply FINN molecule/MW factor 287.
+(((GFAS_BRC_HARMONIZED_SENSITIVITY
+112 GFAS_OCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 72/75/282    1 1
+112 GFAS_OCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 73/75/282    1 1
+112 GFAS_FSOAP_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/286 1 1
+112 GFAS_DBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/285 1 1
+112 GFAS_NPBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/283 1 1
+112 GFAS_PBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/284 1 1
+)))GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_pFe_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc so2fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75/66    1 1
 112 GFAS_SO2_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc so2fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
 )))GFAS
@@ -2343,6 +2438,16 @@ ${RUNDIR_TES_CLIM_N2O}
 #   They are both oxidized by OH in the model ... to generate SOA.
 280 COtoSOAP_anth 0.069 - - - xy 1 1
 281 COtoSOAP_burn 0.013 - - - xy 1 1
+
+# FINNv2.5 BrC harmonized sensitivity factors (default-off above).
+# These are controlled proxies, not FINNv2.5-native or production factors.
+282 FINNv25_BRC_OC_REMAIN      0.5             - - - xy unitless 1
+283 FINNv25_BRC_OC_TO_NPBRCPOA 0.375           - - - xy unitless 1
+284 FINNv25_BRC_OC_TO_PBRCPOA  0.125           - - - xy unitless 1
+285 FINNv25_BRC_BC_TO_DBRCPOA  4.0             - - - xy unitless 1
+286 FINNv25_BRC_CO_TO_FSOAP    0.013           - - - xy unitless 1
+# molecules input is converted using target MW; 28.01/150 preserves mass ratio.
+287 FINNv25_BRC_CO_FSOAP_MWCORR 0.186733333333  - - - xy unitless 1
 
 #==============================================================================
 # --- QFED2 diurnal scale factors ---

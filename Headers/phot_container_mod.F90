@@ -209,13 +209,13 @@ CONTAINS
     ! Constants
     Phot%IND999 = 5     ! Index in RAA & QAA of 999 nm
     Phot%NWVAA  = 41    ! # LUT wavelengths   (RRTMG)
-    Phot%NSPAA  = 8     ! # LUT species       (RRTMG)
+    Phot%NSPAA  = 14    ! # LUT species (NRHAER+NSTRATAER+1dust) (RRTMG)
     Phot%NRAA   = 7     ! # LUT aerosol sizes (RRTMG)   
     Phot%NWVAA0 = 11    ! # non-RRTMG wavelengths
     Phot%NALBD  = 2     ! ??                     
     Phot%NEMISS = 16    ! ??                     
-    Phot%NASPECRAD = 16 ! # RRTMG aerosol species
-    Phot%NSPECRAD  = 23 ! # RRTMG aerosol+gas species
+    Phot%NASPECRAD = 22 ! # RRTMG aerosol species
+    Phot%NSPECRAD  = 29 ! # RRTMG aerosol+gas species
     Phot%NDRg   = 40    ! # LUT dry SNA and OM aerosol sizes 
     Phot%DRg    = 6     ! # identifier of the default aerosol size
 

@@ -5084,7 +5084,7 @@ FSOAS:
   WD_KcScaleFac: [1.0, 0.5, 1.0]
   WD_RainoutEff: [0.8, 0.0, 0.8]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  BackgroundVV: 1.0e-18
+  Background_VV: 1.0e-18
 BRCSOA:
   Formula: CO
   FullName: Brown Carbon formed from Secondary Organic Aerosols released from biomass burning
@@ -5102,7 +5102,7 @@ BRCSOA:
   WD_KcScaleFac: [1.0, 0.5, 1.0]
   WD_RainoutEff: [1.0, 0.0, 1.0]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  BackgroundVV: 1.0e-18
+  Background_VV: 1.0e-18
 WTC:
   Formula: CO
   FullName: Optically White Carbon Organic Aerosol formed from photobleaching of BRCSOA - based off OCPI
@@ -5120,7 +5120,7 @@ WTC:
   WD_KcScaleFac: [1.0, 0.5, 1.0]
   WD_RainoutEff: [1.0, 0.0, 1.0]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  BackgroundVV: 1.0e-18
+  Background_VV: 1.0e-18
 DBRCPOA:
   Formula: CO
   FullName: Optically Dark Brown OA emitted directly from biomass burning - based off OCPO
@@ -5141,13 +5141,13 @@ DBRCPOA:
   WD_KcScaleFac: [0.5, 0.5, 0.5]
   WD_RainoutEff: [0.0, 0.0, 0.0]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  BackgroundVV: 1.0e-18
+  Background_VV: 1.0e-18
 FSOAP:
   Formula: CO
   FullName: Fire SOA gas-phase precursor
   Is_Gas: true
   MW_g: 150
-  BackgroundVV: 1.0e-20
+  Background_VV: 1.0e-20
 NPBRCPOA:
   Formula: CO
   FullName: Non-persistent brown carbon primary organic aerosol - based off OCPI
@@ -5165,7 +5165,7 @@ NPBRCPOA:
   WD_KcScaleFac: [1.0, 0.5, 1.0]
   WD_RainoutEff: [1, 0.0, 1]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  BackgroundVV: 1.0e-18
+  Background_VV: 1.0e-18
 PBRCPOA:
   Formula: CO
   FullName: Persistent brown carbon primary organic aerosol - based off OCPI
@@ -5183,7 +5183,7 @@ PBRCPOA:
   WD_KcScaleFac: [1.0, 0.5, 1.0]
   WD_RainoutEff: [1, 0.0, 1]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  BackgroundVV: 1.0e-18
+  Background_VV: 1.0e-18
 FFOCPI:
   FullName: Hydrophilic fossil-fuel organic carbon aerosol
   Is_Aerosol: true

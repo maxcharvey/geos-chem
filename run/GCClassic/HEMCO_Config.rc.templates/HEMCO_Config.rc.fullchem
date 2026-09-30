@@ -221,6 +221,8 @@ VerboseOnCores:              root       # Accepted values: root all
 165     FINNv25_Inject          : off   CO/SOAP/NO/NO2/BCPI/BCPO/OCPI/OCPO/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA/SO2/pFe/NH3/ACET/ALK4/PRPE/C2H2/C2H4/C2H6/C3H8/CH2O/ISOP/BENZ/TOLU/XYLE/GLYC/MGLY/HAC/MEK/HCOOH/HNO2/ALD2/EOH/MOH/ACTA/MVK/MACR
     --> FINNv25_vertical_injection_fraction : 0.0
     --> FINNv25_vertical_injection_levels   : 0
+    --> FINNV25_GFAS_PROFILE    : false
+    --> FINNv25_profile_fallback : pbl
 117     Volcano                : on    SO2
     --> Volcano_Source         :       AeroCom
     --> Volcano_Table          :       ${RUNDIR_VOLC_TABLE}
@@ -3127,6 +3129,13 @@ VerboseOnCores:              root       # Accepted values: root all
 165 FINNV25_INJECT_MACR $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_MOZART-MACR_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_MOZART-MACR 2012-2023/1-12/1-31/0 EF xy molecules/cm^2/s MACR 75 5 3
 )))FINNv25_Inject
 )))FINNv25
+
+# Auxiliary shape only: GFAS extension 112 remains OFF; no GFAS species emission.
+(((FINNv25_Inject
+(((FINNV25_GFAS_PROFILE
+165 FINNV25_GFAS_REFERENCE $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire_3d 2003-2100/1-12/1-31/0 EFY xyz kg/m2/s * - 1 1
+)))FINNV25_GFAS_PROFILE
+)))FINNv25_Inject
 
 #==============================================================================
 # --- BB4MIPs biomass burning ---

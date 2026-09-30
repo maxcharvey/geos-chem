@@ -150,7 +150,7 @@ MODULE HCO_Interface_GC_Mod
   REAL(hp), POINTER :: H_AIRVOL    (:,:,:)
   REAL(hp), POINTER :: H_AIRDEN    (:,:,:)
   REAL(hp), POINTER :: H_F_OF_PBL  (:,:,:)
-  REAL(hp), POINTER :: H_PBL_OCCUPANCY(:,:,:)
+  REAL(hp), POINTER :: H_PBL_OCCUPANCY(:,:,:) => NULL()
 
   REAL(hp), POINTER :: H_SPHU      (:,:,:)                ! Note: Only need ZBND = 1 sfc value
 
@@ -1403,6 +1403,11 @@ CONTAINS
     !-----------------------------------------------------------------------
 
 #if defined( MODEL_CLASSIC )
+    IF ( ASSOCIATED( H_PBL_OCCUPANCY ) ) THEN
+       DEALLOCATE( H_PBL_OCCUPANCY )
+       NULLIFY( H_PBL_OCCUPANCY )
+    ENDIF
+
     IF ( ASSOCIATED( REGR_3DI ) ) THEN
        DEALLOCATE( REGR_3DI  )
        CALL GC_CheckVar( 'hco_interface_gc_mod.F90:HCOI_GC_Final:REGR_3DI', 2, RC )

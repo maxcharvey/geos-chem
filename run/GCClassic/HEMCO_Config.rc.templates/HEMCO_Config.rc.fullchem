@@ -223,6 +223,7 @@ VerboseOnCores:              root       # Accepted values: root all
     --> FINNv25_vertical_injection_levels   : 0
     --> FINNV25_GFAS_PROFILE    : false
     --> FINNv25_profile_fallback : pbl
+    --> FINNv25_profile_datum    : MSL
 117     Volcano                : on    SO2
     --> Volcano_Source         :       AeroCom
     --> Volcano_Table          :       ${RUNDIR_VOLC_TABLE}
@@ -3133,7 +3134,10 @@ VerboseOnCores:              root       # Accepted values: root all
 # Auxiliary shape only: GFAS extension 112 remains OFF; no GFAS species emission.
 (((FINNv25_Inject
 (((FINNV25_GFAS_PROFILE
-165 FINNV25_GFAS_REFERENCE $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire_3d 2003-2100/1-12/1-31/0 EFY xyz kg/m2/s * - 1 1
+165 FINNV25_GFAS_SUPPORT $ROOT/FINN_GFAS_AUX/$YYYY/GFAS-height-moments-$YYYY$MM$DD.nc valid_co_support 2003-2100/1-12/1-31/0 EFY xy 1 * - 1 1
+165 FINNV25_GFAS_TOTAL $ROOT/FINN_GFAS_AUX/$YYYY/GFAS-height-moments-$YYYY$MM$DD.nc total_co_support 2003-2100/1-12/1-31/0 EFY xy 1 * - 1 1
+165 FINNV25_GFAS_MAMI_MOMENT $ROOT/FINN_GFAS_AUX/$YYYY/GFAS-height-moments-$YYYY$MM$DD.nc mami_co_moment 2003-2100/1-12/1-31/0 EFY xy m * - 1 1
+165 FINNV25_GFAS_APT_MOMENT $ROOT/FINN_GFAS_AUX/$YYYY/GFAS-height-moments-$YYYY$MM$DD.nc apt_co_moment 2003-2100/1-12/1-31/0 EFY xy m * - 1 1
 )))FINNV25_GFAS_PROFILE
 )))FINNv25_Inject
 

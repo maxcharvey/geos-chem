@@ -150,6 +150,7 @@ MODULE HCO_Interface_GC_Mod
   REAL(hp), POINTER :: H_AIRVOL    (:,:,:)
   REAL(hp), POINTER :: H_AIRDEN    (:,:,:)
   REAL(hp), POINTER :: H_F_OF_PBL  (:,:,:)
+  REAL(hp), POINTER :: H_PBL_OCCUPANCY(:,:,:)
 
   REAL(hp), POINTER :: H_SPHU      (:,:,:)                ! Note: Only need ZBND = 1 sfc value
 
@@ -1650,6 +1651,13 @@ CONTAINS
          H_F_OF_PBL = 0.0e0_hp
       ENDIF
 
+      IF ( ExtState%PBL_OCCUPANCY%DoUse ) THEN
+         ALLOCATE( H_PBL_OCCUPANCY( IMh, JMh, LM ), STAT=RC )
+         CALL GC_CheckVar( 'hco_interface_gc_mod.F90:H_PBL_OCCUPANCY', 0, RC )
+         IF ( RC /= GC_SUCCESS ) RETURN
+         H_PBL_OCCUPANCY = 0.0e0_hp
+      ENDIF
+
       ! 3-D State_Chm fields
       IF ( id_O3 > 0 ) THEN
         ALLOCATE( H_SpcO3( IMh, JMh, LM ), STAT=RC )
@@ -2225,6 +2233,31 @@ CONTAINS
     IF ( HMRC /= HCO_SUCCESS ) THEN
        RC     = HMRC
        ErrMsg = 'Error encountered in "ExtDat_Set( FRAC_OF_PBL_FOR_EMIS)"!'
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
+
+    ! Native partial-layer occupancy; distinct from normalized PBL mixing weights.
+    IF ( ExtState%PBL_OCCUPANCY%DoUse ) THEN
+#ifdef MODEL_CLASSIC
+      IF ( .not. Input_Opt%LIMGRID ) THEN
+#endif
+        CALL ExtDat_Set(  HcoState,              ExtState%PBL_OCCUPANCY,       &
+                         'PBL_OCCUPANCY_FOR_EMIS', HMRC,                       &
+                          FIRST,                 State_Met%F_UNDER_PBLTOP         )
+#ifdef MODEL_CLASSIC
+      ELSE
+        CALL ExtDat_Set(  HcoState,              ExtState%PBL_OCCUPANCY,       &
+                         'PBL_OCCUPANCY_FOR_EMIS', HMRC,                       &
+                          FIRST,                 H_PBL_OCCUPANCY                 )
+      ENDIF
+#endif
+    ENDIF
+
+    ! Trap potential errors
+    IF ( HMRC /= HCO_SUCCESS ) THEN
+       RC     = HMRC
+       ErrMsg = 'Error encountered in "ExtDat_Set( PBL_OCCUPANCY_FOR_EMIS)"!'
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
@@ -3298,6 +3331,15 @@ CONTAINS
                            REGR_3DI,  REGR_3DO,   ZBND=State_Grid%NZ,       & ! 3D data
                            ResetRegrName=.true. )
       H_F_OF_PBL(:,:,1:State_Grid%NZ) = REGR_3DO(:,:,1:State_Grid%NZ)
+    ENDIF
+
+    ! PBL_OCCUPANCY
+    IF ( ExtState%PBL_OCCUPANCY%DoUse ) THEN
+      REGR_3DI(:,:,1:State_Grid%NZ) = State_Met%F_UNDER_PBLTOP(:,:,1:State_Grid%NZ)
+      CALL Regrid_MDL2HCO( Input_Opt, State_Grid, State_Grid_HCO,           &
+                           REGR_3DI,  REGR_3DO,   ZBND=State_Grid%NZ,       & ! 3D data
+                           ResetRegrName=.true. )
+      H_PBL_OCCUPANCY(:,:,1:State_Grid%NZ) = REGR_3DO(:,:,1:State_Grid%NZ)
     ENDIF
 
     !-----------------------------------------------------------------------

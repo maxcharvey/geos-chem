@@ -419,6 +419,8 @@ CONTAINS
     USE State_Chm_Mod,  ONLY : ChmState
     USE State_Diag_Mod, ONLY : DgnState
     USE error_mod
+    USE BRC_TRANSPORT_CAPTURE_MOD, ONLY: BRC_CAPTURE_BEGIN, BRC_CAPTURE_OPEN, &
+         BRC_CAPTURE_WRITE, BRC_CAPTURE_CLOSE
 !
 ! !INPUT PARAMETERS:
 !
@@ -524,6 +526,7 @@ CONTAINS
     INTEGER            :: il, ij, ik, iq, k, j, i, Kflip
     INTEGER            :: num, k2m1, S
     INTEGER            :: north, south
+    INTEGER            :: CaptureUnit
 
     REAL(fp)           :: dap   (km)
     REAL(fp)           :: dbk   (km)
@@ -634,6 +637,8 @@ CONTAINS
        dap(ik) = ak(ik+1) - ak(ik)
        dbk(ik) = bk(ik+1) - bk(ik)
     enddo
+
+    CALL BRC_CAPTURE_BEGIN(State_Chm,im,jm,km,jfirst,jlast,ng)
 
 !$OMP PARALLEL DO        &
 !$OMP DEFAULT( SHARED  ) &
@@ -775,10 +780,14 @@ CONTAINS
 !---------------------------------------------------------------------------
 !$OMP PARALLEL DO                                                     &
 !$OMP DEFAULT( SHARED                                               ) &
-!$OMP PRIVATE( iq, dq1, ik, adx, ady, q_ptr, qqu, qqv, north, south )
+!$OMP PRIVATE( iq, dq1, ik, adx, ady, q_ptr, qqu, qqv, north, south, CaptureUnit )
     do iq = 1, nq
 
        q_ptr => State_Chm%Species(iq)%Conc(:,:,km:1:-1)
+
+       CALL BRC_CAPTURE_OPEN(iq,State_Chm%Species(iq)%Units,dt,area_m2,geofac,geofac_pc, &
+            delp1,delp2,q_ptr,cx(:,1:jm,:),cy(:,1:jm,:),wz, &
+            j1p,j2p,FILL,IORD,JORD,KORD,CROSS,CaptureUnit)
 
        ! Zero 3-D arrays for each species
        dq1 = 0.0_fp
@@ -871,6 +880,7 @@ CONTAINS
                  1,             jm,          1,      im,                     &
                  1,             jm,          1,      im,                     &
                  1,             jm,          IORD                           )
+          IF (CaptureUnit/=0) CALL BRC_CAPTURE_WRITE(CaptureUnit,dq1(:,:,ik))
 
           !.sds notes on output arrays
           !  pu  (in)    - pressure at edges in "u" (mb)
@@ -891,6 +901,7 @@ CONTAINS
                  j2p,  1,         im,            1,             jm,          &
                  im,   1,         im,            1,             jm,          &
                  1,    im,        1,             jm,            JORD        )
+          IF (CaptureUnit/=0) CALL BRC_CAPTURE_WRITE(CaptureUnit,dq1(:,:,ik))
 
           !.sds notes on output arrays
           !  cy (in)     - Courant number in N-S direction
@@ -905,6 +916,7 @@ CONTAINS
           !.sds
 
        end do  ! IK
+       IF (CaptureUnit/=0) CALL BRC_CAPTURE_WRITE(CaptureUnit,q_ptr)
 
      ! ==========
        call Fzppm                                                            &
@@ -912,6 +924,7 @@ CONTAINS
             ( klmt, delp1, wz, dq1, q_ptr, fz(:,:,:,iq), j1p,                &
               1,    jm,    1,  im,  1,     jm,           im,                 &
               km,   1,     im, 1,   jm,    1,            km                 )
+       IF (CaptureUnit/=0) CALL BRC_CAPTURE_WRITE(CaptureUnit,dq1)
 
        !.sds notes on output arrays
        !   wz  (in) : vertical mass flux
@@ -928,6 +941,7 @@ CONTAINS
                (dq1, j1p, j2p, 1, jm, 1, im, 1, jm, 1, im, 1, jm, 1, km     )
        end if
 
+       IF (CaptureUnit/=0) CALL BRC_CAPTURE_WRITE(CaptureUnit,dq1)
        q_ptr(:,:,:) =  &
             dq1 / delp2
 
@@ -949,6 +963,8 @@ CONTAINS
        WHERE ( q_ptr < 0.0_fp )
           q_ptr = 1.0e-26_fp
        ENDWHERE
+
+       CALL BRC_CAPTURE_CLOSE(CaptureUnit,q_ptr,fx(:,:,:,iq),fy(:,:,:,iq),fz(:,:,:,iq))
 
        q_ptr => NULL()
 

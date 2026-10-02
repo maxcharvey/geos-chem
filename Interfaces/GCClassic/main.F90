@@ -42,6 +42,7 @@ PROGRAM GEOS_Chem
   USE PRESSURE_MOD          ! For computing pressure at grid boxes
   USE Print_Mod             ! For verbose printing
   USE State_Chm_Mod         ! Derived type for Chemistry State object
+  USE BRC_ORIGIN_MOD, ONLY: BRC_ORIGIN_AUDIT
   USE State_Diag_Mod        ! Derived type for Diagnostics State object
   USE State_Grid_Mod        ! Derived type for Grid State object
   USE State_Met_Mod         ! Derived type for Meteorology State object
@@ -1155,8 +1156,13 @@ PROGRAM GEOS_Chem
 
           ! Call the appropriate version of TPCORE
           IF ( Input_Opt%LTRAN ) THEN
+             CALL BRC_ORIGIN_AUDIT('before_transport',Input_Opt,State_Chm,State_Grid,State_Met,RC)
+             IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
              CALL Do_Transport( Input_Opt,  State_Chm, State_Diag, &
                                 State_Grid, State_Met, RC )
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('Error in Do_Transport before origin audit',ThisLoc)
+          CALL BRC_ORIGIN_AUDIT('transport',Input_Opt,State_Chm,State_Grid,State_Met,RC)
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
 
              ! Trap potential error
              IF ( RC /= GC_SUCCESS ) THEN
@@ -1432,6 +1438,9 @@ PROGRAM GEOS_Chem
           ! (ckeller, 3/5/15)
           CALL Do_Mixing( Input_Opt,  State_Chm, State_Diag, &
                           State_Grid, State_Met, RC )
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('Error in Do_Mixing before origin audit',ThisLoc)
+          CALL BRC_ORIGIN_AUDIT('mixing',Input_Opt,State_Chm,State_Grid,State_Met,RC)
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
 
           ! Trap potential errors
           IF ( RC /= GC_SUCCESS ) THEN
@@ -1456,6 +1465,9 @@ PROGRAM GEOS_Chem
              ! Call the appropriate convection routine
              CALL Do_Convection( Input_Opt,  State_Chm, State_Diag, &
                                  State_Grid, State_Met, RC )
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('Error in Do_Convection before origin audit',ThisLoc)
+          CALL BRC_ORIGIN_AUDIT('convection',Input_Opt,State_Chm,State_Grid,State_Met,RC)
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
 
              ! Trap potential errors
              IF ( RC /= GC_SUCCESS ) THEN
@@ -1513,6 +1525,9 @@ PROGRAM GEOS_Chem
              ! Do GEOS-Chem chemistry
              CALL Do_Chemistry( Input_Opt,  State_Chm, State_Diag, &
                                 State_Grid, State_Met, RC )
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('Error in Do_Chemistry before origin audit',ThisLoc)
+          CALL BRC_ORIGIN_AUDIT('chemistry',Input_Opt,State_Chm,State_Grid,State_Met,RC)
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
 
              ! Trap potential errors
              IF ( RC /= GC_SUCCESS ) THEN
@@ -1539,6 +1554,9 @@ PROGRAM GEOS_Chem
           ! Do wet deposition
           CALL Do_WetDep( Input_Opt, State_Chm, State_Diag, State_Grid, &
                           State_Met, RC )
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('Error in Do_WetDep before origin audit',ThisLoc)
+          CALL BRC_ORIGIN_AUDIT('wetdep',Input_Opt,State_Chm,State_Grid,State_Met,RC)
+          IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
 
           ! Trap potential errors
           IF ( RC /= GC_SUCCESS ) THEN

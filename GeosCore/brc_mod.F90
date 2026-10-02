@@ -42,6 +42,8 @@ MODULE BRC_MOD
 ! !USES:
 !
   USE Precision_Mod    ! For GEOS-Chem Precision (fp)
+  USE State_Chm_Mod, ONLY: Ind_
+  USE BRC_ORIGIN_MOD, ONLY: BRC_ORIGIN_BIND, BRC_ORIGIN_TRANSFER
 
   IMPLICIT NONE
   PRIVATE
@@ -622,6 +624,9 @@ CONTAINS
    ErrMsg  = ''
    ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
 
+   CALL BRC_ORIGIN_BIND(RC)
+   IF (RC /= GC_SUCCESS) RETURN
+
    !-----------------------------------------------------------------
    ! Look up species IDs - reject missing required chemistry species
    ! FSOAP and NPBRCPOA are optional; FSOAS, BRCSOA, WTC are required
@@ -1047,6 +1052,7 @@ CONTAINS
    REAL(fp)            :: DTCHEM, KFSOAP, FREQ, TC0, CNEW, RKT
 
    ! Pointers
+   INTEGER :: OriginDestId
    REAL(fp), POINTER   :: TC(:,:,:)
 !
 ! !DEFINED PARAMETERS:
@@ -1066,6 +1072,7 @@ CONTAINS
    KFSOAP     = 1.e+0_fp / ( 86400e+0_fp * FSOAP_LIFE )
    DTCHEM     = GET_TS_CHEM()
    FSOAP_CONV = 0e+0_fp
+   OriginDestId=Ind_('FSOAS')
    TC         => State_Chm%Species(spcId)%Conc
 
    !=================================================================
@@ -1103,6 +1110,8 @@ CONTAINS
       ENDIF
 
       ! Store new concentration back into species array
+      CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
+                               TC0,CNEW,1.0_fp)
       TC(I,J,L) = CNEW
 
    ENDDO
@@ -1114,6 +1123,7 @@ CONTAINS
    TC => NULL()
 
  END SUBROUTINE CHEM_FSOAP
+
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -1177,6 +1187,7 @@ CONTAINS
    REAL(fp)            :: DTCHEM, KFSOAS, FREQ, TC0, CNEW, RKT
 
    ! Pointers
+   INTEGER :: OriginDestId
    REAL(fp), POINTER   :: TC(:,:,:)
 !
 ! !DEFINED PARAMETERS:
@@ -1197,6 +1208,7 @@ CONTAINS
    KFSOAS     = 1.e+0_fp / ( 86400e+0_fp * FSOAS_LIFE )
    DTCHEM     = GET_TS_CHEM()
    FSOAS_CONV = 0e+0_fp
+   OriginDestId=Ind_('BRCSOA')
    TC         => State_Chm%Species(spcId)%Conc
 
    !=================================================================
@@ -1235,6 +1247,8 @@ CONTAINS
       ENDIF
 
       ! Store new concentration back into species array
+      CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
+                               TC0,CNEW,1.0_fp / OMOC_BBOA)
       TC(I,J,L) = CNEW
 
    ENDDO
@@ -1251,6 +1265,7 @@ CONTAINS
    TC => NULL()
 
  END SUBROUTINE CHEM_FSOAS
+
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -1345,6 +1360,7 @@ CONTAINS
    REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
 
    ! Pointers
+   INTEGER :: OriginDestId
    REAL(fp), POINTER   :: TC(:,:,:)
 
    !=================================================================
@@ -1361,6 +1377,7 @@ CONTAINS
    !            and we consume it below, then zero it at the end.
    BRCSOA_CONV = 0e+0_fp
 
+   OriginDestId=Ind_('WTC')
    TC          => State_Chm%Species(spcId)%Conc
 
    ! Look up O3 species index for local partial pressure
@@ -1525,6 +1542,8 @@ CONTAINS
       ENDIF
 
       ! Store updated BRCSOA back into species array [kg]
+      CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
+                               TC0,CNEW,1.0_fp)
       TC(I,J,L) = CNEW
 
    ENDDO
@@ -1541,6 +1560,7 @@ CONTAINS
    TC => NULL()
 
  END SUBROUTINE CHEM_BRCSOA
+
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -1623,6 +1643,7 @@ CONTAINS
    REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
 
    ! Pointers
+   INTEGER :: OriginDestId
    REAL(fp), POINTER   :: TC(:,:,:)
 
    !=================================================================
@@ -1638,6 +1659,7 @@ CONTAINS
    ! Zero the conversion array for this timestep
    NPBRC_CONV  = 0e+0_fp
 
+   OriginDestId=Ind_('WTC')
    TC          => State_Chm%Species(spcId)%Conc
 
    ! Look up O3 species index for local partial pressure
@@ -1757,6 +1779,8 @@ CONTAINS
       ENDIF
 
       ! Store updated NPBRCPOA back into species array [kg]
+      CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
+                               TC0,CNEW,1.0_fp)
       TC(I,J,L) = CNEW
 
    ENDDO
@@ -1768,6 +1792,7 @@ CONTAINS
    TC => NULL()
 
  END SUBROUTINE CHEM_NPBRCPOA
+
 !EOC
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
@@ -1858,6 +1883,10 @@ CONTAINS
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
       ! Store modified concentration back in species array [kg]
+      ! The parent WTC also has a final underflow cutoff. Apply its actual
+      ! retention to overlays without inventing a receiving chemistry state.
+      CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, spcId, I,J,L, &
+                               TC0+CCV,CNEW,0.0_fp)
       TC(I,J,L) = CNEW
 
    ENDDO

@@ -823,6 +823,7 @@ CONTAINS
     USE HCO_FluxArr_Mod, ONLY : HCO_FluxarrReset
     USE HCO_Driver_Mod,  ONLY : HCO_Run
     USE HCOX_Driver_Mod, ONLY : HCOX_Run
+    USE HCOX_FINNv25_Mod, ONLY : HCOX_FINNv25_CloseOrigins
 
 #if defined( MODEL_CLASSIC )
     ! HEMCO utility routines for GEOS-Chem
@@ -1138,6 +1139,16 @@ CONTAINS
           ErrMsg = 'Error encountered in "HCOX_Run"!'
           CALL GC_Error( ErrMsg, RC, ThisLoc )
           CALL Flush( HcoState%Config%Err%Lun )
+          RETURN
+       ENDIF
+
+       ! Send all unrequested parent sources to the diagnostic UNT partition,
+       ! after every extension has finished. Parents are left unchanged.
+       CALL HCOX_FINNv25_CloseOrigins(HcoState,HMRC)
+       IF (HMRC /= HCO_SUCCESS) THEN
+          RC=HMRC
+          ErrMsg='Error encountered in BrC origin source complement'
+          CALL GC_Error(ErrMsg,RC,ThisLoc)
           RETURN
        ENDIF
 

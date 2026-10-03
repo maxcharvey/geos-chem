@@ -4,16 +4,26 @@
 MODULE BRC_TRANSPORT_CAPTURE_MOD
   USE Precision_Mod, ONLY: fp
   USE State_Chm_Mod, ONLY: ChmState, Ind_
+  USE State_Met_Mod, ONLY: MetState
+  USE State_Grid_Mod, ONLY: GrdState
+  USE UnitConv_Mod, ONLY: KG_SPECIES_PER_KG_DRY_AIR
   USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: int32
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: BRC_CAPTURE_BEGIN, BRC_CAPTURE_OPEN, BRC_CAPTURE_WRITE, BRC_CAPTURE_CLOSE
+  PUBLIC :: BRC_CAPTURE_MIX_PHASE, BRC_CAPTURE_MIX_GUARD, BRC_CAPTURE_MIX_SCALE
+  PUBLIC :: BRC_CAPTURE_MIX_DIFF
   CHARACTER(LEN=8), PARAMETER :: Parents(7)=[ CHARACTER(LEN=8) :: &
     'FSOAP','FSOAS','BRCSOA','NPBRCPOA','WTC','PBRCPOA','DBRCPOA' ]
   CHARACTER(LEN=1024), SAVE :: Directory=''
   INTEGER, SAVE :: Ids(7)=0,Step=0,Limit=1
   INTEGER, SAVE :: Tags(7,4)=0,OriginCount=0
   LOGICAL, SAVE :: Initialized=.FALSE.,Capturing=.FALSE.
+  LOGICAL, SAVE :: MixingAudit=.FALSE.
+  INTEGER, SAVE :: MixIds(35)=0
+  INTEGER, ALLOCATABLE, SAVE :: MixUnits(:),MixStages(:)
+  INTEGER(int32), ALLOCATABLE, SAVE :: Rollback(:,:,:),SafeScale(:,:,:)
+  REAL(fp), ALLOCATABLE, SAVE :: Threshold(:,:),ScaleNum(:,:,:),ScaleDen(:,:,:)
   REAL(fp), ALLOCATABLE, SAVE :: PrePole(:,:,:,:)
   REAL(fp), ALLOCATABLE, SAVE :: PreOrigins(:,:,:,:,:)
   INTERFACE BRC_CAPTURE_WRITE
@@ -31,6 +41,13 @@ CONTAINS
       CALL GET_ENVIRONMENT_VARIABLE('BRC_PARENT_FLUX_CAPTURE_DIR',Directory,Length,Status)
       IF (Status==1 .OR. Length==0) Directory=''
       IF (Status==-1) ERROR STOP 'BRC parent capture directory exceeds1024characters'
+      CALL GET_ENVIRONMENT_VARIABLE('BRC_PARENT_FLUX_CAPTURE_MIXING_AUDIT',Value,Length,Status)
+      IF (Status==-1) ERROR STOP 'Truncated BRC mixing capture flag'
+      IF (Status==0 .AND. Length>0) THEN
+        IF (TRIM(Value)/='0' .AND. TRIM(Value)/='1') ERROR STOP 'BRC mixing capture flag must be0or1'
+        MixingAudit=TRIM(Value)=='1'
+      ENDIF
+      IF (MixingAudit .AND. LEN_TRIM(Directory)==0) ERROR STOP 'BRC mixing capture requires capture directory'
       IF (LEN_TRIM(Directory)>0) THEN
         CALL GET_ENVIRONMENT_VARIABLE('BRC_PARENT_FLUX_CAPTURE_STEPS',Value,Length,Status)
         IF (Status==-1) ERROR STOP 'Truncated BRC parent capture step limit'
@@ -54,6 +71,16 @@ CONTAINS
         IF (TagCount==28) THEN
           OriginCount=4
           ALLOCATE(PreOrigins(NX,NY,NZ,7,4))
+        ENDIF
+        IF (MixingAudit) THEN
+          IF (TagCount/=28) ERROR STOP 'BRC mixing capture requires28origins'
+          DO S=1,7
+            MixIds(5*S-4)=Ids(S)
+            MixIds(5*S-3:5*S)=Tags(S,:)
+          ENDDO
+          ALLOCATE(MixUnits(NY),MixStages(NY),Rollback(NX,35,NY),SafeScale(NX,35,NY), &
+                   Threshold(35,NY),ScaleNum(NX,35,NY),ScaleDen(NX,35,NY))
+          MixUnits=0;MixStages=0
         ENDIF
       ENDIF
     ENDIF
@@ -143,4 +170,110 @@ CONTAINS
     CLOSE(Unit,IOSTAT=Status)
     CALL CHECK_IO(Status)
   END SUBROUTINE BRC_CAPTURE_CLOSE
+  ! Each latitude owns its stream and scratch, including during outer OpenMP.
+  ! All model arguments are read-only. Native kg/kg dry fields may be signed
+  ! at intermediate phases. Stream stores full cells, actual guard masks and
+  ! native mass-restoration arguments; no inferred partition is written back.
+  SUBROUTINE BRC_CAPTURE_MIX_PHASE(Phase,Lat,State_Chm,State_Met,State_Grid,Q,Cflx,Dt,CgFirst,NTop)
+    INTEGER, INTENT(IN) :: Phase,Lat,CgFirst,NTop
+    TYPE(ChmState), INTENT(IN) :: State_Chm
+    TYPE(MetState), INTENT(IN) :: State_Met
+    TYPE(GrdState), INTENT(IN) :: State_Grid
+    REAL(fp), INTENT(IN) :: Q(:,:,:),Cflx(:,:),Dt
+    INTEGER :: B,N,NX,NZ,Status
+    INTEGER(int32) :: Header(12),PhaseCode
+    CHARACTER(LEN=1200) :: Path
+    CHARACTER(LEN=6) :: Counter
+    CHARACTER(LEN=4) :: Latitude
+    IF (.NOT. MixingAudit .OR. .NOT. Capturing) RETURN
+    NX=SIZE(Q,1);NZ=SIZE(Q,2)
+    IF (Phase/=MixStages(Lat)+1 .OR. Phase<1 .OR. Phase>6) ERROR STOP 'BRC mixing capture phase order'
+    IF (Phase==1) THEN
+      IF (ANY(MixIds>SIZE(Q,3)) .OR. ANY(MixIds>SIZE(Cflx,2))) &
+        ERROR STOP 'BRC mixing capture requires transported origin fields'
+      DO B=1,35
+        IF (State_Chm%Species(MixIds(B))%Units/=KG_SPECIES_PER_KG_DRY_AIR) &
+          ERROR STOP 'BRC mixing capture requires native kg/kg dry units'
+      ENDDO
+      WRITE(Counter,'(i6.6)') Step;WRITE(Latitude,'(i4.4)') Lat
+      Path=TRIM(Directory)//'/mix_step'//Counter//'_lat'//Latitude//'.bin'
+      OPEN(NEWUNIT=MixUnits(Lat),FILE=TRIM(Path),ACCESS='STREAM',FORM='UNFORMATTED', &
+           STATUS='NEW',ACTION='WRITE',IOSTAT=Status)
+      CALL CHECK_IO(Status)
+      Header=[1_int32,INT(NX,int32),INT(NZ,int32),INT(Step,int32),INT(Lat,int32), &
+              35_int32,INT(STORAGE_SIZE(Dt)/8,int32),INT(KG_SPECIES_PER_KG_DRY_AIR,int32), &
+              INT(CgFirst,int32),INT(NTop,int32),16909060_int32,6_int32]
+      WRITE(MixUnits(Lat),IOSTAT=Status) 'BRCMX001',Header,Dt, &
+        State_Met%AD(:,Lat,NZ:1:-1),State_Grid%AREA_M2(:,Lat)
+      CALL CHECK_IO(Status)
+      DO B=1,35
+        WRITE(MixUnits(Lat),IOSTAT=Status) Cflx(:,MixIds(B))
+        CALL CHECK_IO(Status)
+      ENDDO
+      Rollback(:,:,Lat)=-1;SafeScale(:,:,Lat)=-1
+      Threshold(:,Lat)=0;ScaleNum(:,:,Lat)=0;ScaleDen(:,:,Lat)=0
+    ENDIF
+    PhaseCode=INT(Phase,int32)
+    WRITE(MixUnits(Lat),IOSTAT=Status) PhaseCode
+    CALL CHECK_IO(Status)
+    DO B=1,35
+      N=MixIds(B)
+      WRITE(MixUnits(Lat),IOSTAT=Status) Q(:,:,N)
+      CALL CHECK_IO(Status)
+    ENDDO
+    MixStages(Lat)=Phase
+    IF (Phase==6) THEN
+      IF (ANY(Rollback(:,:,Lat)<0) .OR. ANY(SafeScale(:,:,Lat)<0)) ERROR STOP 'Incomplete BRC mixing guard capture'
+      WRITE(MixUnits(Lat),IOSTAT=Status) Threshold(:,Lat),Rollback(:,:,Lat), &
+        ScaleNum(:,:,Lat),ScaleDen(:,:,Lat),SafeScale(:,:,Lat)
+      CALL CHECK_IO(Status)
+      CLOSE(MixUnits(Lat),IOSTAT=Status)
+      CALL CHECK_IO(Status)
+      MixUnits(Lat)=0;MixStages(Lat)=0
+    ENDIF
+  END SUBROUTINE BRC_CAPTURE_MIX_PHASE
+
+  SUBROUTINE BRC_CAPTURE_MIX_DIFF(Lat,Cc,Ze,Term,Dqbot)
+    INTEGER, INTENT(IN) :: Lat
+    REAL(fp), INTENT(IN) :: Cc(:,:),Ze(:,:),Term(:,:),Dqbot(:,:)
+    INTEGER :: B,Status
+    IF (.NOT. MixingAudit .OR. .NOT. Capturing) RETURN
+    IF (MixStages(Lat)/=3) ERROR STOP 'BRC mixing coefficients outside rollback phase'
+    WRITE(MixUnits(Lat),IOSTAT=Status) 'BRCMD001',Cc,Ze,Term
+    CALL CHECK_IO(Status)
+    DO B=1,35
+      WRITE(MixUnits(Lat),IOSTAT=Status) Dqbot(:,MixIds(B))
+      CALL CHECK_IO(Status)
+    ENDDO
+  END SUBROUTINE BRC_CAPTURE_MIX_DIFF
+
+  SUBROUTINE BRC_CAPTURE_MIX_GUARD(Lat,M,Adjust,Qmin)
+    INTEGER, INTENT(IN) :: Lat,M
+    LOGICAL, INTENT(IN) :: Adjust(:)
+    REAL(fp), INTENT(IN) :: Qmin
+    INTEGER :: B
+    IF (.NOT. MixingAudit .OR. .NOT. Capturing) RETURN
+    DO B=1,35
+      IF (MixIds(B)/=M) CYCLE
+      IF (MixStages(Lat)/=2) ERROR STOP 'BRC mixing guard outside raw phase'
+      Rollback(:,B,Lat)=MERGE(1_int32,0_int32,Adjust)
+      Threshold(B,Lat)=Qmin
+      RETURN
+    ENDDO
+  END SUBROUTINE BRC_CAPTURE_MIX_GUARD
+
+  SUBROUTINE BRC_CAPTURE_MIX_SCALE(Lat,M,I,Num,Den,Applied)
+    INTEGER, INTENT(IN) :: Lat,M,I
+    REAL(fp), INTENT(IN) :: Num,Den
+    LOGICAL, INTENT(IN) :: Applied
+    INTEGER :: B
+    IF (.NOT. MixingAudit .OR. .NOT. Capturing) RETURN
+    DO B=1,35
+      IF (MixIds(B)/=M) CYCLE
+      IF (MixStages(Lat)/=5) ERROR STOP 'BRC mixing scale outside clipped phase'
+      ScaleNum(I,B,Lat)=Num;ScaleDen(I,B,Lat)=Den
+      SafeScale(I,B,Lat)=MERGE(1_int32,0_int32,Applied)
+      RETURN
+    ENDDO
+  END SUBROUTINE BRC_CAPTURE_MIX_SCALE
 END MODULE BRC_TRANSPORT_CAPTURE_MOD

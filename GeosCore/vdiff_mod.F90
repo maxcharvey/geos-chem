@@ -18,6 +18,8 @@ MODULE Vdiff_Mod
   USE Error_Mod,     ONLY : Debug_Msg
   USE PhysConstants, ONLY : AIRMW, AVO, g0, Rd, Rv, Rdg0, VON_KARMAN
   USE Precision_Mod
+  USE BRC_TRANSPORT_CAPTURE_MOD, ONLY: BRC_CAPTURE_MIX_PHASE, &
+       BRC_CAPTURE_MIX_GUARD, BRC_CAPTURE_MIX_SCALE, BRC_CAPTURE_MIX_DIFF
 
   IMPLICIT NONE
   PRIVATE
@@ -380,6 +382,8 @@ CONTAINS
     !$OMP END PARALLEL DO
 
 ! resume...
+    CALL BRC_CAPTURE_MIX_PHASE(1,lat,State_Chm,State_Met,State_Grid, &
+                              qp0,cflx,ztodt,plev-npbl+1,ntopfl)
 
 !-----------------------------------------------------------------------
 ! 	... convert the surface fluxes to lowest level tendencies
@@ -562,6 +566,8 @@ CONTAINS
 !           quasi-equilibrium conditions assumed for the countergradient term are
 !           strongly violated.
 !-----------------------------------------------------------------------
+    CALL BRC_CAPTURE_MIX_PHASE(2,lat,State_Chm,State_Met,State_Grid, &
+                              qmx,cflx,ztodt,plev-npbl+1,ntopfl)
     do m = 1,nspcmix
        adjust(:plonl) = .false.
        do k = plev-npbl+1,plev
@@ -574,6 +580,7 @@ CONTAINS
 !-----------------------------------------------------------------------
 ! 	... find long indices of those columns for which negatives were found
 !-----------------------------------------------------------------------
+       CALL BRC_CAPTURE_MIX_GUARD(lat,m,adjust(:plonl),qmincg(m))
        nval = count( adjust(:plonl) )
 !-----------------------------------------------------------------------
 ! 	... replace those columns with original values
@@ -590,6 +597,8 @@ CONTAINS
 !-----------------------------------------------------------------------
 ! 	... repeat above for sh
 !-----------------------------------------------------------------------
+    CALL BRC_CAPTURE_MIX_PHASE(3,lat,State_Chm,State_Met,State_Grid, &
+                              qmx,cflx,ztodt,plev-npbl+1,ntopfl)
     adjust(:plonl) = .false.
     do k = plev-npbl+1,plev
        do i = 1,plonl
@@ -678,6 +687,9 @@ CONTAINS
 
     call qvdiff( nspcmix, qmx, dqbot, cch, zeh, &
 	         termh, qp1, plonl )
+    CALL BRC_CAPTURE_MIX_DIFF(lat,cch,zeh,termh,dqbot)
+    CALL BRC_CAPTURE_MIX_PHASE(4,lat,State_Chm,State_Met,State_Grid, &
+                              qp1,cflx,ztodt,plev-npbl+1,ntopfl)
 
 !-----------------------------------------------------------------------
 ! 	... identify and correct constituents exceeding user defined bounds
@@ -687,6 +699,8 @@ CONTAINS
     where (qp1 < 0.0_fp)
        qp1 = 0.0_fp
     endwhere
+    CALL BRC_CAPTURE_MIX_PHASE(5,lat,State_Chm,State_Met,State_Grid, &
+                              qp1,cflx,ztodt,plev-npbl+1,ntopfl)
 
 !-----------------------------------------------------------------------
 ! Simple bug fix to ensure mass conservation - Jintai Lin 20180809
@@ -708,8 +722,11 @@ CONTAINS
                  State_Met%AD(I,lat,plev-ntopfl+1:1:-1))
 
        IF ( IS_SAFE_DIV( sum_qp0, sum_qp1 ) ) THEN
+          CALL BRC_CAPTURE_MIX_SCALE(lat,M,I,sum_qp0,sum_qp1,.TRUE.)
           qp1(I,ntopfl:plev,M) = qp1(I,ntopfl:plev,M) * &
                                  sum_qp0 / sum_qp1
+       ELSE
+          CALL BRC_CAPTURE_MIX_SCALE(lat,M,I,sum_qp0,sum_qp1,.FALSE.)
        ENDIF
 
     enddo
@@ -719,6 +736,8 @@ CONTAINS
 ! 	... diffuse sh
 !-----------------------------------------------------------------------
 
+    CALL BRC_CAPTURE_MIX_PHASE(6,lat,State_Chm,State_Met,State_Grid, &
+                              qp1,cflx,ztodt,plev-npbl+1,ntopfl)
     call qvdiff( 1, shmx, dshbot, cch, zeh, &
 	         termh, shp1, plonl )
 

@@ -853,6 +853,18 @@ HcoConvectiveCloudTopHeight     -1 103 -1 -1 2 level           Convective_cloud_
 #InvMEGAN_FAXX         -1     108  -1  -1  2   kg/m2/s  Formic_acid_emission_flux_from_MEGAN_extension
 #InvMEGAN_AAXX         -1     108  -1  -1  2   kg/m2/s  Acetic_acid_emission_flux_from_MEGAN_extension
 
+# Config-driven fire inventory (Cat 5/Hier 3); inventory identity comes from
+# HEMCO_Config.rc/run provenance. Never enable multiple config inventories.
+InvConfigFire_CO CO 0 5 3 2 kg/m2/s Config_fire_CO_emission_mass_flux
+InvConfigFire_BCPI BCPI 0 5 3 2 kg/m2/s Config_fire_hydrophilic_BC_emission_mass_flux
+InvConfigFire_BCPO BCPO 0 5 3 2 kg/m2/s Config_fire_hydrophobic_BC_emission_mass_flux
+InvConfigFire_OCPI OCPI 0 5 3 2 kg/m2/s Config_fire_residual_hydrophilic_OC_emission_mass_flux
+InvConfigFire_OCPO OCPO 0 5 3 2 kg/m2/s Config_fire_residual_hydrophobic_OC_emission_mass_flux
+InvConfigFire_FSOAP FSOAP 0 5 3 2 kg/m2/s Config_fire_FSOAP_emission_mass_flux
+InvConfigFire_DBRCPOA DBRCPOA 0 5 3 2 kg/m2/s Config_fire_DBRCPOA_emission_mass_flux
+InvConfigFire_NPBRCPOA NPBRCPOA 0 5 3 2 kg/m2/s Config_fire_NPBRCPOA_emission_mass_flux
+InvConfigFire_PBRCPOA PBRCPOA 0 5 3 2 kg/m2/s Config_fire_PBRCPOA_emission_mass_flux
+
 #=============================
 # GFED Extension
 #=============================

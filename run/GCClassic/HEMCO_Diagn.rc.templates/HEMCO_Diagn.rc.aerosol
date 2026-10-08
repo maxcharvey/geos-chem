@@ -105,6 +105,18 @@ EmisOCPO_Anthro    OCPO   0      1   -1   3   kg/m2/s  OCPO_emission_flux_from_a
 EmisOCPO_BioBurn   OCPO   111    -1  -1   2   kg/m2/s  OCPO_emission_flux_from_biomass_burning
 EmisOCPO_Ship      OCPO   0      10  -1   2   kg/m2/s  OCPO_emission_flux_from_ships
 
+# Config-driven fire inventory (Cat 5/Hier 3); inventory identity comes from
+# HEMCO_Config.rc/run provenance. Never enable multiple config inventories.
+InvConfigFire_SOAP SOAP 0 5 3 2 kg/m2/s Config_fire_SOAP_emission_mass_flux
+InvConfigFire_BCPI BCPI 0 5 3 2 kg/m2/s Config_fire_hydrophilic_BC_emission_mass_flux
+InvConfigFire_BCPO BCPO 0 5 3 2 kg/m2/s Config_fire_hydrophobic_BC_emission_mass_flux
+InvConfigFire_OCPI OCPI 0 5 3 2 kg/m2/s Config_fire_residual_hydrophilic_OC_emission_mass_flux
+InvConfigFire_OCPO OCPO 0 5 3 2 kg/m2/s Config_fire_residual_hydrophobic_OC_emission_mass_flux
+InvConfigFire_FSOAP FSOAP 0 5 3 2 kg/m2/s Config_fire_FSOAP_emission_mass_flux
+InvConfigFire_DBRCPOA DBRCPOA 0 5 3 2 kg/m2/s Config_fire_DBRCPOA_emission_mass_flux
+InvConfigFire_NPBRCPOA NPBRCPOA 0 5 3 2 kg/m2/s Config_fire_NPBRCPOA_emission_mass_flux
+InvConfigFire_PBRCPOA PBRCPOA 0 5 3 2 kg/m2/s Config_fire_PBRCPOA_emission_mass_flux
+
 ###############################################################################
 #####  pFe emissions                                                      ##### 
 ###############################################################################

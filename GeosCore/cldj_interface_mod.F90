@@ -213,6 +213,7 @@ CONTAINS
 ! !REVISION HISTORY:
 !  14 Dec 2022 - E. Lundgren - initial version
 !  21 Jul 2026 - M. Harvey - Derive stratospheric aerosol slots from aerosol dimensions
+!  26 Jul 2026 - M. Harvey - Fix stratospheric aerosol source slots
 !  See https://github.com/geoschem/geos-chem for complete history
 !EOP
 !------------------------------------------------------------------------------
@@ -1000,13 +1001,13 @@ CONTAINS
              ! depth computed in GEOS-Chem is non-zero.
 
              !  SSA/LBS/STS
-             IF ( State_Chm%Phot%ODAER(I,J,L,State_Chm%Phot%IWV1000,6) > 0._fp ) THEN
+             IF ( State_Chm%Phot%ODAER(I,J,L,State_Chm%Phot%IWV1000,NRHAER+1) > 0._fp ) THEN
                 AERSP(L,I_STRAT_AER_FIRST) = State_Chm%Species(id_SO4)%Conc(I,J,L) &
                      * MW_g / AVO * BoxHt * 1e+6_fp
              ENDIF
 
              !  NAT/ice PSCs
-             IF ( State_Chm%Phot%ODAER(I,J,L,State_Chm%Phot%IWV1000,7) > 0._fp ) THEN
+             IF ( State_Chm%Phot%ODAER(I,J,L,State_Chm%Phot%IWV1000,NRHAER+2) > 0._fp ) THEN
                 AERSP(L,I_STRAT_AER_FIRST+1) = State_Chm%Species(id_SO4)%Conc(I,J,L) &
                      * MW_g / AVO * BoxHt * 1e+6_fp
              ENDIF

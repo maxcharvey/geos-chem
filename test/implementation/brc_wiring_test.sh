@@ -43,8 +43,12 @@ gfed="${hemco_root}/src/Extensions/hcox_gfed_mod.F90"
 
 # Cloud-J stratospheric aerosol fields must follow the expanded NRHAER layout.
 require "I_STRAT_AER_FIRST = 10 + NRHAER * NRH + 1" "${cldj}"
+require "State_Chm%Phot%IWV1000,NRHAER+1" "${cldj}"
+require "State_Chm%Phot%IWV1000,NRHAER+2" "${cldj}"
 require "AERSP(L,I_STRAT_AER_FIRST)" "${cldj}"
 require "AERSP(L,I_STRAT_AER_FIRST+1)" "${cldj}"
+forbid "State_Chm%Phot%IWV1000,6" "${cldj}"
+forbid "State_Chm%Phot%IWV1000,7" "${cldj}"
 forbid "AERSP(L,41)" "${cldj}"
 forbid "AERSP(L,42)" "${cldj}"
 
@@ -67,6 +71,7 @@ require "brown_carbon has duplicate hygroscopic species" "${aerosol}"
 require "brown_carbon is missing canonical aerosol bin" "${aerosol}"
 require "DO N = 1, State_Chm%nHygGrth" "${aerosol}"
 require "DO NA = 1, State_Chm%nHygGrth" "${aerosol}"
+require "IF ( NA <= State_Chm%nHygGrth ) THEN" "${aerosol}"
 
 # Cloud-J organic mode maps wet BrC to OC records and dry DBRC to OC00.
 # Dedicated mode requires identified wet, persistent, and dry BrC records.

@@ -416,6 +416,7 @@ CONTAINS
     ! Include files w/ physical constants and met values
     USE PhysConstants
     USE ErrCode_Mod
+    USE Qck_Bottom_Survey_Mod, ONLY : Qck_Bottom_Survey_Enabled
     USE State_Chm_Mod,  ONLY : ChmState
     USE State_Diag_Mod, ONLY : DgnState
     USE error_mod
@@ -560,6 +561,7 @@ CONTAINS
     REAL(fp)           :: fz    (im, jm,   km, nq)
 
     LOGICAL, SAVE      :: first = .true.
+    LOGICAL            :: qck_bottom_survey
 
     !     ----------------------------------------------------
     !     ilmt : controls various options in E-W     advection
@@ -580,6 +582,7 @@ CONTAINS
     ! Add definition of j1p and j2p for enlarge polar cap. (ccc, 11/20/08)
     j1p = 3
     j2p = jm - j1p + 1
+    qck_bottom_survey = Qck_Bottom_Survey_Enabled()
 
 #ifdef TOMAS
       !================================================================
@@ -925,7 +928,8 @@ CONTAINS
         ! ===========
           call Qckxyz                                                        &
         ! ===========
-               (dq1, j1p, j2p, 1, jm, 1, im, 1, jm, 1, im, 1, jm, 1, km     )
+               (dq1, j1p, j2p, 1, jm, 1, im, 1, jm, 1, im, 1, jm, 1, km,    &
+                iq, area_m2, qck_bottom_survey                               )
        end if
 
        q_ptr(:,:,:) =  &
@@ -1839,10 +1843,17 @@ CONTAINS
 !
   SUBROUTINE Qckxyz( dq1, J1P, J2P,  JU1_GL, J2_GL, &
                      ILO, IHI, JULO, JHI,    I1,    &
-                     I2,  JU1, J2,   K1,     K2 )
+                     I2,  JU1, J2,   K1,     K2, Species_Index, Area_M2, &
+                     Survey_Native_Behavior )
 !
 ! !INPUT PARAMETERS:
 !
+    USE Qck_Positivity_Mod, ONLY : Qck_Bottom_Conservative,                &
+                                    QCK_BOTTOM_ABSOLUTE_TOLERANCE,          &
+                                    QCK_BOTTOM_RELATIVE_TOLERANCE,          &
+                                    QCK_BOTTOM_ROUNDOFF
+    USE Qck_Bottom_Survey_Mod, ONLY : Qck_Bottom_Survey_Write
+
     ! Global latitude indices at the edges of the S/N polar caps
     ! J1P=JU1_GL+1; J2P=J2_GL-1 for a polar cap of 1 latitude band
     ! J1P=JU1_GL+2; J2P=J2_GL-2 for a polar cap of 2 latitude bands
@@ -1855,6 +1866,9 @@ CONTAINS
     INTEGER, INTENT(IN)  :: I1,     I2
     INTEGER, INTENT(IN)  :: JU1,    J2
     INTEGER, INTENT(IN)  :: K1,     K2
+    INTEGER, INTENT(IN)  :: Species_Index
+    REAL(fp), INTENT(IN) :: Area_M2(:)
+    LOGICAL, INTENT(IN)  :: Survey_Native_Behavior
 
     ! Local min & max longitude (I) and latitude (J) indices
     INTEGER, INTENT(IN)  :: ILO,    IHI
@@ -1891,6 +1905,17 @@ CONTAINS
     REAL(fp)  :: dup, qup
     REAL(fp)  :: qly
     REAL(fp)  :: sum
+    INTEGER   :: qck_bottom_status, qck_bottom_donor_count
+    REAL(fp)  :: qck_bottom_deficit, qck_bottom_available
+    REAL(fp)  :: qck_bottom_withdrawn, qck_bottom_closure
+    REAL(fp)  :: qck_bottom_tolerance
+    INTEGER   :: survey_status(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_deficit(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_available(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_shortfall(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_tolerance(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_immediate(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_column(K1:K2)
 
 
 !     ----------------
@@ -1973,10 +1998,23 @@ CONTAINS
 
     k2m1 = k2 - 1
 
+    IF ( Survey_Native_Behavior ) THEN
+       survey_status    = -1
+       survey_deficit   = 0.0_fp
+       survey_available = 0.0_fp
+       survey_shortfall = 0.0_fp
+       survey_tolerance = 0.0_fp
+       survey_immediate = 0.0_fp
+    ENDIF
+
     ! NOTE: Sum seems to be not used in the loop below!
-    !$OMP PARALLEL DO                          &
-    !$OMP DEFAULT( SHARED )                    &
-    !$OMP PRIVATE( IJ, IL, IP, QUP, QLY, DUP ) &
+    !$OMP PARALLEL DO                                               &
+    !$OMP DEFAULT( SHARED )                                         &
+    !$OMP PRIVATE( IJ, IL, IP, QUP, QLY, DUP, QCK_BOTTOM_STATUS,   &
+    !$OMP          QCK_BOTTOM_DONOR_COUNT, QCK_BOTTOM_DEFICIT,      &
+    !$OMP          QCK_BOTTOM_AVAILABLE, QCK_BOTTOM_WITHDRAWN,      &
+    !$OMP          QCK_BOTTOM_CLOSURE, QCK_BOTTOM_TOLERANCE,        &
+    !$OMP          SURVEY_COLUMN )                                  &
     !$OMP REDUCTION( +:SUM )
     do ij = j1p, j2p
        do il = i1, i2
@@ -1993,6 +2031,28 @@ CONTAINS
              qly = -dq1(il,ij,k2)
              dup = Min (qly, qup)
 
+             IF ( Survey_Native_Behavior ) THEN
+                survey_column = dq1(il,ij,k1:k2)
+                CALL Qck_Bottom_Conservative( survey_column, &
+                     QCK_BOTTOM_RELATIVE_TOLERANCE, &
+                     QCK_BOTTOM_ABSOLUTE_TOLERANCE, qck_bottom_status, &
+                     qck_bottom_deficit, qck_bottom_available, &
+                     qck_bottom_withdrawn, qck_bottom_closure, &
+                     qck_bottom_tolerance, qck_bottom_donor_count )
+                survey_status(il,ij)    = qck_bottom_status
+                survey_deficit(il,ij)   = qck_bottom_deficit
+                survey_available(il,ij) = qck_bottom_available
+                IF ( qck_bottom_status == QCK_BOTTOM_ROUNDOFF ) THEN
+                   survey_shortfall(il,ij) = qck_bottom_closure
+                ELSE
+                   survey_shortfall(il,ij) = MAX( qck_bottom_deficit - &
+                                                   qck_bottom_available, &
+                                                   0.0_fp )
+                ENDIF
+                survey_tolerance(il,ij) = qck_bottom_tolerance
+                survey_immediate(il,ij) = qup
+             ENDIF
+
              dq1(il,ij,k2m1) = qup - dup
 
 !           -------------------------
@@ -2008,6 +2068,13 @@ CONTAINS
        end do
     end do
     !$OMP END PARALLEL DO
+
+    IF ( Survey_Native_Behavior ) THEN
+       CALL Qck_Bottom_Survey_Write( Species_Index, k2, i1, j1p, Area_M2, &
+                                      survey_status, survey_deficit, &
+                                      survey_available, survey_shortfall, &
+                                      survey_tolerance, survey_immediate )
+    ENDIF
 
 ! We don't want to replace zero values by 1e-30. (ccc, 11/20/08)
 !!     =======================================

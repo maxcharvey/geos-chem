@@ -62,6 +62,8 @@ add_library(GeosCore
   pjc_pfix_window_mod.F90
   planeflight_mod.F90
   pops_mod.F90
+  qck_positivity_mod.F90
+  qck_bottom_survey_mod.F90
   RnPbBe_mod.F90
   rpmares_mod.F90
   seasalt_mod.F90

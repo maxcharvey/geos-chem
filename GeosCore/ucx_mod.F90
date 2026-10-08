@@ -3739,7 +3739,7 @@ CONTAINS
     ! and species mixing ratio with the new moisture content (ewl, 4/29/15)
     IF ( LActiveH2O .and. ( .not. SetStrat ) ) THEN
        CALL AIRQNT( Input_Opt, State_Chm, State_Grid, State_Met, &
-                    RC, Update_Mixing_Ratio=.TRUE. )
+                    RC, Update_Mixing_Ratio=.TRUE., CaptureCaller="humidity_air" )
     ENDIF
 
     ! Free pointer

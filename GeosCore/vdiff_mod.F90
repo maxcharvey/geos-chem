@@ -2213,7 +2213,8 @@ CONTAINS
     ! Update air quantities and species concentrations with updated
     ! specific humidity (ewl, 10/28/15)
     CALL AirQnt( Input_Opt, State_Chm, State_Grid,                           &
-                 State_Met, RC,        Update_Mixing_Ratio=.TRUE.           )
+                 State_Met, RC,        Update_Mixing_Ratio=.TRUE.,          &
+                 CaptureCaller="vdiff_air"                                )
 
     ! Trap potential errors
     IF ( RC /= GC_SUCCESS ) THEN

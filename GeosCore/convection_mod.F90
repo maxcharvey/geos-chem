@@ -55,6 +55,9 @@ CONTAINS
 !
 ! !USES:
 !
+! BRC RAS OBSERVER BEGIN
+    USE BRC_RAS_CAPTURE_MOD, ONLY : BRC_RAS_SNAPSHOT
+! BRC RAS OBSERVER END
     USE Diagnostics_Mod, ONLY : Compute_Budget_Diagnostics
     USE ErrCode_Mod
     USE ERROR_MOD,       ONLY : GEOS_CHEM_STOP
@@ -229,6 +232,10 @@ CONTAINS
        RETURN
     ENDIF
 
+! BRC RAS OBSERVER BEGIN
+    CALL BRC_RAS_SNAPSHOT(0,Input_Opt,State_Chm,State_Grid,State_Met,FSOL,DT)
+
+! BRC RAS OBSERVER END
     !=======================================================================
     ! Do convection column by column
     !
@@ -362,6 +369,10 @@ CONTAINS
        RETURN
     ENDIF
 
+! BRC RAS OBSERVER BEGIN
+    CALL BRC_RAS_SNAPSHOT(1,Input_Opt,State_Chm,State_Grid,State_Met,FSOL,DT)
+
+! BRC RAS OBSERVER END
     !----------------------------------------------------------
     ! Convection budget diagnostics - Part 2 of 2
     !----------------------------------------------------------
@@ -437,6 +448,9 @@ CONTAINS
 !
 ! !USES:
 !
+! BRC RAS OBSERVER BEGIN
+    USE BRC_RAS_CAPTURE_MOD, ONLY : BRC_RAS_COLUMN, BRC_RAS_TRACE, BRC_RAS_ACTIVE
+! BRC RAS OBSERVER END
     USE ErrCode_Mod
     USE ERROR_MOD,          ONLY : IT_IS_NAN
     USE ERROR_MOD,          ONLY : IT_IS_FINITE
@@ -537,6 +551,9 @@ CONTAINS
     REAL(fp)               :: F_RAIN
 #endif
 
+! BRC RAS OBSERVER BEGIN
+    LOGICAL :: ObserveBrc
+! BRC RAS OBSERVER END
     ! Strings
     CHARACTER(LEN=255)     :: ErrMsg, ThisLoc
 
@@ -685,6 +702,10 @@ CONTAINS
     ENDDO
 #endif
 
+! BRC RAS OBSERVER BEGIN
+    CALL BRC_RAS_COLUMN(I,J,CLDBASE,KTOP,NS,NDT,DNS,SDT,MB,TS_DYN,TINYNUM,BMASS,PDOWN)
+
+! BRC RAS OBSERVER END
     !========================================================================
     ! (1)  A d v e c t e d   S p e c i e s   L o o p
     !========================================================================
@@ -703,6 +724,10 @@ CONTAINS
 
        ! Also get the corresponding wetdep ID
        NW       =  SpcInfo%WetDepId
+! BRC RAS OBSERVER BEGIN
+       ObserveBrc=BRC_RAS_ACTIVE(I,J,IC)
+       IF (ObserveBrc) CALL BRC_RAS_TRACE(10,I,J,IC,NA,NW,0,0,Q,[REAL(fp) ::],0)
+! BRC RAS OBSERVER END
 
        ! Zero the DIAG14 diagnostic array
        DIAG14(:,NA) = 0.0_fp
@@ -720,6 +745,9 @@ CONTAINS
           ! Initialize
           QC     = 0e+0_fp    ! [kg species/kg dry air]
           T0_SUM = 0e+0_fp    ! [kg species/m2/timestep]
+! BRC RAS OBSERVER BEGIN
+          IF (ObserveBrc) CALL BRC_RAS_TRACE(20,I,J,IC,NA,NW,ISTEP,0,Q,[QC,T0_SUM],0)
+! BRC RAS OBSERVER END
 
           !----------------------------------------------------------
           ! B e l o w   C l o u d   B a s e   (K < CLDBASE)
@@ -775,6 +803,10 @@ CONTAINS
                 !
                 QC = ( MB*QB + CMFMC(CLDBASE-1) * Q(CLDBASE) * SDT  ) / &
                      ( MB    + CMFMC(CLDBASE-1) * SDT  )
+! BRC RAS OBSERVER BEGIN
+                IF (ObserveBrc) CALL BRC_RAS_TRACE(22,I,J,IC,NA,NW,ISTEP,CLDBASE,Q, &
+                     [QC,T0_SUM,QB_NUM,DELP_DRY_NUM,QB,MB],1)
+! BRC RAS OBSERVER END
 
                 ! Copy QC to all levels of the species array Q
                 ! that are below the cloud base level [kg/kg]
@@ -782,6 +814,10 @@ CONTAINS
              ENDIF
           ENDIF
 
+! BRC RAS OBSERVER BEGIN
+          IF (ObserveBrc) CALL BRC_RAS_TRACE(21,I,J,IC,NA,NW,ISTEP,CLDBASE,Q,[QC,T0_SUM],0)
+
+! BRC RAS OBSERVER END
           !==================================================================
           ! (3)  A b o v e   C l o u d   B a s e
           !==================================================================
@@ -997,11 +1033,19 @@ CONTAINS
                 TSUM    = T1 + T2 + T3 + T4
 
                 DELQ    = ( SDT / BMASS(K) ) * TSUM    ! change in [kg/kg]
+! BRC RAS OBSERVER BEGIN
+                IF (ObserveBrc) CALL BRC_RAS_TRACE(30,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,CMFMC_BELOW,CMOUT,ENTRN,ALPHA,ALPHA2,QC_PRES,QC_SCAV, &
+                     T0,T1,T2,T3,T4,TSUM,DELQ],1)
+! BRC RAS OBSERVER END
 
                 ! If DELQ > Q then do not make Q negative!!!
                 IF ( Q(K) + DELQ < 0 ) THEN
                    DELQ = -Q(K)
                 ENDIF
+! BRC RAS OBSERVER BEGIN
+                IF (ObserveBrc) CALL BRC_RAS_TRACE(31,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,CMFMC_BELOW,CMOUT,ENTRN,ALPHA,ALPHA2,QC_PRES,QC_SCAV, &
+                     T0,T1,T2,T3,T4,TSUM,DELQ],1)
+! BRC RAS OBSERVER END
 
                 ! Increment the species array [kg/kg]
                 Q(K) = Q(K) + DELQ
@@ -1095,17 +1139,29 @@ CONTAINS
 
                    ! Change in species concentration [kg/kg]
                    DELQ = ( SDT / BMASS(K) ) * (T2 + T3)
+! BRC RAS OBSERVER BEGIN
+                   IF (ObserveBrc) CALL BRC_RAS_TRACE(30,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,CMFMC_BELOW,CMOUT,ENTRN,ALPHA,ALPHA2,QC_PRES,QC_SCAV, &
+                     T0,T1,T2,T3,T4,TSUM,DELQ],2)
+! BRC RAS OBSERVER END
 
                    ! If DELQ > Q then do not make Q negative!!!
                    IF ( Q(K) + DELQ < 0.0e+0_fp ) THEN
                       DELQ = -Q(K)
                    ENDIF
+! BRC RAS OBSERVER BEGIN
+                   IF (ObserveBrc) CALL BRC_RAS_TRACE(31,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,CMFMC_BELOW,CMOUT,ENTRN,ALPHA,ALPHA2,QC_PRES,QC_SCAV, &
+                     T0,T1,T2,T3,T4,TSUM,DELQ],2)
+! BRC RAS OBSERVER END
 
                    ! Add change in species to Q array [kg/kg]
                    Q(K) = Q(K) + DELQ
 
                 ENDIF
              ENDIF
+! BRC RAS OBSERVER BEGIN
+             IF (ObserveBrc) CALL BRC_RAS_TRACE(32,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,CMFMC_BELOW,CMOUT,ENTRN,ALPHA,ALPHA2,QC_PRES,QC_SCAV, &
+                     T0,T1,T2,T3,T4,TSUM,DELQ],0)
+! BRC RAS OBSERVER END
           ENDDO     ! End of loop over levels above cloud base
 
           !==================================================================
@@ -1127,6 +1183,9 @@ CONTAINS
                 MASS_WASH   = 0e+0_fp
                 MASS_NOWASH = 0e+0_fp
                 AER         = .TRUE.
+! BRC RAS OBSERVER BEGIN
+                IF (ObserveBrc) CALL BRC_RAS_TRACE(40,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,WASHFRAC,ALPHA,ALPHA2,GAINED,WETLOSS,LOST,MASS_WASH,MASS_NOWASH,F_WASHOUT],MERGE(1,0,AER))
+! BRC RAS OBSERVER END
 
                 ! Check if...
                 ! there is precip coming into box (I,J,K) from (I,J,K+1)
@@ -1244,6 +1303,9 @@ CONTAINS
 
                       ! Update species concentration (V. Shah, mps, 5/20/15)
                       ! [kg/kg]
+! BRC RAS OBSERVER BEGIN
+                      IF (ObserveBrc) CALL BRC_RAS_TRACE(41,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,WASHFRAC,ALPHA,ALPHA2,GAINED,WETLOSS,LOST,MASS_WASH,MASS_NOWASH,F_WASHOUT],MERGE(1,0,AER))
+! BRC RAS OBSERVER END
                       Q(K) = Q(K) - WETLOSS / BMASS(K)
 
                       ! Update T0_SUM, the total amount of scavenged
@@ -1282,6 +1344,9 @@ CONTAINS
                       ! originally in the non-precipitating fraction
                       ! of the box, plus MASS_WASH, less WETLOSS.
                       ! [kg/kg]
+! BRC RAS OBSERVER BEGIN
+                      IF (ObserveBrc) CALL BRC_RAS_TRACE(41,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,WASHFRAC,ALPHA,ALPHA2,GAINED,WETLOSS,LOST,MASS_WASH,MASS_NOWASH,F_WASHOUT],MERGE(1,0,AER))
+! BRC RAS OBSERVER END
                       Q(K) = Q(K) - WETLOSS / BMASS(K)
 
                       ! Update T0_SUM, the total scavenged species
@@ -1334,6 +1399,9 @@ CONTAINS
                    ENDIF
 #endif
                 ENDIF
+! BRC RAS OBSERVER BEGIN
+                IF (ObserveBrc) CALL BRC_RAS_TRACE(42,I,J,IC,NA,NW,ISTEP,K,Q,[QC,T0_SUM,WASHFRAC,ALPHA,ALPHA2,GAINED,WETLOSS,LOST,MASS_WASH,MASS_NOWASH,F_WASHOUT],MERGE(1,0,AER))
+! BRC RAS OBSERVER END
              ENDDO     ! End of loop over levels below cloud base
           ENDIF        ! End if for NW > 0
 
@@ -1377,8 +1445,15 @@ CONTAINS
                                        State_Met, State_Chm, State_Diag )
              ENDIF
           ENDIF
+! BRC RAS OBSERVER BEGIN
+          IF (ObserveBrc) CALL BRC_RAS_TRACE(50,I,J,IC,NA,NW,ISTEP,0,Q,[QC,T0_SUM],0)
+! BRC RAS OBSERVER END
        ENDDO               ! End internal timestep loop
 
+! BRC RAS OBSERVER BEGIN
+       IF (ObserveBrc) CALL BRC_RAS_TRACE(11,I,J,IC,NA,NW,0,0,Q,[REAL(fp) ::],0)
+
+! BRC RAS OBSERVER END
        ! Free pointers
        Q       => NULL()
        SpcInfo => NULL()

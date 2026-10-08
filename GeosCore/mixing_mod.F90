@@ -217,6 +217,12 @@ CONTAINS
     USE State_Grid_Mod,       ONLY : GrdState
     USE State_Met_Mod,        ONLY : MetState
     USE TIME_MOD,             ONLY : GET_TS_DYN, GET_TS_CONV, GET_TS_CHEM
+    ! BRC_TEND_OBSERVER_BEGIN
+    USE BRC_TEND_CAPTURE_MOD, ONLY : BRC_TEND_SNAPSHOT, BRC_TEND_SPECIES, &
+         BRC_TEND_COLUMN, BRC_TEND_CELL_BEGIN, BRC_TEND_CELL_END, &
+         BRC_TEND_DEP_BASE, BRC_TEND_DEP_INPUT, BRC_TEND_DEP_APPLIED, &
+         BRC_TEND_EM_INPUT, BRC_TEND_EM_APPLIED
+    ! BRC_TEND_OBSERVER_END
     USE Timers_Mod,           ONLY : Timer_End, Timer_Start
     USE UnitConv_Mod
 #ifdef MODEL_CLASSIC
@@ -295,6 +301,11 @@ CONTAINS
     ThisLoc = ' -> at DO_TEND (in module GeosCore/mixing_mod.F90)'
 
     ! Special case that there is no dry deposition and emissions
+    ! BRC_TEND_OBSERVER_BEGIN
+    CALL BRC_TEND_SNAPSHOT(0,Input_Opt,State_Chm,State_Grid,State_Met,OnlyAbovePBL,DT=DT)
+    IF (.NOT. Input_Opt%LDRYD .AND. .NOT. Input_Opt%DoEmissions) &
+         CALL BRC_TEND_SNAPSHOT(3,Input_Opt,State_Chm,State_Grid,State_Met,OnlyAbovePBL,DT=DT)
+    ! BRC_TEND_OBSERVER_END
     IF ( .NOT. Input_Opt%LDRYD .AND. .NOT. Input_Opt%DoEmissions ) RETURN
 
     ! Initialize
@@ -415,6 +426,10 @@ CONTAINS
     endif
 #endif
 
+    ! BRC_TEND_OBSERVER_BEGIN
+    CALL BRC_TEND_SNAPSHOT(1,Input_Opt,State_Chm,State_Grid,State_Met, &
+         OnlyAbovePBL,DT=DT,NativeTS=TS,Previous=previous_units)
+    ! BRC_TEND_OBSERVER_END
     ! First-time setup
     IF ( FIRST ) THEN
 
@@ -580,6 +595,9 @@ CONTAINS
        ! Can go to next species if this species does not have
        ! dry deposition and/or emissions
        !--------------------------------------------------------------------
+    ! BRC_TEND_OBSERVER_BEGIN
+       CALL BRC_TEND_SPECIES(N,DryDepId,DryDepSpec,EmisSpec,ChemGridOnly)
+    ! BRC_TEND_OBSERVER_END
        IF ( .NOT. DryDepSpec .AND. .NOT. EmisSpec ) CYCLE
 
 !$OMP PARALLEL DO                                                           &
@@ -628,12 +646,18 @@ CONTAINS
 
           ! L2 is the upper level index to loop over
           L2 = MAX(DRYD_TOP, EMIS_TOP)
+    ! BRC_TEND_OBSERVER_BEGIN
+          CALL BRC_TEND_COLUMN(N,I,J,PBL_TOP,L1,DRYD_TOP,EMIS_TOP,L2)
+    ! BRC_TEND_OBSERVER_END
 
           ! This should not happen:
           IF ( L2 < L1 ) CYCLE
 
           ! Loop over selected vertical levels
           DO L = L1, L2
+    ! BRC_TEND_OBSERVER_BEGIN
+             CALL BRC_TEND_CELL_BEGIN(N,I,J,L,State_Chm%Species(N)%Conc(I,J,L))
+    ! BRC_TEND_OBSERVER_END
 
              !--------------------------------------------------------------
              ! Apply dry deposition frequencies to all levels below the
@@ -654,6 +678,9 @@ CONTAINS
                 ! dry deposition frequencies for air-sea exchange and
                 ! from ship NOx plume parameterization (PARANOx). The
                 ! units are [s-1].
+    ! BRC_TEND_OBSERVER_BEGIN
+                CALL BRC_TEND_DEP_BASE(N,I,J,L,FRQ)
+    ! BRC_TEND_OBSERVER_END
                 CALL GetHcoValDep ( Input_Opt, State_Grid, N, I, J, 1, FND, TMP )
 
                 ! Add to dry dep frequency from drydep_mod.F90
@@ -672,6 +699,13 @@ CONTAINS
                 ENDIF
 
                 ! Apply dry deposition
+    ! BRC_TEND_OBSERVER_BEGIN
+                IF (FND) THEN
+                   CALL BRC_TEND_DEP_INPUT(N,I,J,L,FRQ,PNOXLOSS,FND,TMP)
+                ELSE
+                   CALL BRC_TEND_DEP_INPUT(N,I,J,L,FRQ,PNOXLOSS,FND)
+                ENDIF
+    ! BRC_TEND_OBSERVER_END
                 IF ( FRQ > 0.0_fp .OR. PNOXLOSS > 0.0_fp ) THEN
 
                    ! Compute exponential loss term
@@ -708,6 +742,10 @@ CONTAINS
                    !   FLUX = FLUX / MWkg * AVO / TS / ( AREA_M2 * 1.0e4_fp ) ]
                    ! so the denominator as we had it was wrong.
                    ! Now corrected (elundgren, bmy, 6/12/15)
+    ! BRC_TEND_OBSERVER_BEGIN
+                   CALL BRC_TEND_DEP_APPLIED(N,I,J,L,RKT,FRAC,FLUX, &
+                        State_Chm%Species(N)%Conc(I,J,L))
+    ! BRC_TEND_OBSERVER_END
                    DENOM = ( MWkg * TS * 1.0e+4_fp ) / AVO
                    FLUX  = SAFE_DIV( FLUX, DENOM, 0.0e+0_fp )  ! molec/cm2/s
 
@@ -758,6 +796,13 @@ CONTAINS
                 ENDIF
 #endif
 
+    ! BRC_TEND_OBSERVER_BEGIN
+                IF (FND) THEN
+                   CALL BRC_TEND_EM_INPUT(N,I,J,L,FND,TMP)
+                ELSE
+                   CALL BRC_TEND_EM_INPUT(N,I,J,L,FND)
+                ENDIF
+    ! BRC_TEND_OBSERVER_END
                 ! Add emissions (if any)
                 ! Bug fix: allow negative fluxes. (ckeller, 4/12/17)
                 !IF ( FND .AND. (TMP > 0.0_fp) ) THEN
@@ -765,6 +810,9 @@ CONTAINS
 
                    ! Flux: [kg/m2] = [kg m-2 s-1 ] x [s]
                    FLUX = TMP * TS
+    ! BRC_TEND_OBSERVER_BEGIN
+                   CALL BRC_TEND_EM_APPLIED(N,I,J,L,FLUX)
+    ! BRC_TEND_OBSERVER_END
 #ifdef ADJOINT
                    IF ( I .eq. Input_Opt%IFD .and. J .eq. Input_Opt%JFD .and. &
                         L .eq. Input_Opt%LFD .and. N .eq. Input_Opt%NFD) THEN
@@ -781,6 +829,9 @@ CONTAINS
                 ENDIF
              ENDIF
 
+    ! BRC_TEND_OBSERVER_BEGIN
+             CALL BRC_TEND_CELL_END(N,I,J,L,State_Chm%Species(N)%Conc(I,J,L))
+    ! BRC_TEND_OBSERVER_END
              ! Check for negative concentrations
              IF ( State_Chm%Species(N)%Conc(I,J,L) < 0.0_fp ) THEN
 #ifdef TOMAS
@@ -819,6 +870,10 @@ CONTAINS
        SpcInfo  => NULL()
 
     ENDDO !N
+    ! BRC_TEND_OBSERVER_BEGIN
+    CALL BRC_TEND_SNAPSHOT(2,Input_Opt,State_Chm,State_Grid,State_Met, &
+         OnlyAbovePBL,DT=DT,NativeTS=TS)
+    ! BRC_TEND_OBSERVER_END
 
 #if defined( ADJOINT )  && defined ( DEBUG )
     IF (Input_Opt%is_adjoint .and. Input_Opt%IS_FD_SPOT_THIS_PET) THEN
@@ -851,6 +906,10 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
+    ! BRC_TEND_OBSERVER_BEGIN
+    CALL BRC_TEND_SNAPSHOT(3,Input_Opt,State_Chm,State_Grid,State_Met, &
+         OnlyAbovePBL,DT=DT,NativeTS=TS,Previous=previous_units)
+    ! BRC_TEND_OBSERVER_END
 
     ! Start mixing timer again
     IF ( Input_Opt%useTimers ) THEN

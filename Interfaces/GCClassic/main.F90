@@ -43,6 +43,8 @@ PROGRAM GEOS_Chem
   USE Print_Mod             ! For verbose printing
   USE State_Chm_Mod         ! Derived type for Chemistry State object
   USE BRC_ORIGIN_MOD, ONLY: BRC_ORIGIN_AUDIT
+  USE BRC_EVENT_CAPTURE_MOD, ONLY: BRC_EVENT_CAPTURE
+  USE BRC_NATIVE_OPERAND_CAPTURE_MOD, ONLY: BRC_NATIVE_OPERAND_CAPTURE
   USE State_Diag_Mod        ! Derived type for Diagnostics State object
   USE State_Grid_Mod        ! Derived type for Grid State object
   USE State_Met_Mod         ! Derived type for Meteorology State object
@@ -846,6 +848,9 @@ PROGRAM GEOS_Chem
        YEAR          = GET_YEAR()
        ELAPSED_TODAY = ( HOUR * 3600 ) + ( MINUTE * 60 ) + SECOND
 
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('step_begin', &
+            .TRUE.,Input_Opt,State_Chm,State_Grid,State_Met)
+
        IF ( VerboseAndRoot ) THEN
           CALL Debug_Msg( '### MAIN: a SET_CURRENT_TIME' )
        ENDIF
@@ -887,6 +892,7 @@ PROGRAM GEOS_Chem
           ! dynamic timestep as the unit used in GCHP/GEOS GEOS-Chem Run
           ! method.  Skip this for dry-run simulations.
           !------------------------------------------------------------------
+          CALL BRC_EVENT_CAPTURE('before_units_drykg',.TRUE.,Input_Opt,State_Chm,State_Grid,State_Met)
           CALL Convert_Spc_Units(                                            &
                Input_Opt      = Input_Opt,                                   &
                State_Chm      = State_Chm,                                   &
@@ -895,6 +901,7 @@ PROGRAM GEOS_Chem
                new_units      = KG_SPECIES_PER_KG_DRY_AIR,                   &
                previous_units = previous_units,                              &
                RC             = RC                                          )
+          CALL BRC_EVENT_CAPTURE('after_units_drykg',.TRUE.,Input_Opt,State_Chm,State_Grid,State_Met)
 
        ENDIF
 
@@ -1026,7 +1033,8 @@ PROGRAM GEOS_Chem
           IF ( Input_Opt%LTRAN ) THEN
              ! No need to update mixing ratios if advection is on
              ! since floating pressure will not change until advection
-             CALL AirQnt( Input_Opt, State_Chm, State_Grid, State_Met, RC )
+             CALL AirQnt( Input_Opt, State_Chm, State_Grid, State_Met, RC, &
+                  CaptureCaller="main_transport_air" )
           ELSE
              ! If advection is off then (1) update the floating pressures now
              ! (PFLT_DRY/WET) to the time-interpolated met pressures computed
@@ -1039,7 +1047,7 @@ PROGRAM GEOS_Chem
              ENDIF
 
              CALL AirQnt( Input_Opt, State_Chm, State_Grid, State_Met, &
-                  RC, Update_Mixing_Ratio=.TRUE. )
+                  RC, Update_Mixing_Ratio=.TRUE., CaptureCaller="main_no_transport_air" )
           ENDIF
           IF ( RC /= GC_SUCCESS ) THEN
              ErrMsg = 'Error encountered in "AirQnt"!'
@@ -1117,6 +1125,9 @@ PROGRAM GEOS_Chem
        !=====================================================================
        !                  ***** T R A N S P O R T *****
        !=====================================================================
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_transport', &
+            Input_Opt%LTRAN .AND. ITS_TIME_FOR_DYN(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        IF ( ITS_TIME_FOR_DYN() .and. notDryRun ) THEN
 
           IF ( Input_Opt%useTimers ) THEN
@@ -1214,6 +1225,9 @@ PROGRAM GEOS_Chem
 
        ENDIF
 
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('after_transport', &
+            Input_Opt%LTRAN .AND. ITS_TIME_FOR_DYN(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        ! Update clock tracer (skip if running in dry-run mode)
        IF ( notDryRun .and. id_CLOCK > 0 ) THEN
           CALL Set_Clock_Tracer( State_Chm, State_Grid )
@@ -1281,6 +1295,9 @@ PROGRAM GEOS_Chem
        ! Emissions are ALWAYS done, even in dry-run mode. This is
        ! raison d'etre for --dry-run (hplin, 11/1/19)
        !---------------------------------------------------------------------
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_emissions', &
+            ITS_TIME_FOR_EMIS(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        IF ( ITS_TIME_FOR_EMIS() ) THEN
 
           !==================================================================
@@ -1349,6 +1366,9 @@ PROGRAM GEOS_Chem
           ENDIF
        ENDIF
 
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('after_emissions', &
+            ITS_TIME_FOR_EMIS(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        ! Also prescribe methane surface concentrations throughout PBL
        ! (currently done outside emissions)
        IF ( Input_Opt%ITS_A_FULLCHEM_SIM   .and.                             &
@@ -1373,6 +1393,9 @@ PROGRAM GEOS_Chem
        !---------------------------------------------------------------------
        ! Test for convection timestep
        !---------------------------------------------------------------------
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_surface_flux', &
+            ITS_TIME_FOR_CONV() .AND. Input_Opt%LTURB .AND. Input_Opt%LNLPBL,Input_Opt,State_Chm,State_Grid,State_Met)
+
        IF ( ITS_TIME_FOR_CONV() .and. notDryRun ) THEN
 
           !==================================================================
@@ -1427,6 +1450,9 @@ PROGRAM GEOS_Chem
 
           ENDIF
 
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_mixing', &
+            ITS_TIME_FOR_CONV(),Input_Opt,State_Chm,State_Grid,State_Met)
+
           ! Note: mixing routine expects tracers in v/v
           ! DO_MIXING applies the tracer tendencies (dry deposition,
           ! emission rates) to the tracer arrays and performs PBL
@@ -1441,6 +1467,9 @@ PROGRAM GEOS_Chem
           IF (RC /= GC_SUCCESS) CALL Error_Stop('Error in Do_Mixing before origin audit',ThisLoc)
           CALL BRC_ORIGIN_AUDIT('mixing',Input_Opt,State_Chm,State_Grid,State_Met,RC)
           IF (RC /= GC_SUCCESS) CALL Error_Stop('BrC origin audit failure',ThisLoc)
+
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('after_mixing', &
+            ITS_TIME_FOR_CONV(),Input_Opt,State_Chm,State_Grid,State_Met)
 
           ! Trap potential errors
           IF ( RC /= GC_SUCCESS ) THEN
@@ -1457,6 +1486,9 @@ PROGRAM GEOS_Chem
           !==================================================================
           !           ***** C L O U D   C O N V E C T I O N *****
           !==================================================================
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_convection', &
+            Input_Opt%LCONV .AND. ITS_TIME_FOR_CONV(),Input_Opt,State_Chm,State_Grid,State_Met)
+
           IF ( Input_Opt%LCONV ) THEN
              IF ( Input_Opt%useTimers ) THEN
                 CALL Timer_Start( "Convection", RC )
@@ -1484,11 +1516,23 @@ PROGRAM GEOS_Chem
              ENDIF
           ENDIF
 
+       ELSE
+          IF (notDryRun) THEN
+             CALL BRC_EVENT_CAPTURE('before_mixing',.FALSE.,Input_Opt,State_Chm,State_Grid,State_Met)
+             CALL BRC_EVENT_CAPTURE('after_mixing',.FALSE.,Input_Opt,State_Chm,State_Grid,State_Met)
+             CALL BRC_EVENT_CAPTURE('before_convection',.FALSE.,Input_Opt,State_Chm,State_Grid,State_Met)
+          ENDIF
        ENDIF
+
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('after_convection', &
+            Input_Opt%LCONV .AND. ITS_TIME_FOR_CONV(),Input_Opt,State_Chm,State_Grid,State_Met)
 
        !=====================================================================
        !                  ***** C H E M I S T R Y *****
        !=====================================================================
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_chemistry', &
+            ITS_TIME_FOR_CHEM(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        IF ( notDryRun ) THEN
           IF ( Input_Opt%useTimers ) THEN
              CALL Timer_Start( "All chemistry", RC )
@@ -1542,9 +1586,15 @@ PROGRAM GEOS_Chem
           ENDIF
        ENDIF
 
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('after_chemistry', &
+            ITS_TIME_FOR_CHEM(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        !=====================================================================
        !    ***** W E T   D E P O S I T I O N  (rainout + washout) *****
        !=====================================================================
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('before_wetdep', &
+            Input_Opt%LWETD .AND. ITS_TIME_FOR_DYN(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        IF ( Input_Opt%LWETD .and. ITS_TIME_FOR_DYN() .and. notDryRun ) THEN
 
           IF ( Input_Opt%useTimers ) THEN
@@ -1570,6 +1620,9 @@ PROGRAM GEOS_Chem
 
        ENDIF
 
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('after_wetdep', &
+            Input_Opt%LWETD .AND. ITS_TIME_FOR_DYN(),Input_Opt,State_Chm,State_Grid,State_Met)
+
        !=====================================================================
        !         ***** U P D A T E   O P T I C A L   D E P T H *****
        !=====================================================================
@@ -1584,6 +1637,8 @@ PROGRAM GEOS_Chem
           ! in the Radiation Menu. This must be done before the call to any
           ! diagnostic and only on a chemistry timestep.
           ! (skim, 02/05/11)
+          CALL BRC_NATIVE_OPERAND_CAPTURE(3,1,"recompute_od",Input_Opt,State_Chm, &
+               State_Grid,State_Met,State_Chm%Map_Advect,Applied=.TRUE.)
           CALL Recompute_OD( Input_Opt,  State_Chm, State_Diag, &
                              State_Grid, State_Met, RC )
 
@@ -1592,6 +1647,8 @@ PROGRAM GEOS_Chem
              ErrMsg = 'Error encountered in "Recompute_OD"!'
              CALL Error_Stop( ErrMsg, ThisLoc )
           ENDIF
+          CALL BRC_NATIVE_OPERAND_CAPTURE(3,2,"recompute_od",Input_Opt,State_Chm, &
+               State_Grid,State_Met,State_Chm%Map_Advect,Applied=.TRUE.)
 
           IF ( Input_Opt%useTimers ) THEN
              CALL Timer_End( "All chemistry",       RC )
@@ -1777,6 +1834,7 @@ PROGRAM GEOS_Chem
           ! every timestep is required for bit-for-bit reproducibility when
           ! breaking up runs in time.
           !------------------------------------------------------------------
+          CALL BRC_EVENT_CAPTURE('before_units_restore',.TRUE.,Input_Opt,State_Chm,State_Grid,State_Met)
           CALL Convert_Spc_Units(                                            &
                Input_Opt  = Input_Opt,                                       &
                State_Chm  = State_Chm,                                       &
@@ -1789,6 +1847,7 @@ PROGRAM GEOS_Chem
           IF ( Input_Opt%useTimers ) THEN
              CALL Timer_Start( "Diagnostics", RC )
           ENDIF
+          CALL BRC_EVENT_CAPTURE('after_units_restore',.TRUE.,Input_Opt,State_Chm,State_Grid,State_Met)
 
           ! Set diagnostics arrays in State_Diag that are in mol/mol
           CALL Set_SpcConc_Diags_VVDry( Input_Opt,  State_Chm, State_Diag,   &
@@ -2006,6 +2065,9 @@ PROGRAM GEOS_Chem
              CALL Timer_End( "Diagnostics", RC )
           ENDIF
        ENDIF
+
+       IF (notDryRun) CALL BRC_EVENT_CAPTURE('step_end', &
+            .TRUE.,Input_Opt,State_Chm,State_Grid,State_Met)
 
        !=====================================================================
        !     ***** E N D   O F   D Y N A M I C   T I M E S T E P *****

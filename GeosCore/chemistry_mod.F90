@@ -15,6 +15,7 @@ MODULE Chemistry_Mod
 !
 ! !USES:
 !
+  USE BRC_CHEM_UNITS_CAPTURE_MOD, ONLY: BRC_CHEM_UNITS_CAPTURE
   USE Precision_Mod    ! For GEOS-Chem Precision (fp)
   USE Timers_Mod       ! For GEOS-Chem timers (optional)
 
@@ -211,6 +212,7 @@ CONTAINS
     ENDIF
 
     ! Convert units from mol/mol dry to kg
+    CALL BRC_CHEM_UNITS_CAPTURE('chem_to_kg',1,KG_SPECIES,Input_Opt,State_Chm,State_Grid,State_Met)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt      = Input_Opt,                                         &
          State_Chm      = State_Chm,                                         &
@@ -226,6 +228,7 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
+    CALL BRC_CHEM_UNITS_CAPTURE('chem_to_kg',2,KG_SPECIES,Input_Opt,State_Chm,State_Grid,State_Met,PreviousUnits=previous_units)
 
     ! Start "All chemistry" timer again
     IF ( Input_Opt%useTimers ) THEN
@@ -1038,6 +1041,7 @@ CONTAINS
     ENDIF
 
     ! Convert units
+    CALL BRC_CHEM_UNITS_CAPTURE('chem_restore',1,previous_units,Input_Opt,State_Chm,State_Grid,State_Met)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt  = Input_Opt,                                             &
          State_Chm  = State_Chm,                                             &
@@ -1052,6 +1056,7 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
+    CALL BRC_CHEM_UNITS_CAPTURE('chem_restore',2,previous_units,Input_Opt,State_Chm,State_Grid,State_Met)
 
     ! Start "All chemistry" timer again
     IF ( Input_Opt%useTimers ) THEN

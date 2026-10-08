@@ -44,6 +44,8 @@ MODULE BRC_MOD
   USE Precision_Mod    ! For GEOS-Chem Precision (fp)
   USE State_Chm_Mod, ONLY: Ind_
   USE BRC_ORIGIN_MOD, ONLY: BRC_ORIGIN_BIND, BRC_ORIGIN_TRANSFER
+  USE BRC_CHEM_CAPTURE_MOD, ONLY: BRC_CHEM_SNAPSHOT, &
+       BRC_CHEM_CELL_BEFORE, BRC_CHEM_CELL_AFTER
 
   IMPLICIT NONE
   PRIVATE
@@ -659,12 +661,21 @@ CONTAINS
       FIRST = .FALSE.
    ENDIF
 
+   CALL BRC_CHEM_SNAPSHOT(0,1,.TRUE.,0,0, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
+
    !-----------------------------------------------------------------
    ! Step 0 (optional): FSOAP -> FSOAS  (gas-to-particle, tau ~ 1 d)
    !   Only runs if FSOAP is defined in the simulation.
    !   If FSOAP is not defined, FSOAS receives mass from direct
    !   emissions only (backward-compatible).
    !-----------------------------------------------------------------
+   CALL BRC_CHEM_SNAPSHOT(1,1,id_FSOAP > 0,id_FSOAP,id_FSOAS, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
    IF ( id_FSOAP > 0 ) THEN
 
       CALL CHEM_FSOAP( Input_Opt,  State_Chm, State_Diag, &
@@ -682,10 +693,19 @@ CONTAINS
 
    ENDIF
 
+   CALL BRC_CHEM_SNAPSHOT(1,2,id_FSOAP > 0,id_FSOAP,id_FSOAS, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
+
    !-----------------------------------------------------------------
    ! Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 1 day)
    !   Also receives condensed mass from FSOAP (if present)
    !-----------------------------------------------------------------
+   CALL BRC_CHEM_SNAPSHOT(2,1,.TRUE.,id_FSOAS,id_BRCSOA, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
    CALL CHEM_FSOAS( Input_Opt,  State_Chm, State_Diag, &
                     State_Grid, id_FSOAS,  RC          )
 
@@ -695,6 +715,11 @@ CONTAINS
       RETURN
    ENDIF
 
+   CALL BRC_CHEM_SNAPSHOT(2,2,.TRUE.,id_FSOAS,id_BRCSOA, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
+
    IF ( Input_Opt%Verbose ) THEN
       CALL DEBUG_MSG( '### CHEMBRC: after CHEM_FSOAS' )
    ENDIF
@@ -703,6 +728,10 @@ CONTAINS
    ! Step 2: Add darkened mass to BRCSOA, then bleach BRCSOA -> WTC
    !         Bleaching rate depends on local T and RH
    !-----------------------------------------------------------------
+   CALL BRC_CHEM_SNAPSHOT(3,1,.TRUE.,id_BRCSOA,id_WTC, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
    CALL CHEM_BRCSOA( Input_Opt,  State_Chm, State_Diag,  &
                      State_Grid, State_Met, id_BRCSOA, RC )
 
@@ -711,6 +740,11 @@ CONTAINS
       CALL GC_Error( ErrMsg, RC, ThisLoc )
       RETURN
    ENDIF
+
+   CALL BRC_CHEM_SNAPSHOT(3,2,.TRUE.,id_BRCSOA,id_WTC, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
 
    IF ( Input_Opt%Verbose ) THEN
       CALL DEBUG_MSG( '### CHEMBRC: after CHEM_BRCSOA' )
@@ -722,6 +756,10 @@ CONTAINS
    !   Schnitzler et al. (2022) parameterisation as BRCSOA.
    !   Only runs if NPBRCPOA is defined in the simulation.
    !-----------------------------------------------------------------
+   CALL BRC_CHEM_SNAPSHOT(4,1,id_NPBRCPOA > 0,id_NPBRCPOA,id_WTC, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
    IF ( id_NPBRCPOA > 0 ) THEN
 
       CALL CHEM_NPBRCPOA( Input_Opt,  State_Chm, State_Diag,  &
@@ -739,6 +777,11 @@ CONTAINS
 
    ENDIF
 
+   CALL BRC_CHEM_SNAPSHOT(4,2,id_NPBRCPOA > 0,id_NPBRCPOA,id_WTC, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
+
    ! PBRCPOA is a persistent primary BrC-POA tracer.  It receives the
    ! Forrister-style persistent emission fraction in HEMCO and is not
    ! bleached here.
@@ -755,6 +798,10 @@ CONTAINS
          'NPBRC2WTC=',   SUM( NPBRC_CONV  )
    ENDIF
 
+   CALL BRC_CHEM_SNAPSHOT(5,1,.TRUE.,id_WTC,id_WTC, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
    CALL CHEM_WTC( Input_Opt,  State_Chm, State_Diag, &
                   State_Grid, id_WTC,    RC          )
 
@@ -764,11 +811,20 @@ CONTAINS
       RETURN
    ENDIF
 
+   CALL BRC_CHEM_SNAPSHOT(5,2,.TRUE.,id_WTC,id_WTC, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
+
    IF ( Input_Opt%Verbose ) THEN
       CALL DEBUG_MSG( '### CHEMBRC: after CHEM_WTC' )
    ENDIF
 
    !-----------------------------------------------------------------
+   CALL BRC_CHEM_SNAPSHOT(0,2,.TRUE.,0,0, &
+        Input_Opt,State_Chm,State_Grid,SMALLNUM,OMOC_BBOA, &
+        FSOAP_CONV,FSOAS_CONV,BRCSOA_CONV,NPBRC_CONV)
+
    ! BrC-family carbon-mass diagnostics.  FSOAS is transported as OM, so
    ! convert it to carbon with OMOC_BBOA before combining it with the
    ! carbon-mass BrC tracers.  "Abs" follows the RRTMG BRC label:
@@ -1097,6 +1153,9 @@ CONTAINS
       RKT  = ( KFSOAP + FREQ ) * DTCHEM
       CNEW = TC0 * EXP( -RKT )
 
+      CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.TRUE., &
+           KFSOAP,FREQ,RKT)
+
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
@@ -1110,6 +1169,8 @@ CONTAINS
       ENDIF
 
       ! Store new concentration back into species array
+      CALL BRC_CHEM_CELL_AFTER(I,J,L,CNEW,FSOAP_CONV(I,J,L), &
+           1.0_fp,0.0_fp)
       CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
                                TC0,CNEW,1.0_fp)
       TC(I,J,L) = CNEW
@@ -1234,6 +1295,9 @@ CONTAINS
       RKT  = ( KFSOAS + FREQ ) * DTCHEM
       CNEW = TC0 * EXP( -RKT )
 
+      CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.TRUE., &
+           KFSOAS,FREQ,RKT)
+
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
@@ -1247,6 +1311,8 @@ CONTAINS
       ENDIF
 
       ! Store new concentration back into species array
+      CALL BRC_CHEM_CELL_AFTER(I,J,L,CNEW,FSOAS_CONV(I,J,L), &
+           1.0_fp / OMOC_BBOA,FSOAP_CONV(I,J,L))
       CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
                                TC0,CNEW,1.0_fp / OMOC_BBOA)
       TC(I,J,L) = CNEW
@@ -1524,6 +1590,9 @@ CONTAINS
          RKT  = ( KBRCSOA_LOCAL + FREQ ) * DTCHEM
          CNEW = TC0 * EXP( -RKT )
 
+         CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.TRUE., &
+              KBRCSOA_LOCAL,FREQ,RKT)
+
          ! Prevent underflow condition
          IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
@@ -1533,6 +1602,8 @@ CONTAINS
                              / ( KBRCSOA_LOCAL + FREQ )
       ELSE
          CNEW = TC0
+         CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.FALSE., &
+              KBRCSOA_LOCAL,FREQ)
          BRCSOA_CONV(I,J,L) = 0.0_fp
       ENDIF
 
@@ -1542,6 +1613,8 @@ CONTAINS
       ENDIF
 
       ! Store updated BRCSOA back into species array [kg]
+      CALL BRC_CHEM_CELL_AFTER(I,J,L,CNEW,BRCSOA_CONV(I,J,L), &
+           1.0_fp,CCV)
       CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
                                TC0,CNEW,1.0_fp)
       TC(I,J,L) = CNEW
@@ -1761,6 +1834,9 @@ CONTAINS
          RKT  = ( KNPBRC_LOCAL + FREQ ) * DTCHEM
          CNEW = TC0 * EXP( -RKT )
 
+         CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.TRUE., &
+              KNPBRC_LOCAL,FREQ,RKT)
+
          ! Prevent underflow condition
          IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
@@ -1770,6 +1846,8 @@ CONTAINS
                             / ( KNPBRC_LOCAL + FREQ )
       ELSE
          CNEW = TC0
+         CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.FALSE., &
+              KNPBRC_LOCAL,FREQ)
          NPBRC_CONV(I,J,L) = 0.0_fp
       ENDIF
 
@@ -1779,6 +1857,8 @@ CONTAINS
       ENDIF
 
       ! Store updated NPBRCPOA back into species array [kg]
+      CALL BRC_CHEM_CELL_AFTER(I,J,L,CNEW,NPBRC_CONV(I,J,L), &
+           1.0_fp,0.0_fp)
       CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, OriginDestId, I,J,L, &
                                TC0,CNEW,1.0_fp)
       TC(I,J,L) = CNEW
@@ -1879,12 +1959,16 @@ CONTAINS
       ! Add converted mass to WTC
       CNEW = TC0 + CCV
 
+      CALL BRC_CHEM_CELL_BEFORE(I,J,L,TC0,CNEW,.TRUE.)
+
       ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
       ! Store modified concentration back in species array [kg]
       ! The parent WTC also has a final underflow cutoff. Apply its actual
       ! retention to overlays without inventing a receiving chemistry state.
+      CALL BRC_CHEM_CELL_AFTER(I,J,L,CNEW,0.0_fp, &
+           0.0_fp,CCV)
       CALL BRC_ORIGIN_TRANSFER(State_Chm, spcId, spcId, I,J,L, &
                                TC0+CCV,CNEW,0.0_fp)
       TC(I,J,L) = CNEW

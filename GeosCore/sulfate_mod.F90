@@ -19,6 +19,7 @@ MODULE SULFATE_MOD
 !
   USE HCO_ERROR_MOD    ! For HEMCO error handling
   USE PhysConstants    ! Physical constants
+  USE BRC_CHEM_UNITS_CAPTURE_MOD, ONLY: BRC_CHEM_UNITS_CAPTURE
   USE PRECISION_MOD    ! For GEOS-Chem Precision (fp, f4, f8)
 
   IMPLICIT NONE
@@ -602,6 +603,7 @@ CONTAINS
        ! Convert species to [v/v dry] aka [mol/mol dry]
        ! NOTE: For TOMAS, convert all species units, in order not to
        ! break internal unit conversions (Bob Yantosca, 11 Apr 2024)
+       CALL BRC_CHEM_UNITS_CAPTURE('sulfate_late_to_vv',1,MOLES_SPECIES_PER_MOLES_DRY_AIR,Input_Opt,State_Chm,State_Grid,State_Met,Mapping=State_Chm%Map_Advect)
        CALL Convert_Spc_Units(                                               &
             Input_Opt      = Input_Opt,                                      &
             State_Chm      = State_Chm,                                      &
@@ -619,6 +621,7 @@ CONTAINS
                         'Start of CHEM_SULFATE in sulfate_mod.F90')
           RETURN
        ENDIF
+       CALL BRC_CHEM_UNITS_CAPTURE('sulfate_late_to_vv',2,MOLES_SPECIES_PER_MOLES_DRY_AIR,Input_Opt,State_Chm,State_Grid,State_Met,PreviousUnits=previous_units,Mapping=State_Chm%Map_Advect)
 
        ! Start aerosol chem timer again
        IF ( Input_Opt%useTimers ) THEN
@@ -764,6 +767,7 @@ CONTAINS
        ! Convert species to [v/v dry] aka [mol/mol dry]
        ! NOTE: For TOMAS, convert all species units, in order not to
        ! break internal unit conversions (Bob Yantosca, 11 Apr 2024)
+       CALL BRC_CHEM_UNITS_CAPTURE('sulfate_early_to_vv',1,MOLES_SPECIES_PER_MOLES_DRY_AIR,Input_Opt,State_Chm,State_Grid,State_Met,Mapping=State_Chm%Map_Advect)
        CALL Convert_Spc_Units(                                               &
             Input_Opt      = Input_Opt,                                      &
             State_Chm      = State_Chm,                                      &
@@ -781,6 +785,7 @@ CONTAINS
                         'Start of CHEM_SULFATE in sulfate_mod.F90')
           RETURN
        ENDIF
+       CALL BRC_CHEM_UNITS_CAPTURE('sulfate_early_to_vv',2,MOLES_SPECIES_PER_MOLES_DRY_AIR,Input_Opt,State_Chm,State_Grid,State_Met,PreviousUnits=previous_units,Mapping=State_Chm%Map_Advect)
 
        ! Start aerosol chem timer again
        IF ( Input_Opt%useTimers ) THEN
@@ -816,6 +821,7 @@ CONTAINS
     ! Convert species units back to original unit
     ! NOTE: For TOMAS, convert all species units, in order not to
     ! break internal unit conversions (Bob Yantosca, 11 Apr 2024)
+    CALL BRC_CHEM_UNITS_CAPTURE(MERGE('sulfate_late_restore             ','sulfate_early_restore            ',FullRun),1,previous_units,Input_Opt,State_Chm,State_Grid,State_Met,Mapping=State_Chm%Map_Advect)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt  = Input_Opt,                                             &
          State_Chm  = State_Chm,                                             &
@@ -832,6 +838,7 @@ CONTAINS
                      'End of CHEM_SULFATE in sulfate_mod.F90')
        RETURN
     ENDIF
+    CALL BRC_CHEM_UNITS_CAPTURE(MERGE('sulfate_late_restore             ','sulfate_early_restore            ',FullRun),2,previous_units,Input_Opt,State_Chm,State_Grid,State_Met,Mapping=State_Chm%Map_Advect)
 
     ! Start aerosol chem timer again
     IF ( Input_Opt%useTimers ) THEN

@@ -15,6 +15,7 @@ MODULE FullChem_Mod
 !
 ! !USES:
 !
+  USE BRC_CHEM_UNITS_CAPTURE_MOD, ONLY: BRC_CHEM_UNITS_CAPTURE
   USE Precision_Mod
 
 #if defined(MPI_LOAD_BALANCE)
@@ -435,6 +436,7 @@ CONTAINS
     ENDIF
 
     ! Convert units of all species to molec/cm3 for KPP
+    CALL BRC_CHEM_UNITS_CAPTURE('fullchem_to_mnd',1,MOLECULES_SPECIES_PER_CM3,Input_Opt,State_Chm,State_Grid,State_Met)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt      = Input_Opt,                                         &
          State_Chm      = State_Chm,                                         &
@@ -449,6 +451,7 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, 'fullchem_mod.F90')
        RETURN
     ENDIF
+    CALL BRC_CHEM_UNITS_CAPTURE('fullchem_to_mnd',2,MOLECULES_SPECIES_PER_CM3,Input_Opt,State_Chm,State_Grid,State_Met,PreviousUnits=previous_units)
 
     !========================================================================
     ! Call photolysis routine to compute J-Values
@@ -2494,6 +2497,7 @@ CONTAINS
     ENDIF
 
     ! Convert units of all species back to kg
+    CALL BRC_CHEM_UNITS_CAPTURE('fullchem_restore',1,previous_units,Input_Opt,State_Chm,State_Grid,State_Met)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt  = Input_Opt,                                             &
          State_Chm  = State_Chm,                                             &
@@ -2507,6 +2511,7 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, 'fullchem_mod.F90' )
        RETURN
     ENDIF
+    CALL BRC_CHEM_UNITS_CAPTURE('fullchem_restore',2,previous_units,Input_Opt,State_Chm,State_Grid,State_Met)
 
     ! Start gas-phase chem timer again
     IF ( Input_Opt%useTimers ) THEN

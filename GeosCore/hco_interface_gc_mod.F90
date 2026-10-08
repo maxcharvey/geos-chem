@@ -4813,6 +4813,7 @@ CONTAINS
 !
 ! ! USES:
 !
+    USE BRC_SURFACE_BUDGET_CAPTURE_MOD, ONLY : BRC_CAPTURE_SURFACE_BUDGET
     USE Depo_Mercury_Mod,     ONLY : Add_Hg2_DD
     USE Depo_Mercury_Mod,     ONLY : Add_HgP_DD
     USE Depo_Mercury_Mod,     ONLY : Add_Hg2_SnowPack
@@ -5290,6 +5291,9 @@ CONTAINS
     ENDDO
     ENDDO 
     !$OMP END PARALLEL DO
+
+    ! Read-only native E/D evidence, after flux conversion and OMP completion.
+    CALL BRC_CAPTURE_SURFACE_BUDGET(State_Chm,State_Met,State_Grid,eflx,dflx)
 
     !### Uncomment for debug output
     !WRITE( 6, '(a)' ) 'eflx and dflx values HEMCO [kg/m2/s]'

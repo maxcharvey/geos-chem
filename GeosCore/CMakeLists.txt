@@ -24,7 +24,17 @@ add_library(GeosCore
   brc_species_mod.F90
   brc_origin_kernel_mod.F90
   brc_origin_mod.F90
+  brc_event_capture_mod.F90
+  brc_native_operand_capture_mod.F90
+  brc_chem_capture_mod.F90
+  brc_chem_units_capture_mod.F90
+  # BRC RAS OBSERVER BEGIN
+  brc_ras_capture_mod.F90
+  brc_wetdep_capture_mod.F90
+  # BRC RAS OBSERVER END
+  brc_tend_capture_mod.F90
   brc_transport_capture_mod.F90
+  brc_surface_budget_capture_mod.F90
   aerosol_mod.F90
   aerosol_thermodynamics_mod.F90
   airs_ch4_mod.F90

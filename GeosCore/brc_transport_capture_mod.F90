@@ -3,6 +3,7 @@
 ! No origin partition or parent transport algorithm is changed by this module.
 MODULE BRC_TRANSPORT_CAPTURE_MOD
   USE Precision_Mod, ONLY: fp
+  USE BRC_SURFACE_BUDGET_CAPTURE_MOD, ONLY: BRC_CAPTURE_MIX_TIME
   USE State_Chm_Mod, ONLY: ChmState, Ind_
   USE State_Met_Mod, ONLY: MetState
   USE State_Grid_Mod, ONLY: GrdState
@@ -197,6 +198,7 @@ CONTAINS
       ENDDO
       WRITE(Counter,'(i6.6)') Step;WRITE(Latitude,'(i4.4)') Lat
       Path=TRIM(Directory)//'/mix_step'//Counter//'_lat'//Latitude//'.bin'
+      CALL BRC_CAPTURE_MIX_TIME(Path,Step,Lat,Dt,MixIds)
       OPEN(NEWUNIT=MixUnits(Lat),FILE=TRIM(Path),ACCESS='STREAM',FORM='UNFORMATTED', &
            STATUS='NEW',ACTION='WRITE',IOSTAT=Status)
       CALL CHECK_IO(Status)

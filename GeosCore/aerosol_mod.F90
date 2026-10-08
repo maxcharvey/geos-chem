@@ -152,6 +152,7 @@ CONTAINS
     USE State_Grid_Mod,    ONLY : GrdState
     USE State_Met_Mod,     ONLY : MetState
     USE UnitConv_Mod
+    USE BRC_NATIVE_OPERAND_CAPTURE_MOD, ONLY: BRC_NATIVE_OPERAND_CAPTURE
     USE TIME_MOD,          ONLY : GET_MONTH
     USE Timers_Mod,        ONLY : Timer_End, Timer_Start
 !
@@ -252,6 +253,9 @@ CONTAINS
     ENDIF
 
     ! Convert species to [kg] for this routine
+    CALL BRC_NATIVE_OPERAND_CAPTURE(2,1,"aerosol_conc",Input_Opt,State_Chm, &
+         State_Grid,State_Met,State_Chm%Map_Advect,Applied=.TRUE., &
+         PreviousUnits=State_Chm%Species(State_Chm%Map_Advect(1))%Units)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt      = Input_Opt,                                         &
          State_Chm      = State_Chm,                                         &
@@ -268,6 +272,8 @@ CONTAINS
        CALL GC_Error( ErrMsg, RC, ThisLoc )
        RETURN
     ENDIF
+    CALL BRC_NATIVE_OPERAND_CAPTURE(2,2,"aerosol_conc",Input_Opt,State_Chm, &
+         State_Grid,State_Met,State_Chm%Map_Advect,Applied=.TRUE.,PreviousUnits=previous_units)
 
     ! Start aerosol chem timer again
     IF ( Input_Opt%useTimers ) THEN
@@ -1180,6 +1186,8 @@ CONTAINS
     ENDIF
 
     ! Convert species back to original unit
+    CALL BRC_NATIVE_OPERAND_CAPTURE(2,3,"aerosol_conc",Input_Opt,State_Chm, &
+         State_Grid,State_Met,State_Chm%Map_Advect,Applied=.TRUE.,PreviousUnits=previous_units)
     CALL Convert_Spc_Units(                                                  &
          Input_Opt  = Input_Opt,                                             &
          State_Chm  = State_Chm,                                             &
@@ -1194,6 +1202,8 @@ CONTAINS
                      'End of AEROSOL_CONC in aerosol_mod.F90')
        RETURN
     ENDIF
+    CALL BRC_NATIVE_OPERAND_CAPTURE(2,4,"aerosol_conc",Input_Opt,State_Chm, &
+         State_Grid,State_Met,State_Chm%Map_Advect,Applied=.TRUE.,PreviousUnits=previous_units)
 
     ! Start aerosol chem timer again
     IF ( Input_Opt%useTimers ) THEN

@@ -16,6 +16,10 @@ MODULE WETSCAV_MOD
 ! !USES:
 !
   USE PRECISION_MOD    ! For GEOS-Chem Precision (fp)
+! BRC_WETDEP_OBSERVER_BEGIN
+  USE BRC_WETDEP_CAPTURE_MOD, ONLY: BRC_WET_SNAPSHOT,BRC_WET_COLUMN, &
+       BRC_WET_ACTIVE,BRC_WET_TRACE,BRC_WET_SAFETY
+! BRC_WETDEP_OBSERVER_END
 
   IMPLICIT NONE
   PRIVATE
@@ -3316,6 +3320,9 @@ END FUNCTION WASHFRAC_DUSTBIN
        CALL Timer_End( "Wet deposition", RC )
     ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+    CALL BRC_WET_SNAPSHOT(0,LS,REAL(GET_TS_DYN(),fp),-1,id_SO2,Input_Opt,State_Chm,State_Grid,State_Met)
+! BRC_WETDEP_OBSERVER_END
     ! Convert species concentration to mass per unit area (kg/m2) for
     ! wet deposition since computation is done per column (ewl, 9/8/15)
     CALL Convert_Spc_Units(                                                  &
@@ -3342,6 +3349,9 @@ END FUNCTION WASHFRAC_DUSTBIN
        CALL Timer_Start( "Wet deposition", RC )
     ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+    CALL BRC_WET_SNAPSHOT(1,LS,REAL(GET_TS_DYN(),fp),previous_units,id_SO2,Input_Opt,State_Chm,State_Grid,State_Met)
+! BRC_WETDEP_OBSERVER_END
     ! Dynamic timestep [s]
     DT  = GET_TS_DYN()
 
@@ -3415,6 +3425,9 @@ END FUNCTION WASHFRAC_DUSTBIN
           DSpc(NW,L,I,J) = 0e+0_fp
        ENDDO
        ENDDO
+! BRC_WETDEP_OBSERVER_BEGIN
+       CALL BRC_WET_COLUMN(I,J,DSpc)
+! BRC_WETDEP_OBSERVER_END
 
 #ifndef LUO_WETDEP
        !==============================================================
@@ -3902,6 +3915,9 @@ END FUNCTION WASHFRAC_DUSTBIN
     ENDDO
     ENDDO
     !$OMP END PARALLEL DO
+! BRC_WETDEP_OBSERVER_BEGIN
+    CALL BRC_WET_SNAPSHOT(2,LS,DT,previous_units,id_SO2,Input_Opt,State_Chm,State_Grid,State_Met,DSpc)
+! BRC_WETDEP_OBSERVER_END
 
     ! Exit with error condition
     IF ( RC /= GC_SUCCESS ) THEN
@@ -3926,6 +3942,9 @@ END FUNCTION WASHFRAC_DUSTBIN
          new_units  = previous_units,                                        &
          RC         = RC                                                    )
 
+! BRC_WETDEP_OBSERVER_BEGIN
+    CALL BRC_WET_SNAPSHOT(3,LS,DT,previous_units,id_SO2,Input_Opt,State_Chm,State_Grid,State_Met,DSpc)
+! BRC_WETDEP_OBSERVER_END
     ! Trap potential errors
     IF ( RC /= GC_SUCCESS ) THEN
        ErrMsg = 'Unit conversion error at end of WETDEP!'
@@ -4230,6 +4249,26 @@ END FUNCTION WASHFRAC_DUSTBIN
        ! Get the species ID from the wetdep ID
        N = State_Chm%Map_WetDep(NW)
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(1,0,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,K_RAIN,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               State_Met%T(I,J,L),0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [263, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        ! Call subroutine RAINOUT to comptue the fraction
        ! of species lost to rainout in grid box (I,J,L)
        CALL RAINOUT( I, J, L, N, K_RAIN, DT, F_RAINOUT, RAINFRAC,            &
@@ -4245,6 +4284,26 @@ END FUNCTION WASHFRAC_DUSTBIN
           RETURN
        ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(1,1,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,K_RAIN,RAINFRAC, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               State_Met%T(I,J,L),0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [271, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
 #ifdef TOMAS
        ! NOTE: Here the units are kg/m2, so State_Grid%Area_M2(I,J) is
        ! the proper unit conversion factor. (Bob Yantosca, 10 Apr 2024)
@@ -4303,6 +4362,26 @@ END FUNCTION WASHFRAC_DUSTBIN
 
        ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(1,2,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,K_RAIN,RAINFRAC, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               State_Met%T(I,J,L),0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [262415, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        !--------------------------------------------------------------------
        ! HISTORY (aka netCDF diagnostics)
        !
@@ -4386,6 +4465,26 @@ END FUNCTION WASHFRAC_DUSTBIN
              RETURN
           ENDIF
        ENDIF
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(1,3,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,K_RAIN,RAINFRAC, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               State_Met%T(I,J,L),0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [262415, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
     ENDDO
 
     ! Free pointer
@@ -4610,6 +4709,26 @@ END FUNCTION WASHFRAC_DUSTBIN
        KMIN        = 0
 #endif
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,0,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4194803, &
+               MERGE(1,0,LS), &
+               -1, &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        ! Call WASHOUT to compute the fraction of
        ! species lost to washout in grid box (I,J,L)
        CALL WASHOUT(                                                         &
@@ -4650,6 +4769,26 @@ END FUNCTION WASHFRAC_DUSTBIN
           RETURN
        ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,1,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,WASHFRAC,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4195315, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        !%%% BUG FIX (bmy, hamos, 5/26/11, 8/12/15)
        !
        ! Check if WASHFRAC = NaN or WASHFRAC < 0.1 %
@@ -4669,6 +4808,26 @@ END FUNCTION WASHFRAC_DUSTBIN
        !  DSpc to a minimum of 0. (mps, 5/20/15)
        !
        IF ( IT_IS_NAN( WASHFRAC ) ) THEN
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,8,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,WASHFRAC,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4195315, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               1, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
           CYCLE
        ENDIF
 
@@ -4679,6 +4838,26 @@ END FUNCTION WASHFRAC_DUSTBIN
           WASHFRAC = WASHFRAC / TF * F_WASHOUT
        ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,2,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,0.0_fp,WASHFRAC,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4195827, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        !====================================================================
        ! Washout of aerosol species --
        ! this is modeled as a kinetic process
@@ -4695,6 +4874,26 @@ END FUNCTION WASHFRAC_DUSTBIN
                   / ( PDOWN(L+1,I,J) )
 #endif
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,3,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,0.0_fp,WASHFRAC,ALPHA, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4197875, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               -1, &
+               MERGE(1,0,ALPHA>1.0_fp), &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
           ! Restrict ALPHA to be less than 1 (>1 is unphysical)
           ! (hma, 24-Dec-2010)
           IF ( ALPHA > 1e+0_fp ) THEN
@@ -4705,6 +4904,26 @@ END FUNCTION WASHFRAC_DUSTBIN
           ! that gets resuspended in grid box (I,J,L)
           ALPHA2  = 0.5e+0_fp * ALPHA
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,4,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,0.0_fp,WASHFRAC,0.0_fp, &
+               ALPHA,ALPHA2,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4208115, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
           ! GAINED is the rained out aerosol coming down from
           ! grid box (I,J,L+1) that will evaporate and re-enter
           ! the atmosphere in the gas phase in grid box (I,J,L).
@@ -4877,6 +5096,26 @@ END FUNCTION WASHFRAC_DUSTBIN
 
        ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,5,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,0.0_fp,WASHFRAC,0.0_fp, &
+               ALPHA,ALPHA2,GAINED,LOST, &
+               MASS_WASH,MASS_NOWASH,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4716019, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        !--------------------------------------------------------------------
        ! HISTORY (aka netCDF diagnostics)
        !
@@ -4950,6 +5189,26 @@ END FUNCTION WASHFRAC_DUSTBIN
              RETURN
           ENDIF
        ENDIF
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(2,6,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,F_RAINOUT,0.0_fp,0.0_fp, &
+               F_WASHOUT,TF,QDOWN,Q, &
+               TK,0.0_fp,WASHFRAC,0.0_fp, &
+               ALPHA,ALPHA2,GAINED,LOST, &
+               MASS_WASH,MASS_NOWASH,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,State_Met%BXHEIGHT(I,J,L),0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [4716019, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               MERGE(1,0,F_RAINOUT>0.0_fp), &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
     ENDDO
 
     ! Free pointer
@@ -5058,10 +5317,50 @@ END FUNCTION WASHFRAC_DUSTBIN
        ! Get the species ID from the wetdep ID
        N = State_Chm%Map_WetDep(NW)
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(3,0,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [1, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        ! WETLOSS is the amount of species in grid box (I,J,L) per area
        ! that is lost to rainout. (qli, bmy, 10/29/02)
        WETLOSS = -DSpc(NW,L+1,I,J)
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(3,1,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [262145, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        ! All of the rained-out species coming from grid box
        ! (I,J,L+1) goes back into the gas phase at (I,J,L)
        ! In evap, SO2 comes back as SO4 (rjp, bmy, 3/23/03)
@@ -5151,6 +5450,26 @@ END FUNCTION WASHFRAC_DUSTBIN
        ! (I,J,L), so set DSpc at grid box (I,J,L) to zero.
        DSpc(NW,L,I,J) = 0e+0_fp
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(3,2,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [262145, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        !--------------------------------------------------------------------
        ! HISTORY (aka netCDF diagnostics)
        !
@@ -5223,6 +5542,26 @@ END FUNCTION WASHFRAC_DUSTBIN
              RETURN
           ENDIF
        ENDIF
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(3,3,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [262145, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
     ENDDO
 
     ! Free pointer
@@ -5358,6 +5697,26 @@ END FUNCTION WASHFRAC_DUSTBIN
        ! Get species ID from wetdep ID
        N = State_Chm%Map_WetDep(NW)
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(4,0,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,QDOWN,0.0_fp, &
+               TK,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,F, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [524609, &
+               MERGE(1,0,LS), &
+               -1, &
+               -1, &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        ! Call WASHOUT to compute the fraction of species
        ! in grid box (I,J,L) that is lost to washout.
        CALL WASHOUT(                                                         &
@@ -5399,6 +5758,26 @@ END FUNCTION WASHFRAC_DUSTBIN
           RETURN
        ENDIF
 
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(4,1,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,QDOWN,0.0_fp, &
+               TK,WASHFRAC,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,F, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [525121, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               -1, &
+               0, &
+               -1, &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
        ! NOTE: for HNO3 and aerosols, there is an F factor
        ! already present in WASHFRAC.  For other soluble
        ! gases, we need to multiply by the F (hyl, bmy, 10/27/00)
@@ -5414,6 +5793,26 @@ END FUNCTION WASHFRAC_DUSTBIN
        ! Add washout losses in grid box (I,J,L=1) to DSpc [kg/m2]
        ! (added cdh, 4/14/2009)
        DSpc(NW,L,I,J) = DSpc(NW,L+1,I,J) + WETLOSS
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(4,2,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,QDOWN,0.0_fp, &
+               TK,WASHFRAC,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,F, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [787265, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               -1, &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               MERGE(1,0,Spc(N)%Conc(I,J,L)<0.0_fp .AND. L>23), &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
 
        !--------------------------------------------------------------
        ! HISTORY (aka netCDF diagnostics)
@@ -5527,6 +5926,26 @@ END FUNCTION WASHFRAC_DUSTBIN
              RETURN
           ENDIF
        ENDIF
+! BRC_WETDEP_OBSERVER_BEGIN
+       IF (BRC_WET_ACTIVE(I,J,N)) THEN
+         CALL BRC_WET_TRACE(4,3,I,J,L,N,NW,State_Chm,DSpc, &
+              [DT,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,QDOWN,0.0_fp, &
+               TK,WASHFRAC,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,WETLOSS,F, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp, &
+               0.0_fp,0.0_fp,0.0_fp,0.0_fp], &
+              [787265, &
+               MERGE(1,0,LS), &
+               MERGE(1,0,KIN), &
+               -1, &
+               0, &
+               MERGE(1,0,IT_IS_NAN(Spc(N)%Conc(I,J,L)) .OR. Spc(N)%Conc(I,J,L)<0.0_fp .OR. DSpc(NW,L,I,J)<0.0_fp), &
+               -1, &
+               MERGE(1,0,N==id_SO2)])
+       END IF
+! BRC_WETDEP_OBSERVER_END
     ENDDO
 
     ! Free pointer
@@ -5605,6 +6024,9 @@ END FUNCTION WASHFRAC_DUSTBIN
     ! SAFETY begins here!
     !======================================================================
 
+! BRC_WETDEP_OBSERVER_BEGIN
+    CALL BRC_WET_SAFETY(I,J,L,N,LS,Spc,DSpc)
+! BRC_WETDEP_OBSERVER_END
     ! TL Added: 9/29/25: Start WetDep-Safety-Update 
     ! TL Added: 9/29/25: Following suggestion by yantosca (https://github.com/geoschem/geos-chem/issues/501)
     ! TL Added: 2/9/26: Removed Print and Flush Statements and BAD following comment by yantosca (https://github.com/geoschem/geos-chem/pull/3164/changes)

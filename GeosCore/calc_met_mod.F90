@@ -144,7 +144,7 @@ CONTAINS
 ! !INTERFACE:
 !
   SUBROUTINE AIRQNT( Input_Opt, State_Chm, State_Grid, State_Met, &
-                     RC, Update_Mixing_Ratio )
+                     RC, Update_Mixing_Ratio, CaptureCaller )
 !
 ! !USES:
 !
@@ -159,12 +159,14 @@ CONTAINS
     USE Time_Mod,       ONLY : Get_LocalTime_In_Sec
     USE Time_Mod,       ONLY : Get_Ts_Dyn
     USE UnitConv_Mod
+    USE BRC_NATIVE_OPERAND_CAPTURE_MOD, ONLY: BRC_NATIVE_OPERAND_CAPTURE
 !
 ! !INPUT PARAMETERS:
 !
     TYPE(OptInput), INTENT(IN)           :: Input_Opt  ! Input Options object
     TYPE(GrdState), INTENT(IN)           :: State_Grid ! Grid State object
     LOGICAL,        INTENT(IN), OPTIONAL :: Update_Mixing_Ratio ! Default is yes
+    CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: CaptureCaller
 !
 ! !INPUT/OUTPUT PARAMETERS:
 !
@@ -227,6 +229,7 @@ CONTAINS
     REAL(fp)            :: SPHU_kgkg, AVGW_moist, H,         FRAC
     REAL(fp)            :: Pb,        Pt,         XH2O,      ADmoist
     LOGICAL             :: UpdtMR
+    CHARACTER(LEN=32)    :: CaptureLabel
     REAL(fp)            :: FRLAND_NOSNOW_NOICE, FRWATER, FRICE, FRSNOW
 
     ! Arrays
@@ -274,6 +277,11 @@ CONTAINS
     ! Shadow variable for mixing ratio update. Default is false.
     UpdtMR = .FALSE.
     IF ( PRESENT(update_mixing_ratio) ) UpdtMR = update_mixing_ratio
+    CaptureLabel='unspecified_airqnt'
+    IF (PRESENT(CaptureCaller)) THEN
+       IF (LEN_TRIM(CaptureCaller)>32) ERROR STOP 'BRC AIRQNT caller label too long'
+       CaptureLabel=CaptureCaller
+    ENDIF
 
     ! Pre-compute local solar time = UTC + Lon/15
     !$OMP PARALLEL DO                                                       &
@@ -690,6 +698,9 @@ CONTAINS
           RETURN
        ENDIF
 
+       CALL BRC_NATIVE_OPERAND_CAPTURE(1,1,CaptureLabel,Input_Opt,State_Chm, &
+            State_Grid,State_Met,State_Chm%Map_All,UpdateMR=UpdtMR,Applied=.TRUE.)
+
        !$OMP PARALLEL DO                                                     &
        !$OMP DEFAULT( SHARED                                                )&
        !$OMP PRIVATE( I, J, L, N                                            )
@@ -708,6 +719,13 @@ CONTAINS
           ENDDO
        ENDDO
        !$OMP END PARALLEL DO
+       CALL BRC_NATIVE_OPERAND_CAPTURE(1,2,CaptureLabel,Input_Opt,State_Chm, &
+            State_Grid,State_Met,State_Chm%Map_All,UpdateMR=UpdtMR,Applied=.TRUE.)
+    ELSE
+       CALL BRC_NATIVE_OPERAND_CAPTURE(1,1,CaptureLabel,Input_Opt,State_Chm, &
+            State_Grid,State_Met,State_Chm%Map_All,UpdateMR=UpdtMR,Applied=.FALSE.)
+       CALL BRC_NATIVE_OPERAND_CAPTURE(1,2,CaptureLabel,Input_Opt,State_Chm, &
+            State_Grid,State_Met,State_Chm%Map_All,UpdateMR=UpdtMR,Applied=.FALSE.)
     ENDIF
 
   END SUBROUTINE AIRQNT

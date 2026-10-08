@@ -25,6 +25,7 @@ add_library(GeosCore
   brc_origin_kernel_mod.F90
   brc_origin_mod.F90
   brc_transport_capture_mod.F90
+  brc_surface_budget_capture_mod.F90
   aerosol_mod.F90
   aerosol_thermodynamics_mod.F90
   airs_ch4_mod.F90

@@ -28,6 +28,30 @@
 # Name             Spec   ExtNr  Cat Hier Dim OutUnit       LongName
 
 ###############################################################################
+#####  GFAS native and harmonized-sensitivity fire emissions              #####
+###############################################################################
+# These inventory-labelled rows select ExtNr=0, Cat=5, Hier=3.  Keep GFAS as
+# the only config-driven biomass-burning inventory enabled when using them.
+EmisGFAS_CO_Native           CO         0   5   3   2   kg/m2/s  GFAS_native_CO_emission_flux
+EmisGFAS_CO_Native3D         CO         0   5   3   3   kg/m2/s  GFAS_native_CO_emission_flux_3D_profile
+EmisGFAS_BCPI_Native         BCPI       0   5   3   2   kg/m2/s  GFAS_native_hydrophilic_BC_emission_flux
+EmisGFAS_BCPI_Native3D       BCPI       0   5   3   3   kg/m2/s  GFAS_native_hydrophilic_BC_emission_flux_3D_profile
+EmisGFAS_BCPO_Native         BCPO       0   5   3   2   kg/m2/s  GFAS_native_hydrophobic_BC_emission_flux
+EmisGFAS_BCPO_Native3D       BCPO       0   5   3   3   kg/m2/s  GFAS_native_hydrophobic_BC_emission_flux_3D_profile
+EmisGFAS_OCPI                OCPI       0   5   3   2   kg/m2/s  GFAS_hydrophilic_OC_flux_native_or_harmonized_residual
+EmisGFAS_OCPI3D              OCPI       0   5   3   3   kg/m2/s  GFAS_hydrophilic_OC_flux_native_or_harmonized_residual_3D_profile
+EmisGFAS_OCPO                OCPO       0   5   3   2   kg/m2/s  GFAS_hydrophobic_OC_flux_native_or_harmonized_residual
+EmisGFAS_OCPO3D              OCPO       0   5   3   3   kg/m2/s  GFAS_hydrophobic_OC_flux_native_or_harmonized_residual_3D_profile
+EmisGFAS_FSOAP_HarmSens      FSOAP      0   5   3   2   kg/m2/s  GFAS_harmonized_sensitivity_FSOAP_proxy_added_from_CO
+EmisGFAS_FSOAP_HarmSens3D    FSOAP      0   5   3   3   kg/m2/s  GFAS_harmonized_sensitivity_FSOAP_proxy_added_from_CO_3D_profile
+EmisGFAS_DBRCPOA_HarmSens    DBRCPOA    0   5   3   2   kg/m2/s  GFAS_harmonized_sensitivity_DBRCPOA_proxy_added_from_BC
+EmisGFAS_DBRCPOA_HarmSens3D  DBRCPOA    0   5   3   3   kg/m2/s  GFAS_harmonized_sensitivity_DBRCPOA_proxy_added_from_BC_3D_profile
+EmisGFAS_NPBRCPOA_HarmSens   NPBRCPOA   0   5   3   2   kg/m2/s  GFAS_harmonized_sensitivity_NPBRCPOA_redirected_from_OC
+EmisGFAS_NPBRCPOA_HarmSens3D NPBRCPOA   0   5   3   3   kg/m2/s  GFAS_harmonized_sensitivity_NPBRCPOA_redirected_from_OC_3D_profile
+EmisGFAS_PBRCPOA_HarmSens    PBRCPOA    0   5   3   2   kg/m2/s  GFAS_harmonized_sensitivity_PBRCPOA_redirected_from_OC
+EmisGFAS_PBRCPOA_HarmSens3D  PBRCPOA    0   5   3   3   kg/m2/s  GFAS_harmonized_sensitivity_PBRCPOA_redirected_from_OC_3D_profile
+
+###############################################################################
 #####   ACET emissions                                                    #####
 ###############################################################################
 EmisACET_Total      ACET   -1     -1  -1   3   kg/m2/s  ACET_emission_flux_from_all_sectors

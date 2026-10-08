@@ -571,6 +571,18 @@ MODULE State_Diag_Mod
      TYPE(DgnMap),       POINTER :: Map_AODHygWL3
      LOGICAL                     :: Archive_AODHygWL3
 
+     REAL(f4),           POINTER :: AerosolDryAbsWL1(:,:,:,:)
+     TYPE(DgnMap),       POINTER :: Map_AerosolDryAbsWL1
+     LOGICAL                     :: Archive_AerosolDryAbsWL1
+
+     REAL(f4),           POINTER :: AerosolDryAbsWL2(:,:,:,:)
+     TYPE(DgnMap),       POINTER :: Map_AerosolDryAbsWL2
+     LOGICAL                     :: Archive_AerosolDryAbsWL2
+
+     REAL(f4),           POINTER :: AerosolDryAbsWL3(:,:,:,:)
+     TYPE(DgnMap),       POINTER :: Map_AerosolDryAbsWL3
+     LOGICAL                     :: Archive_AerosolDryAbsWL3
+
      REAL(f4),           POINTER :: AODSOAfromAqIsopWL1(:,:,:)
      LOGICAL                     :: Archive_AODSOAfromAqIsopWL1
 
@@ -2052,6 +2064,18 @@ CONTAINS
     State_Diag%AODHygWL3                           => NULL()
     State_Diag%Map_AODHygWL3                       => NULL()
     State_Diag%Archive_AODHygWL3                   = .FALSE.
+
+    State_Diag%AerosolDryAbsWL1                     => NULL()
+    State_Diag%Map_AerosolDryAbsWL1                 => NULL()
+    State_Diag%Archive_AerosolDryAbsWL1             = .FALSE.
+
+    State_Diag%AerosolDryAbsWL2                     => NULL()
+    State_Diag%Map_AerosolDryAbsWL2                 => NULL()
+    State_Diag%Archive_AerosolDryAbsWL2             = .FALSE.
+
+    State_Diag%AerosolDryAbsWL3                     => NULL()
+    State_Diag%Map_AerosolDryAbsWL3                 => NULL()
+    State_Diag%Archive_AerosolDryAbsWL3             = .FALSE.
 
     State_Diag%AODSOAfromAqIsopWL1                 => NULL()
     State_Diag%Archive_AODSOAfromAqIsopWL1         = .FALSE.
@@ -8676,6 +8700,72 @@ CONTAINS
        ENDIF
 
        !-------------------------------------------------------------------
+       ! Dry ambient-volume absorption by component at requested wavelengths
+       !-------------------------------------------------------------------
+       TmpWL  = RadWL(1)
+       diagID = 'AerosolDryAbs' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%AerosolDryAbsWL1,                    &
+            archiveData    = State_Diag%Archive_AerosolDryAbsWL1,            &
+            mapData        = State_Diag%Map_AerosolDryAbsWL1,                &
+            diagId         = diagId,                                         &
+            diagFlag       = 'Q',                                            &
+            RC             = RC                                             )
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       TmpWL  = RadWL(2)
+       diagID = 'AerosolDryAbs' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%AerosolDryAbsWL2,                    &
+            archiveData    = State_Diag%Archive_AerosolDryAbsWL2,            &
+            mapData        = State_Diag%Map_AerosolDryAbsWL2,                &
+            diagId         = diagId,                                         &
+            diagFlag       = 'Q',                                            &
+            RC             = RC                                             )
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       TmpWL  = RadWL(3)
+       diagID = 'AerosolDryAbs' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%AerosolDryAbsWL3,                    &
+            archiveData    = State_Diag%Archive_AerosolDryAbsWL3,            &
+            mapData        = State_Diag%Map_AerosolDryAbsWL3,                &
+            diagId         = diagId,                                         &
+            diagFlag       = 'Q',                                            &
+            RC             = RC                                             )
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       !-------------------------------------------------------------------
        ! Optical Depth per Hygroscopic Aerosol Species at 2nd Wavelength
        !-------------------------------------------------------------------
        TmpWL  = RadWL(2)
@@ -13764,6 +13854,24 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'AerosolDryAbs' // TRIM(RadWL(1)) // 'nm',     &
+                   Ptr2Data = State_Diag%AerosolDryAbsWL1,                   &
+                   mapData  = State_Diag%Map_AerosolDryAbsWL1,               &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'AerosolDryAbs' // TRIM(RadWL(2)) // 'nm',     &
+                   Ptr2Data = State_Diag%AerosolDryAbsWL2,                   &
+                   mapData  = State_Diag%Map_AerosolDryAbsWL2,               &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'AerosolDryAbs' // TRIM(RadWL(3)) // 'nm',     &
+                   Ptr2Data = State_Diag%AerosolDryAbsWL3,                   &
+                   mapData  = State_Diag%Map_AerosolDryAbsWL3,               &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
     CALL Finalize( diagId   = 'AODSOAfromAqIsopWL1',                         &
                    Ptr2Data = State_Diag%AODSOAfromAqIsopWL1,                &
                    RC       = RC                                            )
@@ -15963,6 +16071,30 @@ CONTAINS
        IF ( isTagged  ) TagId = 'TOMASBIN'
 #endif
 
+    ELSE IF ( TRIM(Name_AllCaps) == 'AEROSOLDRYABS' // &
+                                      TRIM(RadWL(1)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'Dry ambient-volume aerosol absorption ' // &
+                                 'coefficient at ' // TRIM(RadWL(1)) // ' nm'
+       IF ( isUnits   ) Units = 'Mm-1'
+       IF ( isRank    ) Rank  =  3
+       IF ( isTagged  ) TagId = 'DRYABS'
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'AEROSOLDRYABS' // &
+                                      TRIM(RadWL(2)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'Dry ambient-volume aerosol absorption ' // &
+                                 'coefficient at ' // TRIM(RadWL(2)) // ' nm'
+       IF ( isUnits   ) Units = 'Mm-1'
+       IF ( isRank    ) Rank  =  3
+       IF ( isTagged  ) TagId = 'DRYABS'
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'AEROSOLDRYABS' // &
+                                      TRIM(RadWL(3)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'Dry ambient-volume aerosol absorption ' // &
+                                 'coefficient at ' // TRIM(RadWL(3)) // ' nm'
+       IF ( isUnits   ) Units = 'Mm-1'
+       IF ( isRank    ) Rank  =  3
+       IF ( isTagged  ) TagId = 'DRYABS'
+
     ELSE IF ( TRIM(Name_AllCaps) == 'AODDUST' ) THEN
        IF ( isDesc    ) Desc  = 'Optical depth for mineral dust'
        IF ( isUnits   ) Units = '1'
@@ -17231,6 +17363,8 @@ CONTAINS
           numTags = State_Chm%nTomasBins
        CASE( 'DUSTBIN', 'B' )
           numTags = NDUST
+       CASE( 'DRYABS',  'Q' )
+          numTags = 6
        CASE( 'FIX',     'F' )
           numTags = State_Chm%nKppFix
        CASE( 'GAS',     'G' )
@@ -17374,7 +17508,7 @@ CONTAINS
     !=======================================================================
     SELECT CASE( TRIM( tagID ) )
        CASE( 'ALL', 'ADV',   'DUSTBIN', 'TOMASBIN', 'PRD',                   &
-             'LOS', 'RRTMG', 'UVFLX',   'RXN'                               )
+             'LOS', 'RRTMG', 'UVFLX',   'RXN',      'DRYABS'                 )
           D = N
        CASE( 'AER'  )
           D = State_Chm%Map_Aero(N)
@@ -17425,6 +17559,23 @@ CONTAINS
        CASE( 'DUSTBIN' )
           WRITE ( Nstr, "(I1)" ) D
           tagName = 'bin' // TRIM(Nstr)
+
+       ! Dry absorption closure components
+       CASE( 'DRYABS' )
+          SELECT CASE ( D )
+             CASE ( 1 )
+                tagName = 'Tot'
+             CASE ( 2 )
+                tagName = 'BC'
+             CASE ( 3 )
+                tagName = 'BrC'
+             CASE ( 4 )
+                tagName = 'OA'
+             CASE ( 5 )
+                tagName = 'Dust'
+             CASE ( 6 )
+                tagName = 'Other'
+          END SELECT
 
        ! Loss species
        CASE( 'LOS' )
@@ -19238,6 +19389,7 @@ CONTAINS
     ! Scalars
     LOGICAL                   :: found
     LOGICAL                   :: isDustBin
+    LOGICAL                   :: isDryAbs
     LOGICAL                   :: isTomasBin
     LOGICAL                   :: isLoss
     LOGICAL                   :: isProd
@@ -19276,11 +19428,13 @@ CONTAINS
     mapName2   = TRIM( mapName ) // '%id'
     isTomasBin = ( indFlag == 'T'                        )
     isDustBin  = ( indFlag == 'B'                        )
+    isDryAbs   = ( indFlag == 'Q'                        )
     isRxnRate  = ( indFlag == 'R'                        )
     isUvFlx    = ( indFlag == 'U'                        )
     isLoss     = ( indFlag == 'X'                        )
     isProd     = ( indFlag == 'Y'                        )
-    skipInd    = ( isRxnRate .or. isUvFlx .or. isDustBin .or. isTomasBin )
+    skipInd    = ( isRxnRate .or. isUvFlx .or. isDustBin .or. isTomasBin .or. &
+                   isDryAbs )
     spcName    = ''
     wcName     = ''
     errMsg     = ''
@@ -19454,6 +19608,30 @@ CONTAINS
              ENDIF
 
              ! Store wavelength bin index in the slot2Id field
+             mapData%slot2id(TagItem%index) = index
+
+          ELSE IF ( isDryAbs ) THEN
+
+             ! Dry-absorption closure categories are not species IDs
+             SELECT CASE ( TRIM( TagItem%name ) )
+                CASE ( 'Tot', 'TOT' )
+                   index = 1
+                CASE ( 'BC' )
+                   index = 2
+                CASE ( 'BrC', 'BRC' )
+                   index = 3
+                CASE ( 'OA' )
+                   index = 4
+                CASE ( 'Dust', 'DUST' )
+                   index = 5
+                CASE ( 'Other', 'OTHER' )
+                   index = 6
+                CASE DEFAULT
+                   errMsg = 'Unknown dry-absorption component tag: ' // &
+                            TRIM( TagItem%name )
+                   CALL GC_Error( errMsg, RC, thisLoc )
+                   RETURN
+             END SELECT
              mapData%slot2id(TagItem%index) = index
 
           ELSE

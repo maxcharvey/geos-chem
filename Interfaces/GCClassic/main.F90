@@ -85,6 +85,7 @@ PROGRAM GEOS_Chem
   !--------------------------------------------------------------------------
   USE PLANEFLIGHT_MOD       ! For planeflight track diag
   USE HISTORY_MOD           ! Updated netCDF diagnostics
+  USE Plume_Checkpoint_Mod, ONLY : Write_Plume_Checkpoint
   USE OBSPACK_MOD           ! For ObsPack diagnostics
   USE GOSAT_CH4_MOD         ! For GOSAT observation operator
   USE AIRS_CH4_MOD          ! For AIRS observation operator
@@ -1168,6 +1169,14 @@ PROGRAM GEOS_Chem
 #endif
           !--------------------------------------------------------------------
 
+          CALL Write_Plume_Checkpoint(                                      &
+               'C0_PRE_TPCORE', 0, State_Chm, State_Grid, State_Met,         &
+               Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC, 0, RC )
+          IF ( RC /= GC_SUCCESS ) THEN
+             ErrMsg = 'Error writing C0 plume checkpoint!'
+             CALL Error_Stop( ErrMsg, ThisLoc )
+          ENDIF
+
           ! Call the appropriate version of TPCORE
           IF ( Input_Opt%LTRAN ) THEN
              CALL Do_Transport( Input_Opt,  State_Chm, State_Diag, &
@@ -1182,6 +1191,15 @@ PROGRAM GEOS_Chem
              IF ( VerboseAndRoot ) THEN
                 CALL Debug_Msg( '### MAIN: a DO_TRANSPORT' )
              ENDIF
+          ENDIF
+
+          CALL Write_Plume_Checkpoint(                                      &
+               'C1_POST_TPCORE', 1, State_Chm, State_Grid, State_Met,        &
+               Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC,                  &
+               Input_Opt%TS_DYN, RC )
+          IF ( RC /= GC_SUCCESS ) THEN
+             ErrMsg = 'Error writing C1 plume checkpoint!'
+             CALL Error_Stop( ErrMsg, ThisLoc )
           ENDIF
 
           ! Initialize wet scavenging and wetdep fields after
@@ -1358,6 +1376,15 @@ PROGRAM GEOS_Chem
           ENDIF
        ENDIF
 
+       CALL Write_Plume_Checkpoint(                                         &
+            'C2_FLUX_READY', 2, State_Chm, State_Grid, State_Met,            &
+            Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC,                     &
+            Input_Opt%TS_DYN, RC )
+       IF ( RC /= GC_SUCCESS ) THEN
+          ErrMsg = 'Error writing C2 plume checkpoint!'
+          CALL Error_Stop( ErrMsg, ThisLoc )
+       ENDIF
+
        ! Also prescribe methane surface concentrations throughout PBL
        ! (currently done outside emissions)
        IF ( Input_Opt%ITS_A_FULLCHEM_SIM   .and.                             &
@@ -1454,6 +1481,15 @@ PROGRAM GEOS_Chem
              CALL Error_Stop( ErrMsg, ThisLoc )
           ENDIF
 
+          CALL Write_Plume_Checkpoint(                                      &
+               'C3_POST_MIXING', 3, State_Chm, State_Grid, State_Met,        &
+               Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC,                  &
+               Input_Opt%TS_DYN, RC )
+          IF ( RC /= GC_SUCCESS ) THEN
+             ErrMsg = 'Error writing C3 plume checkpoint!'
+             CALL Error_Stop( ErrMsg, ThisLoc )
+          ENDIF
+
           IF ( Input_Opt%useTimers ) THEN
              CALL Timer_End( "Boundary layer mixing", RC )
           ENDIF
@@ -1487,6 +1523,15 @@ PROGRAM GEOS_Chem
              ENDIF
           ENDIF
 
+       ENDIF
+
+       CALL Write_Plume_Checkpoint(                                         &
+            'C4_POST_CONVECTION', 4, State_Chm, State_Grid, State_Met,       &
+            Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC,                     &
+            Input_Opt%TS_DYN, RC )
+       IF ( RC /= GC_SUCCESS ) THEN
+          ErrMsg = 'Error writing C4 plume checkpoint!'
+          CALL Error_Stop( ErrMsg, ThisLoc )
        ENDIF
 
        !=====================================================================
@@ -1542,6 +1587,15 @@ PROGRAM GEOS_Chem
           ENDIF
        ENDIF
 
+       CALL Write_Plume_Checkpoint(                                         &
+            'C5_POST_CHEMISTRY', 5, State_Chm, State_Grid, State_Met,        &
+            Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC,                     &
+            Input_Opt%TS_DYN, RC )
+       IF ( RC /= GC_SUCCESS ) THEN
+          ErrMsg = 'Error writing C5 plume checkpoint!'
+          CALL Error_Stop( ErrMsg, ThisLoc )
+       ENDIF
+
        !=====================================================================
        !    ***** W E T   D E P O S I T I O N  (rainout + washout) *****
        !=====================================================================
@@ -1565,6 +1619,15 @@ PROGRAM GEOS_Chem
              CALL Timer_End( "Wet deposition", RC )
           ENDIF
 
+       ENDIF
+
+       CALL Write_Plume_Checkpoint(                                         &
+            'C6_POST_WETDEP', 6, State_Chm, State_Grid, State_Met,           &
+            Input_Opt, NYMD, NHMS, N_STEP, ELAPSED_SEC,                     &
+            Input_Opt%TS_DYN, RC )
+       IF ( RC /= GC_SUCCESS ) THEN
+          ErrMsg = 'Error writing C6 plume checkpoint!'
+          CALL Error_Stop( ErrMsg, ThisLoc )
        ENDIF
 
        !=====================================================================

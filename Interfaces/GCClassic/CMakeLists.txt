@@ -12,6 +12,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/gc_classic_version.H.in
 #-----------------------------------------------------------------------------
 add_library(GCClassic
   STATIC EXCLUDE_FROM_ALL
+  plume_checkpoint_mod.F90
   main.F90
 )
 target_link_libraries(GCClassic

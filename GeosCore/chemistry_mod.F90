@@ -69,6 +69,7 @@ CONTAINS
     USE LINEAR_CHEM_MOD,  ONLY : DO_LINEAR_CHEM
     USE MERCURY_MOD,      ONLY : CHEMMERCURY
     USE POPS_MOD,         ONLY : CHEMPOPS
+    USE Plume_Aging_Mod,  ONLY : Apply_Plume_Aging
     USE RnPbBe_MOD,       ONLY : CHEMRnPbBe
     USE RPMARES_MOD,      ONLY : DO_RPMARES
     USE SEASALT_MOD,      ONLY : CHEMSEASALT
@@ -892,6 +893,15 @@ CONTAINS
              RETURN
           ENDIF
 
+          ! Optional exact parent-to-product aging for the controlled plume
+          ! transport experiment. Disabled unless GC_PLUME_AGING is enabled.
+          CALL Apply_Plume_Aging( State_Chm, State_Grid, RC )
+          IF ( RC /= GC_SUCCESS ) THEN
+             ErrMsg = 'Error encountered in "Apply_Plume_Aging"!'
+             CALL GC_Error( ErrMsg, RC, ThisLoc )
+             RETURN
+          ENDIF
+
        !=====================================================================
        ! Tagged O3
        !=====================================================================
@@ -1122,6 +1132,7 @@ CONTAINS
     USE AEROSOL_MOD,    ONLY : AEROSOL_CONC
     USE AEROSOL_MOD,    ONLY : RDAER
     USE DUST_MOD,       ONLY : RDUST_ONLINE
+    USE Dry_Absorption_Diag_Mod, ONLY : Compute_Dry_Absorption_Diagnostics
     USE ErrCode_Mod
     USE ERROR_MOD,      ONLY : Debug_Msg
     USE Input_Opt_Mod,  ONLY : OptInput
@@ -1249,6 +1260,19 @@ CONTAINS
              !### Debug
              IF ( Input_Opt%Verbose ) THEN
                 CALL DEBUG_MSG( '### RECOMPUTE_OD: after RDUST' )
+             ENDIF
+
+             CALL Compute_Dry_Absorption_Diagnostics(                        &
+                  Input_Opt  = Input_Opt,                                    &
+                  State_Chm  = State_Chm,                                    &
+                  State_Diag = State_Diag,                                   &
+                  State_Grid = State_Grid,                                   &
+                  State_Met  = State_Met,                                    &
+                  RC         = RC                                           )
+             IF ( RC /= GC_SUCCESS ) THEN
+                ErrMsg = 'Error encountered in dry absorption diagnostics!'
+                CALL GC_Error( ErrMsg, RC, ThisLoc )
+                RETURN
              ENDIF
           ENDIF
        ENDIF

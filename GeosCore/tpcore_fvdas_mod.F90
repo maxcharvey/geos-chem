@@ -176,6 +176,11 @@ MODULE Tpcore_FvDas_Mod
   REAL(fp), ALLOCATABLE, SAVE :: cose(:)
   REAL(fp), ALLOCATABLE, SAVE :: gw(:)
   REAL(fp), ALLOCATABLE, SAVE :: DLAT(:)
+  LOGICAL, SAVE :: Qck_Bottom_Microclosure_Initialized = .FALSE.
+  REAL(fp), SAVE :: Qck_Bottom_Microclosure_Event_Max_Kg = 0.0_fp
+  REAL(fp), SAVE :: Qck_Bottom_Microclosure_Call_Max_Kg = 0.0_fp
+  REAL(fp), SAVE :: Qck_Bottom_Microclosure_Run_Max_Kg = 0.0_fp
+  REAL(f8), SAVE :: Qck_Bottom_Microclosure_Run_Total_Kg = 0.0_f8
 !
 ! !AUTHOR:
 ! Original code from Shian-Jiann Lin, GMAO
@@ -216,6 +221,7 @@ CONTAINS
 !
     USE PhysConstants
     USE ErrCode_Mod
+    USE Qck_Bottom_Sizing_Mod, ONLY : Qck_Bottom_Sizing_Reset
 !
 ! !INPUT PARAMETERS:
 !
@@ -265,6 +271,8 @@ CONTAINS
     RC      = GC_SUCCESS
     ErrMsg  = ''
     ThisLoc = ' -> at Init_Tpcore (in module GeosCore/tpcore_fvas_mod.F90)'
+    Qck_Bottom_Microclosure_Run_Total_Kg = 0.0_f8
+    CALL Qck_Bottom_Sizing_Reset()
 
     ! NOTE: since we are not using MPI parallelization, we can set JFIRST
     ! and JLAST to the global grid limits in latitude. (bmy, 12/3/08)
@@ -378,6 +386,20 @@ CONTAINS
 !------------------------------------------------------------------------------
 !BOC
 
+    USE Qck_Bottom_Sizing_Mod, ONLY : Qck_Bottom_Sizing_Write_Summary
+
+    IF ( Qck_Bottom_Microclosure_Run_Max_Kg > 0.0_fp ) THEN
+       WRITE( 6, '(a,es22.14,a,es22.14)' ) &
+            'QCK_BOTTOM bounded-production run closure summary: closure_kg=', &
+            Qck_Bottom_Microclosure_Run_Total_Kg, ', run_max_kg=', &
+            Qck_Bottom_Microclosure_Run_Max_Kg
+    ENDIF
+    CALL Qck_Bottom_Sizing_Write_Summary( &
+         Qck_Bottom_Microclosure_Run_Total_Kg, &
+         Qck_Bottom_Microclosure_Event_Max_Kg, &
+         Qck_Bottom_Microclosure_Call_Max_Kg, &
+         Qck_Bottom_Microclosure_Run_Max_Kg )
+
     ! Deallocate arrays only if they are allocated
     IF ( ALLOCATED( COSP   ) ) DEALLOCATE( COSP   )
     IF ( ALLOCATED( COSE   ) ) DEALLOCATE( COSE   )
@@ -416,9 +438,27 @@ CONTAINS
     ! Include files w/ physical constants and met values
     USE PhysConstants
     USE ErrCode_Mod
+    USE Plume_Tpcore_Budget_Mod, ONLY : Compute_Conc_Metrics,                &
+                                        Compute_Dq_Metrics,                  &
+                                        N_PLUME_TPCORE_TAGS,                  &
+                                        Plume_Tpcore_Metrics,                 &
+                                        Tpcore_Budget_Begin,                  &
+                                        Tpcore_Budget_Enabled,                &
+                                        Tpcore_Budget_Tag_Index,              &
+                                        Tpcore_Budget_Write_Positivity_Boundaries, &
+                                        Tpcore_Cell_Diagnostics_Enabled,      &
+                                        Tpcore_Cell_Diag_Begin,               &
+                                        Tpcore_Cell_Diag_Capture_Dq_After_Horizontal, &
+                                        Tpcore_Cell_Diag_Capture_Dq_After_Fzppm, &
+                                        Tpcore_Cell_Diag_Capture_Pre_Floor,  &
+                                        Tpcore_Cell_Diag_Capture_Post_Floor, &
+                                        Tpcore_Cell_Diag_Write
+    USE Qck_Bottom_Survey_Mod, ONLY : Qck_Bottom_Survey_Enabled
+    USE Qck_Bottom_Sizing_Mod, ONLY : Qck_Bottom_Sizing_Enabled, &
+                                      Qck_Bottom_Sizing_Next_Tpcore_Ordinal
     USE State_Chm_Mod,  ONLY : ChmState
     USE State_Diag_Mod, ONLY : DgnState
-    USE error_mod
+    USE Time_Mod, ONLY : GET_NHMS, GET_NYMD
 !
 ! !INPUT PARAMETERS:
 !
@@ -524,6 +564,9 @@ CONTAINS
     INTEGER            :: il, ij, ik, iq, k, j, i, Kflip
     INTEGER            :: num, k2m1, S
     INTEGER            :: north, south
+    INTEGER            :: plume_tag, qck_corrected
+    INTEGER            :: qck_model_date, qck_model_time
+    INTEGER            :: qck_tpcore_ordinal
 
     REAL(fp)           :: dap   (km)
     REAL(fp)           :: dbk   (km)
@@ -560,6 +603,16 @@ CONTAINS
     REAL(fp)           :: fz    (im, jm,   km, nq)
 
     LOGICAL, SAVE      :: first = .true.
+    LOGICAL            :: plume_tpcore_budget
+    LOGICAL            :: plume_tpcore_cell_diagnostics
+    LOGICAL            :: qck_bottom_survey
+    LOGICAL            :: qck_bottom_sizing
+
+    TYPE(Plume_Tpcore_Metrics) :: qck_pre_metrics(N_PLUME_TPCORE_TAGS)
+    TYPE(Plume_Tpcore_Metrics) :: qck_post_metrics(N_PLUME_TPCORE_TAGS)
+    TYPE(Plume_Tpcore_Metrics) :: pre_floor_metrics(N_PLUME_TPCORE_TAGS)
+    TYPE(Plume_Tpcore_Metrics) :: post_floor_metrics(N_PLUME_TPCORE_TAGS)
+    INTEGER :: qck_corrected_cells(N_PLUME_TPCORE_TAGS)
 
     !     ----------------------------------------------------
     !     ilmt : controls various options in E-W     advection
@@ -600,6 +653,22 @@ CONTAINS
       end do
       end do
 #endif
+
+    plume_tpcore_budget = Tpcore_Budget_Enabled()
+    qck_bottom_survey = Qck_Bottom_Survey_Enabled()
+    qck_bottom_sizing = Qck_Bottom_Sizing_Enabled()
+    qck_model_date = GET_NYMD()
+    qck_model_time = GET_NHMS()
+    qck_tpcore_ordinal = Qck_Bottom_Sizing_Next_Tpcore_Ordinal()
+    plume_tpcore_cell_diagnostics = .FALSE.
+    IF ( plume_tpcore_budget ) THEN
+       CALL Tpcore_Budget_Begin( State_Chm, ak, bk, ps1, area_m2, nq, dt, &
+                                 FILL )
+       plume_tpcore_cell_diagnostics = Tpcore_Cell_Diagnostics_Enabled()
+       IF ( plume_tpcore_cell_diagnostics ) THEN
+          CALL Tpcore_Cell_Diag_Begin( im, jm, km )
+       ENDIF
+    ENDIF
 
     ! Average surf. pressures in the polar cap. (ccc, 11/20/08)
     CALL Average_Press_Poles( area_m2, ps1, 1, im, 1, jm, 1, im, 1, jm )
@@ -773,12 +842,16 @@ CONTAINS
 ! to PRIVATE loop variables.  This seems to avoid small diffs in output.
 !   -- Bob Yantosca (04 Jan 2022)
 !---------------------------------------------------------------------------
+    IF ( plume_tpcore_budget ) qck_corrected_cells = 0
 !$OMP PARALLEL DO                                                     &
 !$OMP DEFAULT( SHARED                                               ) &
-!$OMP PRIVATE( iq, dq1, ik, adx, ady, q_ptr, qqu, qqv, north, south )
+!$OMP PRIVATE( iq, dq1, ik, adx, ady, q_ptr, qqu, qqv, north, south, &
+!$OMP          plume_tag, qck_corrected )
     do iq = 1, nq
 
        q_ptr => State_Chm%Species(iq)%Conc(:,:,km:1:-1)
+       plume_tag = 0
+       IF ( plume_tpcore_budget ) plume_tag = Tpcore_Budget_Tag_Index( iq )
 
        ! Zero 3-D arrays for each species
        dq1 = 0.0_fp
@@ -906,6 +979,10 @@ CONTAINS
 
        end do  ! IK
 
+       IF ( plume_tpcore_cell_diagnostics .and. plume_tag > 0 ) THEN
+          CALL Tpcore_Cell_Diag_Capture_Dq_After_Horizontal( plume_tag, dq1 )
+       ENDIF
+
      ! ==========
        call Fzppm                                                            &
      ! ==========
@@ -918,15 +995,32 @@ CONTAINS
        !   dq1 (inout) : species density (mb)
        !   q (in) : species concentration (mixing ratio)
        !.sds
+       IF ( plume_tpcore_cell_diagnostics .and. plume_tag > 0 ) THEN
+          CALL Tpcore_Cell_Diag_Capture_Dq_After_Fzppm( plume_tag, dq1 )
+       ENDIF
+       IF ( plume_tag > 0 ) THEN
+          CALL Compute_Dq_Metrics( dq1, delp2, area_m2, &
+                                   qck_pre_metrics(plume_tag) )
+       ENDIF
 
-
-
-       if (FILL) then
+       IF ( FILL ) THEN
         ! ===========
           call Qckxyz                                                        &
         ! ===========
-               (dq1, j1p, j2p, 1, jm, 1, im, 1, jm, 1, im, 1, jm, 1, km     )
-       end if
+               (dq1, j1p, j2p, 1, jm, 1, im, 1, jm, 1, im, 1, jm, 1, km,     &
+                qck_corrected, plume_tag, plume_tpcore_cell_diagnostics, iq,  &
+                State_Chm%SpcData(iq)%Info%Name, area_m2, qck_bottom_survey, &
+                qck_bottom_sizing, qck_model_date, qck_model_time, &
+                qck_tpcore_ordinal )
+          IF ( plume_tag > 0 ) THEN
+             CALL Compute_Dq_Metrics( dq1, delp2, area_m2, &
+                                      qck_post_metrics(plume_tag) )
+             qck_corrected_cells(plume_tag) = qck_corrected
+          ENDIF
+       ELSE IF ( plume_tag > 0 ) THEN
+          qck_post_metrics(plume_tag) = qck_pre_metrics(plume_tag)
+          qck_corrected_cells(plume_tag) = 0
+       ENDIF
 
        q_ptr(:,:,:) =  &
             dq1 / delp2
@@ -939,6 +1033,14 @@ CONTAINS
 
        end if
 
+       IF ( plume_tag > 0 ) THEN
+          IF ( plume_tpcore_cell_diagnostics ) THEN
+             CALL Tpcore_Cell_Diag_Capture_Pre_Floor( plume_tag, q_ptr )
+          ENDIF
+          CALL Compute_Conc_Metrics( q_ptr, delp2, area_m2, &
+                                     pre_floor_metrics(plume_tag) )
+       ENDIF
+
        !========================================================================
        ! MODIFICATION by Harvard Atmospheric Chemistry Modeling Group
        !
@@ -950,11 +1052,31 @@ CONTAINS
           q_ptr = 1.0e-26_fp
        ENDWHERE
 
+       IF ( plume_tag > 0 ) THEN
+          IF ( plume_tpcore_cell_diagnostics ) THEN
+             CALL Tpcore_Cell_Diag_Capture_Post_Floor( plume_tag, q_ptr )
+          ENDIF
+          CALL Compute_Conc_Metrics( q_ptr, delp2, area_m2, &
+                                     post_floor_metrics(plume_tag) )
+       ENDIF
+
        q_ptr => NULL()
 
     ENDDO
 !$OMP END PARALLEL DO
-       
+
+    IF ( plume_tpcore_budget ) THEN
+       CALL Tpcore_Budget_Write_Positivity_Boundaries( qck_pre_metrics, &
+                                                        qck_post_metrics, &
+                                                        qck_corrected_cells, &
+                                                        pre_floor_metrics, &
+                                                        post_floor_metrics, &
+                                                        delp2, area_m2 )
+    ENDIF
+    IF ( plume_tpcore_cell_diagnostics ) THEN
+       CALL Tpcore_Cell_Diag_Write( delp2, area_m2 )
+    ENDIF
+
     !======================================================================
     ! MODIFICATION by Harvard Atmospheric Chemistry Modeling Group
     !
@@ -1839,10 +1961,30 @@ CONTAINS
 !
   SUBROUTINE Qckxyz( dq1, J1P, J2P,  JU1_GL, J2_GL, &
                      ILO, IHI, JULO, JHI,    I1,    &
-                     I2,  JU1, J2,   K1,     K2 )
+                     I2,  JU1, J2,   K1,     K2,     N_Corrected, &
+                     Plume_Tag, Cell_Diagnostics, Species_Index, Species_Name, &
+                     Area_M2, Survey_Native_Behavior, Sizing_Diagnostics, &
+                     Model_Date, Model_Time, Tpcore_Ordinal )
 !
 ! !INPUT PARAMETERS:
 !
+    USE ERROR_MOD, ONLY : Error_Stop
+    USE PhysConstants, ONLY : g0_100
+    USE Plume_Tpcore_Budget_Mod, ONLY : PLUME_QCK_TOP, PLUME_QCK_INTERIOR, &
+                                        PLUME_QCK_BOTTOM,                  &
+                                        Tpcore_Cell_Diag_Record_Qckxyz
+    USE Qck_Positivity_Mod, ONLY : Qck_Bottom_Conservative,                &
+                                    Qck_Interior_Correct,                   &
+                                    QCK_BOTTOM_ABSOLUTE_TOLERANCE,          &
+                                    QCK_BOTTOM_EXACT,                       &
+                                    QCK_BOTTOM_INVALID_DONOR,               &
+                                    QCK_BOTTOM_MICROCLOSURE,                &
+                                    QCK_BOTTOM_RELATIVE_TOLERANCE,          &
+                                    QCK_BOTTOM_ROUNDOFF,                    &
+                                    QCK_BOTTOM_UNFILLABLE
+    USE Qck_Bottom_Survey_Mod, ONLY : Qck_Bottom_Survey_Write
+    USE Qck_Bottom_Sizing_Mod, ONLY : Qck_Bottom_Sizing_Record_Call
+
     ! Global latitude indices at the edges of the S/N polar caps
     ! J1P=JU1_GL+1; J2P=J2_GL-1 for a polar cap of 1 latitude band
     ! J1P=JU1_GL+2; J2P=J2_GL-2 for a polar cap of 2 latitude bands
@@ -1855,6 +1997,16 @@ CONTAINS
     INTEGER, INTENT(IN)  :: I1,     I2
     INTEGER, INTENT(IN)  :: JU1,    J2
     INTEGER, INTENT(IN)  :: K1,     K2
+    INTEGER, INTENT(OUT) :: N_Corrected
+    INTEGER, INTENT(IN)  :: Plume_Tag
+    LOGICAL, INTENT(IN)  :: Cell_Diagnostics
+    INTEGER, INTENT(IN)  :: Species_Index
+    CHARACTER(LEN=*), INTENT(IN) :: Species_Name
+    REAL(fp), INTENT(IN) :: Area_M2(:)
+    LOGICAL, INTENT(IN)  :: Survey_Native_Behavior
+    LOGICAL, INTENT(IN)  :: Sizing_Diagnostics
+    INTEGER, INTENT(IN)  :: Model_Date, Model_Time
+    INTEGER, INTENT(IN)  :: Tpcore_Ordinal
 
     ! Local min & max longitude (I) and latitude (J) indices
     INTEGER, INTENT(IN)  :: ILO,    IHI
@@ -1886,18 +2038,80 @@ CONTAINS
 ! LOCAL VARIABLES:
 !
     INTEGER :: il, ij, ik
-    INTEGER :: ip
     INTEGER :: k1p1, k2m1
+    INTEGER :: qck_bottom_status, qck_bottom_donor_count
+    INTEGER :: qck_failure_status, qck_failure_i, qck_failure_j
+    INTEGER :: qck_sizing_attempted_i, qck_sizing_attempted_j
+    INTEGER :: qck_sizing_attempted_status
+    INTEGER :: qck_sizing_accepted_i, qck_sizing_accepted_j
     REAL(fp)  :: dup, qup
     REAL(fp)  :: qly
-    REAL(fp)  :: sum
+    REAL(fp)  :: column_total_above, column_positive_above
+    REAL(fp)  :: qck_bottom_deficit, qck_bottom_available
+    REAL(fp)  :: qck_bottom_withdrawn, qck_bottom_closure
+    REAL(fp)  :: qck_bottom_tolerance
+    REAL(fp)  :: qck_bottom_microclosure_tolerance
+    REAL(fp)  :: qck_microclosure_event_max_kg
+    REAL(fp)  :: qck_microclosure_call_max_kg
+    REAL(fp)  :: qck_microclosure_run_max_kg
+    REAL(fp)  :: qck_failure_deficit, qck_failure_available
+    REAL(fp)  :: qck_failure_tolerance
+    REAL(f8)  :: qck_microclosure_total_kg
+    REAL(f8)  :: qck_sizing_attempted_event_kg
+    REAL(f8)  :: qck_sizing_accepted_event_kg
+    INTEGER   :: survey_status(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_deficit(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_available(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_shortfall(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_tolerance(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_immediate(I1:I2,J1P:J2P)
+    REAL(fp)  :: survey_column(K1:K2)
+    REAL(f8)  :: qck_sizing_attempted_kg(I1:I2,J1P:J2P)
+    REAL(f8)  :: qck_sizing_accepted_kg(I1:I2,J1P:J2P)
+    INTEGER   :: qck_sizing_status(I1:I2,J1P:J2P)
+    CHARACTER(LEN=255) :: ErrMsg, ThisLoc
 
 
 !     ----------------
 !     Begin execution.
 !     ----------------
 
-    ip = 0
+    N_Corrected = 0
+    qck_microclosure_event_max_kg = 0.0_fp
+    qck_microclosure_call_max_kg  = 0.0_fp
+    qck_microclosure_run_max_kg   = 0.0_fp
+    qck_microclosure_total_kg     = 0.0_f8
+    CALL Get_Qck_Bottom_Microclosure_Limits( &
+         qck_microclosure_event_max_kg, qck_microclosure_call_max_kg, &
+         qck_microclosure_run_max_kg )
+    IF ( Survey_Native_Behavior .and. &
+         qck_microclosure_event_max_kg > 0.0_fp ) THEN
+       ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+       ErrMsg = 'QCK_BOTTOM native survey and microclosure ceilings are mutually exclusive'
+       CALL Error_Stop( ErrMsg, ThisLoc )
+    ENDIF
+    IF ( Sizing_Diagnostics .and. Survey_Native_Behavior ) THEN
+       ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+       ErrMsg = 'QCK_BOTTOM sizing diagnostics require native survey to be disabled'
+       CALL Error_Stop( ErrMsg, ThisLoc )
+    ENDIF
+    IF ( Sizing_Diagnostics .and. &
+         ( qck_microclosure_event_max_kg <= 0.0_fp .or. &
+           qck_microclosure_call_max_kg <= 0.0_fp .or. &
+           qck_microclosure_run_max_kg <= 0.0_fp ) ) THEN
+       ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+       ErrMsg = 'QCK_BOTTOM sizing diagnostics require event, call, and run ceilings'
+       CALL Error_Stop( ErrMsg, ThisLoc )
+    ENDIF
+    IF ( .not. Survey_Native_Behavior ) THEN
+       IF ( qck_microclosure_event_max_kg > 0.0_fp ) THEN
+          IF ( g0_100 <= 0.0_fp .or. ANY( Area_M2 <= 0.0_fp ) ) THEN
+             ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+             ErrMsg = 'QCK_BOTTOM microclosure requires positive area and gravity'
+             CALL Error_Stop( ErrMsg, ThisLoc )
+          ENDIF
+       ENDIF
+    ENDIF
 
 
 !     ----------
@@ -1908,13 +2122,19 @@ CONTAINS
 
     !$OMP PARALLEL DO          &
     !$OMP DEFAULT( SHARED )    &
-    !$OMP PRIVATE( IJ, IL, IP )
+    !$OMP PRIVATE( IJ, IL )    &
+    !$OMP REDUCTION( +:N_Corrected )
     do ij = j1p, j2p
        do il = i1, i2
 
           if (dq1(il,ij,k1) < 0.0e+0_fp) then
 
-             ip = ip + 1
+             N_Corrected = N_Corrected + 1
+             IF ( Cell_Diagnostics .and. Plume_Tag > 0 ) THEN
+                CALL Tpcore_Cell_Diag_Record_Qckxyz( Plume_Tag, PLUME_QCK_TOP, &
+                     il, ij, k1, dq1(il,ij,k1), 0.0_fp, -dq1(il,ij,k1), &
+                     0.0_fp, 0.0_fp, 0.0_fp )
+             ENDIF
 
              dq1(il,ij,k1p1) = dq1(il,ij,k1p1) + dq1(il,ij,k1)
              dq1(il,ij,k1)   = 0.0e+0_fp
@@ -1930,13 +2150,14 @@ CONTAINS
 
        !$OMP PARALLEL DO                         &
        !$OMP DEFAULT( SHARED )                   &
-       !$OMP PRIVATE( IJ, IL, IP, QUP, QLY, DUP )
+       !$OMP PRIVATE( IJ, IL, QUP, QLY, DUP )    &
+       !$OMP REDUCTION( +:N_Corrected )
        do ij = j1p, j2p
           do il = i1, i2
 
              if (dq1(il,ij,ik) < 0.0e+0_fp) then
 
-                ip = ip + 1
+                N_Corrected = N_Corrected + 1
 
 !             -----------
 !             From above.
@@ -1946,15 +2167,14 @@ CONTAINS
                 qly = -dq1(il,ij,ik)
                 dup =  Min (qly, qup)
 
-                dq1(il,ij,ik-1) = qup - dup
-                dq1(il,ij,ik)   = dup - qly
+                IF ( Cell_Diagnostics .and. Plume_Tag > 0 ) THEN
+                   CALL Tpcore_Cell_Diag_Record_Qckxyz( Plume_Tag, &
+                        PLUME_QCK_INTERIOR, il, ij, ik, dq1(il,ij,ik), &
+                        qup, qly, dup, 0.0_fp, 0.0_fp )
+                ENDIF
 
-!             -----------
-!             From below.
-!             -----------
-
-                dq1(il,ij,ik+1) = dq1(il,ij,ik+1) + dq1(il,ij,ik)
-                dq1(il,ij,ik)   = 0.0e+0_fp
+                CALL Qck_Interior_Correct( dq1(il,ij,ik-1), dq1(il,ij,ik), &
+                                            dq1(il,ij,ik+1) )
 
              end if
 
@@ -1969,21 +2189,43 @@ CONTAINS
 !     Bottom layer.
 !     -------------
 
-    sum  = 0.0e+0_fp
-
     k2m1 = k2 - 1
+    qck_failure_status    = QCK_BOTTOM_EXACT
+    qck_failure_i         = HUGE( 0 )
+    qck_failure_j         = HUGE( 0 )
+    qck_failure_deficit   = 0.0_fp
+    qck_failure_available = 0.0_fp
+    qck_failure_tolerance = 0.0_fp
+    IF ( Survey_Native_Behavior ) THEN
+       survey_status    = -1
+       survey_deficit   = 0.0_fp
+       survey_available = 0.0_fp
+       survey_shortfall = 0.0_fp
+       survey_tolerance = 0.0_fp
+       survey_immediate = 0.0_fp
+    ENDIF
+    IF ( Sizing_Diagnostics ) THEN
+       qck_sizing_attempted_kg = 0.0_f8
+       qck_sizing_accepted_kg  = 0.0_f8
+       qck_sizing_status       = QCK_BOTTOM_EXACT
+    ENDIF
 
-    ! NOTE: Sum seems to be not used in the loop below!
-    !$OMP PARALLEL DO                          &
-    !$OMP DEFAULT( SHARED )                    &
-    !$OMP PRIVATE( IJ, IL, IP, QUP, QLY, DUP ) &
-    !$OMP REDUCTION( +:SUM )
+    !$OMP PARALLEL DO                                               &
+    !$OMP DEFAULT( SHARED )                                         &
+    !$OMP PRIVATE( IJ, IL, IK, QUP, QLY, DUP, COLUMN_TOTAL_ABOVE,  &
+    !$OMP          COLUMN_POSITIVE_ABOVE, QCK_BOTTOM_STATUS,        &
+    !$OMP          QCK_BOTTOM_DONOR_COUNT, QCK_BOTTOM_DEFICIT,      &
+    !$OMP          QCK_BOTTOM_AVAILABLE, QCK_BOTTOM_WITHDRAWN,      &
+    !$OMP          QCK_BOTTOM_CLOSURE, QCK_BOTTOM_TOLERANCE,        &
+    !$OMP          QCK_BOTTOM_MICROCLOSURE_TOLERANCE,                &
+    !$OMP          SURVEY_COLUMN )                                  &
+    !$OMP REDUCTION( +:N_Corrected, QCK_MICROCLOSURE_TOTAL_KG )
     do ij = j1p, j2p
        do il = i1, i2
 
           if (dq1(il,ij,k2) < 0.0e+0_fp) then
 
-             ip = ip + 1
+             N_Corrected = N_Corrected + 1
 
 !           -----------
 !           From above.
@@ -1993,21 +2235,209 @@ CONTAINS
              qly = -dq1(il,ij,k2)
              dup = Min (qly, qup)
 
-             dq1(il,ij,k2m1) = qup - dup
+             IF ( Cell_Diagnostics .and. Plume_Tag > 0 ) THEN
+                column_total_above    = 0.0_fp
+                do ik = k1, k2m1
+                   column_total_above = column_total_above + dq1(il,ij,ik)
+                end do
+             ENDIF
 
-!           -------------------------
-!           From "below" the surface.
-!           -------------------------
+             IF ( Survey_Native_Behavior ) THEN
+                survey_column = dq1(il,ij,k1:k2)
+                CALL Qck_Bottom_Conservative( survey_column, &
+                     QCK_BOTTOM_RELATIVE_TOLERANCE, &
+                     QCK_BOTTOM_ABSOLUTE_TOLERANCE, qck_bottom_status, &
+                     qck_bottom_deficit, qck_bottom_available, &
+                     qck_bottom_withdrawn, qck_bottom_closure, &
+                     qck_bottom_tolerance, qck_bottom_donor_count )
+                survey_status(il,ij)    = qck_bottom_status
+                survey_deficit(il,ij)   = qck_bottom_deficit
+                survey_available(il,ij) = qck_bottom_available
+                IF ( qck_bottom_status == QCK_BOTTOM_ROUNDOFF ) THEN
+                   survey_shortfall(il,ij) = qck_bottom_closure
+                ELSE
+                   survey_shortfall(il,ij) = MAX( qck_bottom_deficit - &
+                                                   qck_bottom_available, &
+                                                   0.0_fp )
+                ENDIF
+                survey_tolerance(il,ij) = qck_bottom_tolerance
+                survey_immediate(il,ij) = qup
 
-             sum = sum + qly - dup
+                ! Preserve the historical QCK_BOTTOM path in survey mode.
+                dq1(il,ij,k2m1) = qup - dup
+                dq1(il,ij,k2)   = 0.0e+0_fp
+             ELSE
+                qck_bottom_microclosure_tolerance = 0.0_fp
+                IF ( qck_microclosure_event_max_kg > 0.0_fp ) THEN
+                   qck_bottom_microclosure_tolerance = &
+                        qck_microclosure_event_max_kg / &
+                        ( Area_M2(ij) * g0_100 )
+                ENDIF
+                CALL Qck_Bottom_Conservative( dq1(il,ij,k1:k2), &
+                     QCK_BOTTOM_RELATIVE_TOLERANCE, &
+                     QCK_BOTTOM_ABSOLUTE_TOLERANCE, qck_bottom_status, &
+                     qck_bottom_deficit, qck_bottom_available, &
+                     qck_bottom_withdrawn, qck_bottom_closure, &
+                     qck_bottom_tolerance, qck_bottom_donor_count, &
+                     Microclosure_Tolerance=qck_bottom_microclosure_tolerance )
+                IF ( Sizing_Diagnostics .and. &
+                     ( qck_bottom_status == QCK_BOTTOM_ROUNDOFF .or. &
+                       qck_bottom_status == QCK_BOTTOM_MICROCLOSURE ) ) THEN
+                   qck_sizing_attempted_kg(il,ij) = &
+                        REAL( MAX( qck_bottom_deficit - qck_bottom_available, &
+                                   0.0_fp ), f8 ) * REAL( Area_M2(ij), f8 ) * &
+                        REAL( g0_100, f8 )
+                   qck_sizing_status(il,ij) = qck_bottom_status
+                   IF ( qck_bottom_status == QCK_BOTTOM_MICROCLOSURE ) THEN
+                      qck_sizing_accepted_kg(il,ij) = &
+                           REAL( qck_bottom_closure, f8 ) * &
+                           REAL( Area_M2(ij), f8 ) * REAL( g0_100, f8 )
+                   ENDIF
+                ENDIF
+                IF ( qck_bottom_status == QCK_BOTTOM_MICROCLOSURE ) THEN
+                   qck_microclosure_total_kg = qck_microclosure_total_kg + &
+                        REAL( qck_bottom_closure, f8 ) * REAL( Area_M2(ij), f8 ) * &
+                        REAL( g0_100, f8 )
+                ENDIF
+             ENDIF
 
-             dq1(il,ij,k2) = 0.0e+0_fp
+             IF ( .not. Survey_Native_Behavior .and. &
+                  ( qck_bottom_status == QCK_BOTTOM_UNFILLABLE .or. &
+                    qck_bottom_status == QCK_BOTTOM_INVALID_DONOR ) ) THEN
+                !$OMP CRITICAL (QCK_BOTTOM_FAILURE)
+                IF ( qck_failure_status == QCK_BOTTOM_EXACT .or. &
+                     ij < qck_failure_j .or. &
+                     ( ij == qck_failure_j .and. il < qck_failure_i ) ) THEN
+                   qck_failure_status    = qck_bottom_status
+                   qck_failure_i         = il
+                   qck_failure_j         = ij
+                   qck_failure_deficit   = qck_bottom_deficit
+                   qck_failure_available = qck_bottom_available
+                   qck_failure_tolerance = qck_bottom_tolerance
+                ENDIF
+                !$OMP END CRITICAL (QCK_BOTTOM_FAILURE)
+             ELSEIF ( .not. Survey_Native_Behavior .and. &
+                      Cell_Diagnostics .and. Plume_Tag > 0 ) THEN
+                column_positive_above = qck_bottom_available
+                CALL Tpcore_Cell_Diag_Record_Qckxyz( Plume_Tag, &
+                     PLUME_QCK_BOTTOM, il, ij, k2, -qly, &
+                     qup, qly, dup, column_total_above, &
+                     column_positive_above, &
+                     Correction_Status=qck_bottom_status, &
+                     Donor_Count=qck_bottom_donor_count, &
+                     Full_Column_Withdrawn=qck_bottom_withdrawn, &
+                     Declared_Closure=qck_bottom_closure, &
+                     Correction_Tolerance=qck_bottom_tolerance, &
+                     Microclosure_Event_Max_Kg=qck_microclosure_event_max_kg, &
+                     Microclosure_Call_Max_Kg=qck_microclosure_call_max_kg )
+             ENDIF
 
           end if
 
        end do
     end do
     !$OMP END PARALLEL DO
+
+    IF ( Survey_Native_Behavior ) THEN
+       CALL Qck_Bottom_Survey_Write( Species_Index, k2, i1, j1p, Area_M2, &
+                                      survey_status, survey_deficit, &
+                                      survey_available, survey_shortfall, &
+                                      survey_tolerance, &
+                                      survey_immediate )
+    ENDIF
+
+    IF ( Sizing_Diagnostics ) THEN
+       qck_sizing_attempted_event_kg = 0.0_f8
+       qck_sizing_attempted_i = -1
+       qck_sizing_attempted_j = -1
+       qck_sizing_attempted_status = -1
+       qck_sizing_accepted_event_kg = 0.0_f8
+       qck_sizing_accepted_i = -1
+       qck_sizing_accepted_j = -1
+       DO ij = j1p, j2p
+          DO il = i1, i2
+             IF ( qck_sizing_attempted_kg(il,ij) > &
+                  qck_sizing_attempted_event_kg ) THEN
+                qck_sizing_attempted_event_kg = &
+                     qck_sizing_attempted_kg(il,ij)
+                qck_sizing_attempted_i = il
+                qck_sizing_attempted_j = ij
+                qck_sizing_attempted_status = qck_sizing_status(il,ij)
+             ENDIF
+             IF ( qck_sizing_accepted_kg(il,ij) > &
+                  qck_sizing_accepted_event_kg ) THEN
+                qck_sizing_accepted_event_kg = &
+                     qck_sizing_accepted_kg(il,ij)
+                qck_sizing_accepted_i = il
+                qck_sizing_accepted_j = ij
+             ENDIF
+          ENDDO
+       ENDDO
+       CALL Qck_Bottom_Sizing_Record_Call( &
+            qck_sizing_attempted_event_kg, qck_sizing_attempted_i, &
+            qck_sizing_attempted_j, k2, qck_sizing_attempted_status, &
+            qck_sizing_accepted_event_kg, qck_sizing_accepted_i, &
+            qck_sizing_accepted_j, k2, qck_microclosure_total_kg, &
+            Species_Index, Species_Name, Model_Date, Model_Time, &
+            Tpcore_Ordinal )
+    ENDIF
+
+    IF ( .not. Survey_Native_Behavior .and. &
+         ( qck_failure_status == QCK_BOTTOM_UNFILLABLE .or. &
+           qck_failure_status == QCK_BOTTOM_INVALID_DONOR ) ) THEN
+       ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+       IF ( qck_failure_status == QCK_BOTTOM_UNFILLABLE ) THEN
+          WRITE( ErrMsg, '(a,i0,a,i0,a,i0,a,i0,a,es12.5,a,es12.5,a,es12.5,a,es12.5)' ) &
+               'QCK_BOTTOM full-column donor mass is insufficient at I=', &
+               qck_failure_i, ', J=', qck_failure_j, ', K=', k2, ', tracer=', &
+               Species_Index, &
+               ': deficit_hpa=', qck_failure_deficit, ', available_hpa=', &
+               qck_failure_available, ', tolerance_hpa=', qck_failure_tolerance, &
+               ', microclosure_event_max_kg=', qck_microclosure_event_max_kg
+       ELSEIF ( qck_failure_status == QCK_BOTTOM_INVALID_DONOR ) THEN
+          WRITE( ErrMsg, '(a,i0,a,i0,a,i0,a,i0,a,es12.5,a,es12.5,a,es12.5)' ) &
+               'QCK_BOTTOM donor precondition failed at I=', qck_failure_i, &
+               ', J=', qck_failure_j, ', K=', k2, ', tracer=', Species_Index, &
+               ': deficit_hpa=', &
+               qck_failure_deficit, ', available_hpa=', qck_failure_available, &
+               ', tolerance_hpa=', qck_failure_tolerance
+       ELSE
+          ErrMsg = 'QCK_BOTTOM remediation returned an unknown status'
+       ENDIF
+       CALL Error_Stop( ErrMsg, ThisLoc )
+    ENDIF
+
+    IF ( .not. Survey_Native_Behavior .and. &
+         qck_microclosure_total_kg > REAL( qck_microclosure_call_max_kg, f8 ) ) THEN
+       ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+       WRITE( ErrMsg, '(a,i0,a,es12.5,a,es12.5)' ) &
+            'QCK_BOTTOM microclosure call ceiling exceeded for tracer=', &
+            Species_Index, ': closure_kg=', qck_microclosure_total_kg, &
+            ', call_max_kg=', qck_microclosure_call_max_kg
+       CALL Error_Stop( ErrMsg, ThisLoc )
+    ENDIF
+
+    IF ( .not. Survey_Native_Behavior .and. &
+         qck_microclosure_total_kg > 0.0_f8 ) THEN
+!$OMP CRITICAL( Qck_Bottom_Run_Closure )
+       IF ( qck_microclosure_run_max_kg > 0.0_fp .and. &
+            Qck_Bottom_Microclosure_Run_Total_Kg + &
+            qck_microclosure_total_kg > &
+            REAL( qck_microclosure_run_max_kg, f8 ) ) THEN
+          ThisLoc = ' -> at Qckxyz (in tpcore_fvdas_mod.F90)'
+          WRITE( ErrMsg, '(a,i0,a,es12.5,a,es12.5,a,es12.5)' ) &
+               'QCK_BOTTOM microclosure run ceiling exceeded for tracer=', &
+               Species_Index, ': prior_closure_kg=', &
+               Qck_Bottom_Microclosure_Run_Total_Kg, ', call_closure_kg=', &
+               qck_microclosure_total_kg, ', run_max_kg=', &
+               qck_microclosure_run_max_kg
+          CALL Error_Stop( ErrMsg, ThisLoc )
+       ENDIF
+       Qck_Bottom_Microclosure_Run_Total_Kg = &
+            Qck_Bottom_Microclosure_Run_Total_Kg + &
+            qck_microclosure_total_kg
+!$OMP END CRITICAL( Qck_Bottom_Run_Closure )
+    ENDIF
 
 ! We don't want to replace zero values by 1e-30. (ccc, 11/20/08)
 !!     =======================================
@@ -2017,6 +2447,92 @@ CONTAINS
 
   END SUBROUTINE Qckxyz
 !EOC
+!------------------------------------------------------------------------------
+  SUBROUTINE Get_Qck_Bottom_Microclosure_Limits( Event_Max_Kg, Call_Max_Kg, &
+                                                  Run_Max_Kg )
+
+    USE ERROR_MOD, ONLY : Error_Stop
+    USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY : IEEE_IS_FINITE
+
+    REAL(fp), INTENT(OUT) :: Event_Max_Kg, Call_Max_Kg, Run_Max_Kg
+
+    CHARACTER(LEN=1024) :: Event_Value, Call_Value, Run_Value
+    CHARACTER(LEN=255)  :: ErrMsg, ThisLoc
+    INTEGER             :: Event_Status, Call_Status, Run_Status, IO_Status
+    LOGICAL             :: Event_Provided, Call_Provided, Run_Provided
+
+    IF ( .not. Qck_Bottom_Microclosure_Initialized ) THEN
+!$OMP CRITICAL( Qck_Bottom_Limit_Initialization )
+       IF ( .not. Qck_Bottom_Microclosure_Initialized ) THEN
+       Event_Value = ''
+       Call_Value = ''
+       Run_Value = ''
+       CALL GET_ENVIRONMENT_VARIABLE( &
+            'GC_QCK_BOTTOM_MICROCLOSURE_EVENT_MAX_KG', Event_Value, &
+            STATUS=Event_Status )
+       CALL GET_ENVIRONMENT_VARIABLE( &
+            'GC_QCK_BOTTOM_MICROCLOSURE_CALL_MAX_KG', Call_Value, &
+            STATUS=Call_Status )
+       CALL GET_ENVIRONMENT_VARIABLE( &
+            'GC_QCK_BOTTOM_MICROCLOSURE_RUN_MAX_KG', Run_Value, &
+            STATUS=Run_Status )
+       Event_Provided = Event_Status == 0 .and. LEN_TRIM( Event_Value ) > 0
+       Call_Provided  = Call_Status == 0 .and. LEN_TRIM( Call_Value ) > 0
+       Run_Provided   = Run_Status == 0 .and. LEN_TRIM( Run_Value ) > 0
+       ThisLoc = ' -> at Get_Qck_Bottom_Microclosure_Limits ' // &
+                 '(in tpcore_fvdas_mod.F90)'
+
+       IF ( Event_Provided .neqv. Call_Provided ) THEN
+          ErrMsg = 'Both QCK_BOTTOM microclosure mass ceilings must be set together'
+          CALL Error_Stop( ErrMsg, ThisLoc )
+       ENDIF
+       IF ( Run_Provided .and. .not. Event_Provided ) THEN
+          ErrMsg = 'QCK_BOTTOM run ceiling requires event and call ceilings'
+          CALL Error_Stop( ErrMsg, ThisLoc )
+       ENDIF
+
+       Qck_Bottom_Microclosure_Event_Max_Kg = 0.0_fp
+       Qck_Bottom_Microclosure_Call_Max_Kg = 0.0_fp
+       Qck_Bottom_Microclosure_Run_Max_Kg = 0.0_fp
+       IF ( Event_Provided ) THEN
+          READ( Event_Value, *, IOSTAT=IO_Status ) &
+               Qck_Bottom_Microclosure_Event_Max_Kg
+          IF ( IO_Status /= 0 .or. &
+               .not. IEEE_IS_FINITE( Qck_Bottom_Microclosure_Event_Max_Kg ) .or. &
+               .not. ( Qck_Bottom_Microclosure_Event_Max_Kg > 0.0_fp ) ) THEN
+             ErrMsg = 'GC_QCK_BOTTOM_MICROCLOSURE_EVENT_MAX_KG must be positive'
+             CALL Error_Stop( ErrMsg, ThisLoc )
+          ENDIF
+
+          READ( Call_Value, *, IOSTAT=IO_Status ) &
+               Qck_Bottom_Microclosure_Call_Max_Kg
+          IF ( IO_Status /= 0 .or. &
+               .not. IEEE_IS_FINITE( Qck_Bottom_Microclosure_Call_Max_Kg ) .or. &
+               .not. ( Qck_Bottom_Microclosure_Call_Max_Kg > 0.0_fp ) ) THEN
+             ErrMsg = 'GC_QCK_BOTTOM_MICROCLOSURE_CALL_MAX_KG must be positive'
+             CALL Error_Stop( ErrMsg, ThisLoc )
+          ENDIF
+       ENDIF
+       IF ( Run_Provided ) THEN
+          READ( Run_Value, *, IOSTAT=IO_Status ) &
+               Qck_Bottom_Microclosure_Run_Max_Kg
+          IF ( IO_Status /= 0 .or. &
+               .not. IEEE_IS_FINITE( Qck_Bottom_Microclosure_Run_Max_Kg ) .or. &
+               .not. ( Qck_Bottom_Microclosure_Run_Max_Kg > 0.0_fp ) ) THEN
+             ErrMsg = 'GC_QCK_BOTTOM_MICROCLOSURE_RUN_MAX_KG must be positive'
+             CALL Error_Stop( ErrMsg, ThisLoc )
+          ENDIF
+       ENDIF
+       Qck_Bottom_Microclosure_Initialized = .TRUE.
+       ENDIF
+!$OMP END CRITICAL( Qck_Bottom_Limit_Initialization )
+    ENDIF
+
+    Event_Max_Kg = Qck_Bottom_Microclosure_Event_Max_Kg
+    Call_Max_Kg  = Qck_Bottom_Microclosure_Call_Max_Kg
+    Run_Max_Kg   = Qck_Bottom_Microclosure_Run_Max_Kg
+
+  END SUBROUTINE Get_Qck_Bottom_Microclosure_Limits
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
 !------------------------------------------------------------------------------

@@ -3865,6 +3865,29 @@ PassiveTracer:
   MW_g: 1.0   # Use value of 1.0 to get past checks for missing MW_g
   Snk_Mode: none
   Src_Mode: none
+PLUME_TAG_PROP: &PLUMETAGproperties
+  Background_VV: 1.0e-20
+  Is_Gas: true
+  Is_Tracer: true
+  MW_g: 1.0
+  Snk_Mode: none
+  Src_Add: true
+  Src_Mode: HEMCO
+PLUME_SFC:
+  << : *PLUMETAGproperties
+  FullName: Inert plume tag with surface source placement
+PLUME_PBL:
+  << : *PLUMETAGproperties
+  FullName: Inert plume tag with fractional PBL source placement
+PLUME_6535:
+  << : *PLUMETAGproperties
+  FullName: Inert plume tag with 65 percent PBL and 35 percent FT source placement
+PLUME_LEV:
+  << : *PLUMETAGproperties
+  FullName: Inert plume tag with fixed model-level source placement
+PLUME_PROFILE:
+  << : *PLUMETAGproperties
+  FullName: Inert plume tag with prescribed distributed source profile
 Pb210_PROP: &Pbproperties
   DD_DvzAerSnow: 0.03
   DD_F0: 0.0

@@ -315,6 +315,7 @@ CONTAINS
     USE State_Met_Mod,      ONLY : MetState
     USE PhysConstants            ! Physical constants
     USE PJC_PFIX_MOD,       ONLY : DO_PJC_PFIX
+    USE Plume_Tpcore_Budget_Mod, ONLY : Tpcore_Budget_End
     USE TIME_MOD,           ONLY : GET_TS_DYN
     USE TPCORE_FVDAS_MOD,   ONLY : TPCORE_FVDAS
     USE UnitConv_Mod
@@ -481,6 +482,9 @@ CONTAINS
     ! Do not update tracer mixing ratio because after advection
     ! the mixing ratio values reflect the new air pressure (ewl, 3/31/15)
     CALL AIRQNT( Input_Opt, State_Chm, State_Grid, State_Met, RC )
+    IF ( RC == GC_SUCCESS ) THEN
+       CALL Tpcore_Budget_End( State_Chm, State_Met )
+    ENDIF
 
     !!### DEBUG: Print a few global species sums
     !IF ( Input_Opt%Verbose ) THEN

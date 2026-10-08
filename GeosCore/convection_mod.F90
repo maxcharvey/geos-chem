@@ -60,6 +60,7 @@ CONTAINS
     USE ERROR_MOD,       ONLY : GEOS_CHEM_STOP
     USE Input_Opt_Mod,   ONLY : OptInput
     USE PhysConstants
+    USE Plume_Conv_Reevap_Mod, ONLY : Conv_Reevap_Begin, Conv_Reevap_Write
     USE Species_Mod,     ONLY : Species
     USE State_Chm_Mod,   ONLY : ChmState
     USE State_Diag_Mod,  ONLY : DgnState
@@ -175,6 +176,12 @@ CONTAINS
     DoConvFlux = State_Diag%Archive_CloudConvFlux       ! Save mass flux?
     DoWetLoss  = ( State_Diag%Archive_WetLossConv                       .or. &
                    State_Diag%Archive_SatDiagnWetLossConv )
+
+    ! Initialize the runtime-gated, diagnostic-only RAS surface
+    ! re-evaporation ledger before entering the OpenMP column loop.
+    CALL Conv_Reevap_Begin( State_Chm, State_Grid%NX, State_Grid%NY, &
+                            DoWetLoss, &
+                            .not. Input_Opt%Grell_Freitas_Convection )
 
     ! Number of advected species
     nAdvect = State_Chm%nAdvect
@@ -355,6 +362,9 @@ CONTAINS
     ENDDO
     !$OMP END PARALLEL DO
 
+    ! Emit the diagnostic ledger serially in deterministic tag/J/I order.
+    CALL Conv_Reevap_Write()
+
     ! Return if Do_Cloud_Convection returned an error
     IF ( RC /= GC_SUCCESS ) THEN
        ErrMsg = 'Error encountered in "Do_Cloud_Convection"!'
@@ -437,6 +447,8 @@ CONTAINS
 !
 ! !USES:
 !
+    USE Plume_Conv_Reevap_Mod, ONLY : &
+         Conv_Reevap_Record_Surface_Omission
     USE ErrCode_Mod
     USE ERROR_MOD,          ONLY : IT_IS_NAN
     USE ERROR_MOD,          ONLY : IT_IS_FINITE
@@ -528,6 +540,7 @@ CONTAINS
     REAL(fp)               :: T2,          T3,        T4
     REAL(fp)               :: TSUM,        LOST,      GAINED
     REAL(fp)               :: WETLOSS,     MASS_WASH, MASS_NOWASH
+    REAL(fp)               :: Q_BEFORE_REEVAP
     REAL(fp)               :: QDOWN,       DT,        F_WASHOUT
     REAL(fp)               :: K_RAIN,      WASHFRAC,  WET_Hg2
     REAL(fp)               :: WET_HgP,     MB,        QB
@@ -1244,7 +1257,29 @@ CONTAINS
 
                       ! Update species concentration (V. Shah, mps, 5/20/15)
                       ! [kg/kg]
+                      Q_BEFORE_REEVAP = Q(K)
                       Q(K) = Q(K) - WETLOSS / BMASS(K)
+
+                      ! Measurement only: RAS applies this signed surface term
+                      ! to Q, but the native DIAG38 F>0 gate omits it when the
+                      ! surface scavenging fraction is zero.
+                      IF ( USE_DIAG38 .and. NW > 0 .and. K == 1 .and. &
+                           F(K,NA) <= 0.0_fp ) THEN
+                         CALL Conv_Reevap_Record_Surface_Omission(            &
+                              Species_Id          = IC,                      &
+                              Wetdep_Id            = NW,                      &
+                              I                    = I,                       &
+                              J                    = J,                       &
+                              K                    = K,                       &
+                              Scavenging_Fraction  = F(K,NA),                 &
+                              Area_M2              = AREA_M2,                 &
+                              Bmass                = BMASS(K),                &
+                              Q_Before             = Q_BEFORE_REEVAP,         &
+                              Q_After              = Q(K),                    &
+                              Gained               = GAINED,                  &
+                              Washfrac             = WASHFRAC,                &
+                              Wetloss              = WETLOSS                 )
+                      ENDIF
 
                       ! Update T0_SUM, the total amount of scavenged
                       ! species that will be passed to the grid box below

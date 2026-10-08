@@ -33,6 +33,7 @@ add_library(GeosCore
   depo_mercury_mod.F90
   diagnostics_mod.F90
   drydep_mod.F90
+  dry_absorption_diag_mod.F90
   dust_mod.F90
   emissions_mod.F90
   fast_jx_mod.F90
@@ -61,7 +62,13 @@ add_library(GeosCore
   photolysis_mod.F90
   pjc_pfix_mod.F90
   pjc_pfix_window_mod.F90
+  plume_aging_mod.F90
+  plume_conv_reevap_mod.F90
   planeflight_mod.F90
+  qck_positivity_mod.F90
+  qck_bottom_sizing_mod.F90
+  qck_bottom_survey_mod.F90
+  plume_tpcore_budget_mod.F90
   pops_mod.F90
   RnPbBe_mod.F90
   rpmares_mod.F90

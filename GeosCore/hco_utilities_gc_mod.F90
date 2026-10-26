@@ -1571,6 +1571,7 @@ CONTAINS
 !
 ! !USES:
 !
+   USE Restart_Validation_Mod
    USE CMN_SIZE_Mod,     ONLY  : NDUST
    USE ErrCode_Mod
    USE Error_Mod
@@ -1671,6 +1672,9 @@ CONTAINS
    REAL*8,  POINTER   :: Ptr4D_r8(:,:,:,:)
 
    ! For species mass conservation
+   LOGICAL            :: restart_valid
+   REAL(fp)           :: restart_dp(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
+   REAL(fp)           :: pressure_factors(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
    LOGICAL            :: update_mixing_ratio
    REAL*8             :: AirMass
    REAL*8,  TARGET    :: SpcMass(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
@@ -1682,6 +1686,7 @@ CONTAINS
 
    ! Assume success
    RC        = GC_SUCCESS
+   update_mixing_ratio = .FALSE.
 
    ! Initialize pointers
    Ptr2D       => NULL()
@@ -1779,6 +1784,14 @@ CONTAINS
 
       ! Open file
       CALL Ncop_Rd( fId, TRIM(nc_path) )
+      CALL Restart_Validate_File(fId,State_Grid%Lon,State_Grid%Lat, &
+           State_Grid%Lev, &
+           Input_Opt%NYMDb,Input_Opt%NHMSb,restart_valid,Msg)
+      IF (.NOT.restart_valid) THEN
+         CALL NcCl(fId)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
 
       ! If we are not using HEMCO to read the restart file, then stop
       ! the run if the restart file vertical resolution does not match
@@ -1813,7 +1826,20 @@ CONTAINS
    IF ( use_HEMCO_for_restart_read ) THEN
       CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),  &
            Ptr3D,     RC,         FOUND=FOUND_DELP_DRY )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND_DELP_DRY,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
    ELSE
+      ierr=NF90_Inq_VarId(fId,TRIM(v_name_in_file),varid)
+      IF (ierr/=NF90_NOERR.AND.ierr/=NF90_ENOTVAR) THEN
+         Msg='Failed to inquire restart field: '//TRIM(NF90_STRERROR(ierr))
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
+      FOUND_DELP_DRY=(ierr==NF90_NOERR)
+      IF (FOUND_DELP_DRY) THEN
       Temp4D_r8 = 0.0_fp
       Ptr4D_r8 => Temp4D_r8
       st4d   = (/  1,  1,  1,  1 /)
@@ -1822,14 +1848,25 @@ CONTAINS
       FOUND_DELP_DRY = .TRUE.
       a_name = "units"
       CALL NcGet_Var_Attributes( fId,TRIM(v_name_in_file),TRIM(a_name),a_val )
+      ENDIF
    ENDIF
 
    IF ( FOUND_DELP_DRY ) THEN
       IF ( use_HEMCO_for_restart_read ) THEN
-         State_Met%DP_DRY_PREV = Ptr3D
+         restart_dp = REAL(Ptr3D,fp)
       ELSE
-         State_Met%DP_DRY_PREV = Ptr4D_r8(:,:,:,1)
+         IF (TRIM(ADJUSTL(a_val))/='hPa') THEN
+            CALL GC_Error('Restart Met_DELPDRY must have hPa units',RC,Loc)
+            RETURN
+         ENDIF
+         restart_dp = Ptr4D_r8(:,:,:,1)
       ENDIF
+      CALL Restart_Pressure_Factors(restart_dp,State_Met%DELP_DRY,pressure_factors,restart_valid)
+      IF (.NOT.restart_valid) THEN
+         CALL GC_Error('Invalid restart/current dry pressures or ratios',RC,Loc)
+         RETURN
+      ENDIF
+      State_Met%DP_DRY_PREV=restart_dp
       IF ( Input_Opt%amIRoot ) THEN
          WRITE( 6, 510 ) ADJUSTL( v_name_in_file   ),         &
               MINVAL(  State_Met%DP_DRY_PREV ),               &
@@ -1838,7 +1875,7 @@ CONTAINS
       ENDIF
 
       ! Check if different from current meteorology. If yes, print warning and set flag.
-      IF ( ABS(SUM(State_Met%DP_DRY_PREV) - SUM(State_Met%DELP_DRY)) > 1.d-10 ) THEN
+      IF ( ANY(State_Met%DP_DRY_PREV /= State_Met%DELP_DRY) ) THEN
          update_mixing_ratio = .TRUE.
          WRITE (6,*) 'WARNING: Layer delta pressures found in the restart file differ from current '
          WRITE (6,*) 'meteorology. All species concentrations will be scaled by the ratio of '
@@ -1870,7 +1907,6 @@ CONTAINS
    DO N = 1, State_Chm%nSpecies
 
       ! Initialize species concentration to all zeroes
-      Spc(N)%Conc = 0.e+0_fp
 
       ! Get info about this species from the species database
       SpcInfo => State_Chm%SpcData(N)%Info
@@ -1888,6 +1924,11 @@ CONTAINS
          ! Get variable from HEMCO and store in local array
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM(v_name_in_hemco), &
               Ptr3D,     RC,         FOUND=FOUND )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
 
       ELSE
 
@@ -1968,20 +2009,8 @@ CONTAINS
             ! Update mixing ratio to conserve mass if current pressure different
             ! from restart file pressure
             IF ( update_mixing_ratio ) THEN
-               ! Update concentrations
-               !$OMP PARALLEL DO        &
-               !$OMP DEFAULT( SHARED  ) &
-               !$OMP PRIVATE( I, J, L ) &
-               !$OMP COLLAPSE( 3 )
-               DO L = 1, State_Grid%NZ
-               DO J = 1, State_Grid%NY
-               DO I = 1, State_Grid%NX
-                  Spc(N)%Conc(I,J,L) = Spc(N)%Conc(I,J,L)   &
-                       * State_Met%DP_DRY_PREV(I,J,L) / State_Met%DELP_DRY(I,J,L)
-               ENDDO
-               ENDDO
-               ENDDO
-               !$OMP END PARALLEL DO
+               CALL Restart_Apply_Pressure(Spc(N)%Conc,State_Met%DP_DRY_PREV, &
+                    State_Met%DELP_DRY,pressure_factors)
             ENDIF
 
          ENDIF
@@ -2169,6 +2198,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr3D,     RC,         FOUND=FOUND )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp4D_r8 = 0.0_fp
          Ptr4D_r8 => Temp4D_r8
@@ -2218,6 +2252,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr2D,     RC,         FOUND=FOUND )
+      IF (.NOT.Restart_HCO_Valid(Ptr2D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp3D_r8 = 0.0_fp
          Ptr3D_r8 => Temp3D_r8
@@ -2260,6 +2299,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr2D,     RC,         FOUND=FOUND )
+      IF (.NOT.Restart_HCO_Valid(Ptr2D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp3D_r8 = 0.0_fp
          Ptr3D_r8 => Temp3D_r8
@@ -2310,6 +2354,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr3D,     RC,         FOUND=FOUND                )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp4D_r8 = 0.0_fp
          Ptr4D_r8 => Temp4D_r8
@@ -2352,6 +2401,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr3D,     RC,         FOUND=FOUND                )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp4D_r8 = 0.0_fp
          Ptr4D_r8 => Temp4D_r8
@@ -2394,6 +2448,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr3D,     RC,         FOUND=FOUND                )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp4D_r8 = 0.0_fp
          Ptr4D_r8 => Temp4D_r8
@@ -2438,6 +2497,11 @@ CONTAINS
          IF ( use_HEMCO_for_restart_read ) THEN
             CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ), &
                  Ptr3D,     RC,         FOUND=FOUND             )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
          ELSE
             Temp4D_r8 = 0.0_fp
             Ptr4D_r8 => Temp4D_r8
@@ -2489,6 +2553,11 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr3D,     RC,         FOUND=FOUND                )
+      IF (.NOT.Restart_HCO_Valid(Ptr3D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY,State_Grid%NZ])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
          Temp4D_r4 = 0.0_fp
          Ptr4D_r4 => Temp4D_r4
@@ -2547,8 +2616,21 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr2D,     RC,         FOUND=FOUND                )
+      IF (.NOT.Restart_HCO_Valid(Ptr2D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
-         Temp3D_r8 = 0.0_fp
+         ierr=NF90_Inq_VarId(fId,TRIM(v_name_in_file),varid)
+      IF (ierr/=NF90_NOERR.AND.ierr/=NF90_ENOTVAR) THEN
+         Msg='Failed to inquire restart field: '//TRIM(NF90_STRERROR(ierr))
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
+      FOUND=(ierr==NF90_NOERR)
+      IF (FOUND) THEN
+      Temp3D_r8 = 0.0_fp
          Ptr3D_r8 => Temp3D_r8
          st3d   = (/  1,  1,  1 /)
          ct3d   = (/ State_Grid%NX, State_Grid%NY, 1 /)
@@ -2556,6 +2638,7 @@ CONTAINS
          FOUND = .TRUE.
          a_name = "units"
          CALL NcGet_Var_Attributes( fId,TRIM(v_name_in_file),TRIM(a_name),a_val )
+      ENDIF
       ENDIF
 
       ! Check if variable is in file
@@ -2589,8 +2672,21 @@ CONTAINS
       IF ( use_HEMCO_for_restart_read ) THEN
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ),    &
               Ptr2D,     RC,         FOUND=FOUND                )
+      IF (.NOT.Restart_HCO_Valid(Ptr2D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
       ELSE
-         Temp3D_r8 = 0.0_fp
+         ierr=NF90_Inq_VarId(fId,TRIM(v_name_in_file),varid)
+      IF (ierr/=NF90_NOERR.AND.ierr/=NF90_ENOTVAR) THEN
+         Msg='Failed to inquire restart field: '//TRIM(NF90_STRERROR(ierr))
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
+      FOUND=(ierr==NF90_NOERR)
+      IF (FOUND) THEN
+      Temp3D_r8 = 0.0_fp
          Ptr3D_r8 => Temp3D_r8
          st3d   = (/  1,  1,  1 /)
          ct3d   = (/ State_Grid%NX, State_Grid%NY, 1 /)
@@ -2598,6 +2694,7 @@ CONTAINS
          FOUND = .TRUE.
          a_name = "units"
          CALL NcGet_Var_Attributes( fId,TRIM(v_name_in_file),TRIM(a_name),a_val )
+      ENDIF
       ENDIF
 
       ! Check if variable is in file
@@ -2651,6 +2748,11 @@ CONTAINS
          ! Get variable from HEMCO and store in local array
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ), &
                              Ptr2D,     RC,         FOUND=FOUND             )
+      IF (.NOT.Restart_HCO_Valid(Ptr2D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
 
          ! Check if variable is in file
          IF ( FOUND ) THEN
@@ -2711,6 +2813,11 @@ CONTAINS
          ! Get variable from HEMCO and store in local array
          CALL HCO_GC_GetPtr( Input_Opt, State_Grid, TRIM( v_name_in_hemco ), &
                              Ptr2D,     RC,         FOUND=FOUND             )
+      IF (.NOT.Restart_HCO_Valid(Ptr2D,FOUND,RC,GC_SUCCESS,[State_Grid%NX,State_Grid%NY])) THEN
+         Msg='Invalid HEMCO restart status/pointer/shape: '//TRIM(v_name_in_hemco)
+         CALL GC_Error(Msg,RC,Loc)
+         RETURN
+      ENDIF
 
          ! Check if variable is in file
          IF ( FOUND ) THEN

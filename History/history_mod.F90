@@ -3068,7 +3068,11 @@ CONTAINS
           IF ( isBndCond ) THEN
              Container%FileWriteAlarm = 0.0_fp
           ELSE
-             RETURN
+             ! Other collections do not write at startup.  Keep looking
+             ! for BoundaryConditions regardless of the collection order.
+             Container  => NULL()
+             Collection => Collection%Next
+             CYCLE
           ENDIF
        ENDIF             
 

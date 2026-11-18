@@ -223,6 +223,7 @@ VerboseOnCores:              root       # Accepted values: root all
     --> FINNv25_vertical_injection_levels   : 0
     --> FINNV25_GFAS_PROFILE    : false
     --> FINNv25_profile_fallback : pbl
+    --> FINNv25_GFAS_height_scale : 1.0
 117     Volcano                : on    SO2
     --> Volcano_Source         :       AeroCom
     --> Volcano_Table          :       ${RUNDIR_VOLC_TABLE}

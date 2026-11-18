@@ -101,12 +101,14 @@ MODULE AEROSOL_MOD
   INTEGER :: id_SOAIE,   id_INDIOL,  id_LVOCOA
 
   ! BrC species IDs (M. Harvey, 19 Mar 2026)
-  INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_BRC_WTC  ! Canonical bin-8 density metadata only
+  INTEGER :: id_BRC_PWTC, id_BRC_SWTC
   INTEGER :: id_BRC_PBRC
   INTEGER :: id_FSOAS  ! darkened fire SOA precursor piggybacks SOAS optics
 
   ! FF-OC species IDs
-  INTEGER :: id_FFOCPI, id_FFOCPO
+  INTEGER :: id_FFOCPI, id_FFOCPO, id_FOCPI, id_FOCPO
 
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
@@ -556,7 +558,7 @@ CONTAINS
           ! Each BrC species has its own AerMass field and WAERSL bin:
           !   BRCPI  -> WAERSL(6)  (BRCSOA, N=6)
           !   NPBRC  -> WAERSL(7)  (NPBRCPOA, N=7)
-          !   WTCPI  -> WAERSL(8)  (WTC, N=8)
+          !   WTCPI  -> WAERSL(8)  (PWTC+SWTC derived total, N=8)
           !   FSOAS  -> WAERSL(9)  (FSOAS, N=9)
           !   PBRC   -> WAERSL(10) (PBRCPOA, N=10)
           !   BRCPO  -> DAERSL(3), add-on to N=11 (DBRCPOA)
@@ -575,6 +577,8 @@ CONTAINS
           State_Chm%AerMass%BRCPO(I,J,L) = 0.0_fp
           State_Chm%AerMass%NPBRC(I,J,L) = 0.0_fp
           State_Chm%AerMass%WTCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%PWTCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%SWTCPI(I,J,L) = 0.0_fp
           State_Chm%AerMass%FSOAS(I,J,L) = 0.0_fp
           State_Chm%AerMass%PBRC(I,J,L)  = 0.0_fp
 
@@ -596,13 +600,20 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          ! WTC -> WTCPI (bin N=8, org.dat; bleached, transparent OC)
-          IF ( id_BRC_WTC > 0 ) THEN
-             State_Chm%AerMass%WTCPI(I,J,L) =                      &
-                Spc(id_BRC_WTC)%Conc(I,J,L)                        &
-                * State_Chm%AerMass%OCFOPOA(I,J)                   &
-                / AIRVOL(I,J,L)
+          ! Attributed stocks share the existing white-carbon growth/optics.
+          IF ( id_BRC_PWTC > 0 ) THEN
+             State_Chm%AerMass%PWTCPI(I,J,L) = &
+                Spc(id_BRC_PWTC)%Conc(I,J,L) &
+                * State_Chm%AerMass%OCFOPOA(I,J) / AIRVOL(I,J,L)
           ENDIF
+          IF ( id_BRC_SWTC > 0 ) THEN
+             State_Chm%AerMass%SWTCPI(I,J,L) = &
+                Spc(id_BRC_SWTC)%Conc(I,J,L) &
+                * State_Chm%AerMass%OCFOPOA(I,J) / AIRVOL(I,J,L)
+          ENDIF
+          ! WTC is derived: count each physical component once.
+          State_Chm%AerMass%WTCPI(I,J,L) = &
+             State_Chm%AerMass%PWTCPI(I,J,L) + State_Chm%AerMass%SWTCPI(I,J,L)
 
           ! FSOAS -> FSOAS (bin N=9; already kg_OM, no OM:OC)
           IF ( id_FSOAS > 0 ) THEN
@@ -640,6 +651,23 @@ CONTAINS
              State_Chm%AerMass%OCPO(I,J,L) =                       &
                 State_Chm%AerMass%OCPO(I,J,L)                      &
                 + Spc(id_FFOCPO)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFPOA(I,J)                    &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! Source-tagged residual fire OC shares the existing OC carriers.
+          IF ( Input_Opt%LBRC .AND. (id_FOCPI > 0) ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_FOCPI)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          IF ( Input_Opt%LBRC .AND. (id_FOCPO > 0) ) THEN
+             State_Chm%AerMass%OCPO(I,J,L) =                       &
+                State_Chm%AerMass%OCPO(I,J,L)                      &
+                + Spc(id_FOCPO)%Conc(I,J,L)                       &
                 * State_Chm%AerMass%OCFPOA(I,J)                    &
                 / AIRVOL(I,J,L)
           ENDIF
@@ -985,8 +1013,8 @@ CONTAINS
        ENDIF
 
        ! BrC is fine organic aerosol in both simple- and complex-SOA runs.
-       ! WTC is classified as primary OC here: it is the bleached product of
-       ! primary BrC, rather than a secondary-organic production pathway.
+       ! Total PM includes all white carbon once. PM25oc/PM25soa below
+       ! classify PWTC/SWTC separately; WTC is only the derived total.
        ! DBRCPOA is a dry carrier, so do not apply hygroscopic OM growth.
        IF ( Input_Opt%LBRC ) THEN
           State_Chm%AerMass%PM25(I,J,L) = State_Chm%AerMass%PM25(I,J,L)      &
@@ -1107,7 +1135,7 @@ CONTAINS
                = ( State_Chm%AerMass%OCPO(I,J,L)                             &
                +   State_Chm%AerMass%OCPI(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%NPBRC(I,J,L)  * ORG_GROWTH              &
-               +   State_Chm%AerMass%WTCPI(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%PWTCPI(I,J,L)  * ORG_GROWTH              &
                +   State_Chm%AerMass%PBRC(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%BRCPO(I,J,L)                )           &
                * ( P_SFC_STD                       / PMID(I,J,L) )           &
@@ -1144,6 +1172,7 @@ CONTAINS
                +   State_Chm%AerMass%SOAS(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%ISOAAQ(I,J,L) * ORG_GROWTH              &
                +   State_Chm%AerMass%BRCPI(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%SWTCPI(I,J,L) * ORG_GROWTH              &
                +   State_Chm%AerMass%FSOAS(I,J,L)  * ORG_GROWTH  )           &
                * ( P_SFC_STD                       / PMID(I,J,L) )           &
                * ( T(I,J,L)                        / T_298_K     )           &
@@ -2830,7 +2859,9 @@ CONTAINS
        id_LVOCOA     = Ind_( 'LVOCOA'  )
 
        ! BrC species IDs (M. Harvey, 19 Mar 2026)
-       id_BRC_WTC    = Ind_( 'WTC'     )
+       id_BRC_WTC    = Ind_( 'WTC'     ) ! Metadata only, never mass
+       id_BRC_PWTC   = Ind_( 'PWTC'    )
+       id_BRC_SWTC   = Ind_( 'SWTC'    )
        id_BRC_SOA    = Ind_( 'BRCSOA'  )
        id_BRC_DBRC   = Ind_( 'DBRCPOA' )
        id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
@@ -2838,6 +2869,8 @@ CONTAINS
        id_FSOAS      = Ind_( 'FSOAS'   )
        id_FFOCPI     = Ind_( 'FFOCPI'  )
        id_FFOCPO     = Ind_( 'FFOCPO'  )
+       id_FOCPI      = Ind_( 'FOCPI'   )
+       id_FOCPO      = Ind_( 'FOCPO'   )
        
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )

@@ -1241,6 +1241,7 @@ CONTAINS
 
     INTEGER :: Hco_OCPI, Hco_OCPO, Hco_FFOCPI, Hco_FFOCPO
     INTEGER :: id_OCPI,  id_OCPO,  id_FFOCPI,  id_FFOCPO
+    INTEGER :: Hco_FOCPI, Hco_FOCPO, id_FOCPI, id_FOCPO
 
     RC = HCO_SUCCESS
 
@@ -1292,6 +1293,60 @@ CONTAINS
                   HcoState%Spc(Hco_OCPO)%Emis%Val +                          &
                   HcoState%Spc(Hco_FFOCPO)%Emis%Val
              HcoState%Spc(Hco_FFOCPO)%Emis%Val = 0.0_hp
+          ENDIF
+       ENDIF
+    ENDIF
+
+
+    ! Fold residual fire tags into legacy OC when BrC is disabled.
+    id_OCPI   = Ind_( 'OCPI'   )
+    id_OCPO   = Ind_( 'OCPO'   )
+    id_FOCPI = Ind_( 'FOCPI' )
+    id_FOCPO = Ind_( 'FOCPO' )
+
+    ! Transfer any restart concentration before it can participate in a
+    ! disabled-BrC calculation.  The paired OC and FOC tracers share MW.
+    IF ( id_OCPI > 0 .AND. id_FOCPI > 0 ) THEN
+       State_Chm%Species(id_OCPI)%Conc = State_Chm%Species(id_OCPI)%Conc + &
+                                        State_Chm%Species(id_FOCPI)%Conc
+       State_Chm%Species(id_FOCPI)%Conc = 0.0_fp
+    ENDIF
+
+    IF ( id_OCPO > 0 .AND. id_FOCPO > 0 ) THEN
+       State_Chm%Species(id_OCPO)%Conc = State_Chm%Species(id_OCPO)%Conc + &
+                                        State_Chm%Species(id_FOCPO)%Conc
+       State_Chm%Species(id_FOCPO)%Conc = 0.0_fp
+    ENDIF
+
+    Hco_OCPI   = HCO_GetHcoID( 'OCPI',   HcoState )
+    Hco_OCPO   = HCO_GetHcoID( 'OCPO',   HcoState )
+    Hco_FOCPI = HCO_GetHcoID( 'FOCPI', HcoState )
+    Hco_FOCPO = HCO_GetHcoID( 'FOCPO', HcoState )
+
+    IF ( Hco_OCPI > 0 .AND. Hco_FOCPI > 0 ) THEN
+       IF ( ASSOCIATED( HcoState%Spc(Hco_FOCPI)%Emis ) ) THEN
+          IF ( ASSOCIATED( HcoState%Spc(Hco_FOCPI)%Emis%Val ) ) THEN
+             CALL HCO_ArrAssert( HcoState%Spc(Hco_OCPI)%Emis,                &
+                                 HcoState%NX, HcoState%NY, HcoState%NZ, RC )
+             IF ( RC /= HCO_SUCCESS ) RETURN
+             HcoState%Spc(Hco_OCPI)%Emis%Val =                               &
+                  HcoState%Spc(Hco_OCPI)%Emis%Val +                          &
+                  HcoState%Spc(Hco_FOCPI)%Emis%Val
+             HcoState%Spc(Hco_FOCPI)%Emis%Val = 0.0_hp
+          ENDIF
+       ENDIF
+    ENDIF
+
+    IF ( Hco_OCPO > 0 .AND. Hco_FOCPO > 0 ) THEN
+       IF ( ASSOCIATED( HcoState%Spc(Hco_FOCPO)%Emis ) ) THEN
+          IF ( ASSOCIATED( HcoState%Spc(Hco_FOCPO)%Emis%Val ) ) THEN
+             CALL HCO_ArrAssert( HcoState%Spc(Hco_OCPO)%Emis,                &
+                                 HcoState%NX, HcoState%NY, HcoState%NZ, RC )
+             IF ( RC /= HCO_SUCCESS ) RETURN
+             HcoState%Spc(Hco_OCPO)%Emis%Val =                               &
+                  HcoState%Spc(Hco_OCPO)%Emis%Val +                          &
+                  HcoState%Spc(Hco_FOCPO)%Emis%Val
+             HcoState%Spc(Hco_FOCPO)%Emis%Val = 0.0_hp
           ENDIF
        ENDIF
     ENDIF
@@ -4165,7 +4220,7 @@ CONTAINS
     USE HCO_ExtList_Mod,    ONLY : CoreNr
     USE Input_Opt_Mod,      ONLY : OptInput
     USE State_Met_Mod,      ONLY : MetState
-    USE State_Chm_Mod,      ONLY : ChmState
+    USE State_Chm_Mod,      ONLY : ChmState, Ind_
 !
 ! !INPUT PARAMETERS:
 !
@@ -4301,6 +4356,17 @@ CONTAINS
                     OptValBool=LTMP, FOUND=FOUND, RC=HMRC )
     IF ( HMRC /= HCO_SUCCESS ) GOTO 900
     IF ( FOUND ) L_QFED_BRC_HS = LTMP
+
+    ! New source tags replace residual fire OC. Refuse old species lists rather
+    ! than silently discard the source after suppressing its generic OC route.
+    IF ( Input_Opt%LBRC .AND. ( L_GFED .OR. L_FINN_BRC_HS .OR. &
+                               L_GFAS_BRC_HS .OR. L_QFED_BRC_HS ) ) THEN
+       IF ( Ind_('FOCPI','A') <= 0 .OR. Ind_('FOCPO','A') <= 0 ) THEN
+          ErrMsg = 'BrC fire routing requires transported FOCPI and FOCPO!'
+          CALL GC_Error( ErrMsg, RC, ThisLoc )
+          RETURN
+       ENDIF
+    ENDIF
 
     IF ( COUNT( (/ L_GFED, L_GFAS, L_QFED2, L_FINNV25 /) ) > 1 ) THEN
        ErrMsg = 'Select only one biomass-burning inventory: GFED, GFAS, QFED2, or FINNv25!'

@@ -5105,11 +5105,13 @@ BRCSOA:
   Background_VV: 1.0e-18
 WTC:
   Formula: CO
-  FullName: Optically White Carbon Organic Aerosol formed from photobleaching of BRCSOA - based off OCPI
-  Is_Aerosol: true
-  Is_Advected: true
-  Is_DryDep: true
-  Is_WetDep: true
+  FullName: Derived total white carbon PWTC plus SWTC; no independent physical stock
+  Is_Gas: false
+  Is_Aerosol: false
+  Is_Advected: false
+  Is_DryDep: false
+  Is_WetDep: false
+  # Registration only: physical bin-8 mass comes from PWTC+SWTC.
   Is_HygroGrowth: true
   Density: 1300.0
   MW_g: 12.01
@@ -5120,14 +5122,54 @@ WTC:
   WD_KcScaleFac: [1.0, 0.5, 1.0]
   WD_RainoutEff: [1.0, 0.0, 1.0]
   WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
-  Background_VV: 1.0e-18
+  Background_VV: 0.0
+PWTC:
+  Formula: CO
+  FullName: White carbon formed from photobleaching of NPBRCPOA
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  # Growth/optics use the aggregate WTC bin; do not register a duplicate bin.
+  Is_HygroGrowth: false
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  Background_VV: 0.0
+SWTC:
+  Formula: CO
+  FullName: White carbon formed from photobleaching of BRCSOA
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  # Growth/optics use the aggregate WTC bin; do not register a duplicate bin.
+  Is_HygroGrowth: false
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 0.8
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.8]
+  Background_VV: 0.0
 DBRCPOA:
   Formula: CO
   FullName: Optically Dark Brown OA emitted directly from biomass burning - based off OCPO
   Is_Aerosol: true
   Is_Advected: true
   Is_DryDep: true
-  Is_WetDep: true
+  # Explicit no-wet-removal experiment: exclude from all wet species maps.
+  # Wet-scavenging coefficients below are retained as inactive historical metadata.
+  Is_WetDep: false
   # Keep in the hygroscopic-growth species list so AOD/AerSurf diagnostics
   # expose a DBRCPOA tag, but aerosol_mod treats DBRCPOA as a dry carrier:
   # WAERSL(N=11)=0 and dry DAERSL(3) uses dbrc.dat for online AOD/RRTMG.
@@ -5215,3 +5257,38 @@ FFOCPO:
   WD_KcScaleFac: [0.5, 0.5, 0.5]
   WD_KcScaleFac_Luo: [0.0, 0.0, 0.0]
   WD_RainoutEff: [0.0, 0.0, 0.0]
+
+FOCPI:
+  FullName: Hydrophilic residual primary fire organic carbon aerosol
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 1.0
+  WD_KcScaleFac: [1.0, 0.5, 1.0]
+  WD_KcScaleFac_Luo: [0.5, 0.25, 0.5]
+  WD_RainoutEff: [1.0, 0.0, 1.0]
+  WD_RainoutEff_Luo: [0.4, 0.0, 0.5]
+  Background_VV: 0.0
+
+FOCPO:
+  FullName: Hydrophobic residual primary fire organic carbon aerosol
+  Is_Aerosol: true
+  Is_Advected: true
+  Is_DryDep: true
+  Is_WetDep: true
+  Density: 1300.0
+  MW_g: 12.01
+  DD_DvzAerSnow: 0.03
+  DD_F0: 0.0
+  DD_Hstar: 0.0
+  WD_AerScavEff: 1.0
+  WD_KcScaleFac: [0.5, 0.5, 0.5]
+  WD_KcScaleFac_Luo: [0.0, 0.0, 0.0]
+  WD_RainoutEff: [0.0, 0.0, 0.0]
+  Background_VV: 0.0

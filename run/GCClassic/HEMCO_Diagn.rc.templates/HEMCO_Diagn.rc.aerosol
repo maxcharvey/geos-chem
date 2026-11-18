@@ -246,3 +246,9 @@ EmisPBRCPOA_TotalColumn PBRCPOA -1 -1 -1 2 kg/m2/s PBRCPOA_column_emission_flux_
 #InvQFED2_PBRCPOAColumn PBRCPOA 0 5 2 2 kg/m2/s PBRCPOA_column_emission_flux_from_QFED2_harmonized_sensitivity
 
 #EOC
+
+# Residual primary fire OC, kept separate from BrC and fossil-fuel OC.
+EmisFOCPI_Total FOCPI -1 -1 -1 3 kg/m2/s FOCPI_total_emission_flux
+EmisFOCPI_TotalColumn FOCPI -1 -1 -1 2 kg/m2/s FOCPI_total_emission_flux
+EmisFOCPO_Total FOCPO -1 -1 -1 3 kg/m2/s FOCPO_total_emission_flux
+EmisFOCPO_TotalColumn FOCPO -1 -1 -1 2 kg/m2/s FOCPO_total_emission_flux

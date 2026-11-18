@@ -1572,6 +1572,7 @@ CONTAINS
 ! !USES:
 !
    USE Restart_Validation_Mod
+   USE BRC_WTC_Output_Mod
    USE CMN_SIZE_Mod,     ONLY  : NDUST
    USE ErrCode_Mod
    USE Error_Mod
@@ -1672,6 +1673,7 @@ CONTAINS
    REAL*8,  POINTER   :: Ptr4D_r8(:,:,:,:)
 
    ! For species mass conservation
+   TYPE(BRC_WTC_Map) :: WtcOutput
    LOGICAL            :: restart_valid
    REAL(fp)           :: restart_dp(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
    REAL(fp)           :: pressure_factors(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
@@ -1686,6 +1688,33 @@ CONTAINS
 
    ! Assume success
    RC        = GC_SUCCESS
+   WtcOutput = BRC_WTC_Map()
+   IF ( Input_Opt%LBRC ) WtcOutput = BRC_WTC_Output_Ids()
+   IF ( WtcOutput%Total > 0 ) THEN
+      IF ( State_Chm%SpcData(WtcOutput%Total)%Info%Is_Advected .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%Is_Aerosol .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%Is_DryDep .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%Is_DryAlt .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%Is_WetDep ) THEN
+         CALL GC_Error('Derived WTC requires updated diagnostic-only species metadata', RC, &
+              'Get_GC_Restart: WTC metadata')
+         RETURN
+      ENDIF
+   ENDIF
+   IF ( WtcOutput%Total > 0 ) THEN
+      IF ( State_Chm%SpcData(WtcOutput%Total)%Info%MW_g /= &
+           State_Chm%SpcData(WtcOutput%Primary)%Info%MW_g .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%MW_g /= &
+           State_Chm%SpcData(WtcOutput%Secondary)%Info%MW_g .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%Density /= &
+           State_Chm%SpcData(WtcOutput%Primary)%Info%Density .OR. &
+           State_Chm%SpcData(WtcOutput%Total)%Info%Density /= &
+           State_Chm%SpcData(WtcOutput%Secondary)%Info%Density ) THEN
+         CALL GC_Error('WTC, PWTC and SWTC must share molecular weight and optical density', RC, &
+              'Get_GC_Restart: WTC metadata')
+         RETURN
+      ENDIF
+   ENDIF
    update_mixing_ratio = .FALSE.
 
    ! Initialize pointers
@@ -1952,6 +1981,15 @@ CONTAINS
 
       ENDIF
 
+      ! Both physical component fields are mandatory before background fallback.
+      IF ( Input_Opt%LBRC ) THEN
+         Msg = BRC_WTC_Missing_Restart_Error(TRIM(SpcInfo%Name), FOUND)
+         IF ( LEN_TRIM(Msg) > 0 ) THEN
+            CALL GC_Error(Msg, RC, Loc)
+            RETURN
+         ENDIF
+      ENDIF
+
       ! Check if species data is in file
       IF ( FOUND ) THEN
          SpcInfo%Is_InRestart = .TRUE.
@@ -2182,6 +2220,27 @@ CONTAINS
       SpcInfo => NULL()
 
    ENDDO
+
+   ! The archived total is redundant, never an independent internal stock.
+   IF ( WtcOutput%Total > 0 ) THEN
+      IF ( State_Chm%SpcData(WtcOutput%Total)%Info%Is_InRestart ) THEN
+         IF ( .NOT. BRC_WTC_Total_Matches(Spc(WtcOutput%Total)%Conc, &
+              Spc(WtcOutput%Primary)%Conc, Spc(WtcOutput%Secondary)%Conc) ) THEN
+            Msg = 'Restart WTC does not match PWTC+SWTC; no legacy partition or mass reset is allowed'
+            CALL GC_Error(Msg, RC, Loc)
+            RETURN
+         ENDIF
+      ELSE
+         IF ( .NOT. BRC_WTC_Components_Valid(Spc(WtcOutput%Primary)%Conc, &
+              Spc(WtcOutput%Secondary)%Conc) ) THEN
+            Msg = 'Restart PWTC/SWTC must be finite and nonnegative'
+            CALL GC_Error(Msg, RC, Loc)
+            RETURN
+         ENDIF
+      ENDIF
+      ! Never convert, transport or count a diagnostic copy of component mass.
+      Spc(WtcOutput%Total)%Conc = 0.0_fp
+   ENDIF
 
    !=========================================================================
    ! Get variables for KPP mechanisms (right now just fullchem and Hg)

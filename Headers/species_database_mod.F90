@@ -1176,10 +1176,24 @@ CONTAINS
           RETURN
        ENDIF
 
+       ! WTC is an explicitly registered output identity, not gas or aerosol
+       ! mass. Keep this exception narrow; every ordinary species retains the
+       ! usual gas/aerosol validation below.
+       IF ( Input_Opt%LBRC .AND. TRIM(modelSpcName) == 'WTC' ) THEN
+          IF ( ThisSpc%Is_Gas .OR. ThisSpc%Is_Aerosol .OR. ThisSpc%Is_Advected .OR. &
+               ThisSpc%Is_Kpp .OR. ThisSpc%Is_DryDep .OR. ThisSpc%Is_WetDep .OR. &
+               ThisSpc%Is_DryAlt .OR. .NOT. ThisSpc%Is_HygroGrowth ) THEN
+             errMsg = 'WTC must be diagnostic-only with canonical HYG metadata and no physical processes'
+             CALL GC_Error(errMsg, RC, thisLoc)
+             RETURN
+          ENDIF
+       ENDIF
+
        ! Is_Gas and Is_Aero tags cannot both be FALSE at the same time
        IF ( ( .not. ThisSpc%Is_Gas     )   .and.                             &
             ( .not. ThisSpc%Is_Aerosol )   .and.                             &
-            ( .not. ThisSpc%Is_Omitted ) ) THEN
+            ( .not. ThisSpc%Is_Omitted ) .AND. &
+            .NOT. (Input_Opt%LBRC .AND. TRIM(modelSpcName) == 'WTC') ) THEN
 
           ! Check if this is a KPP species, is so set Is_Gas to TRUE, otherwise
           ! return with an error. This will account for P/L families not
@@ -1591,6 +1605,21 @@ CONTAINS
     ! Number of advected species listed in geoschem_config.yml
     nAdvect  = Input_Opt%N_Advect
 
+    ! WTC is appended as diagnostic metadata, never as an advected/KPP stock.
+    IF ( Input_Opt%LBRC ) THEN
+       IF ( ANY(Input_Opt%AdvectSpc_Name == 'WTC') ) THEN
+          errMsg = 'Derived WTC must be removed from transported_species; transport PWTC and SWTC only'
+          CALL GC_Error(errMsg, RC, thisLoc)
+          RETURN
+       ENDIF
+       IF ( .NOT. ANY(Input_Opt%AdvectSpc_Name == 'PWTC') .OR. &
+            .NOT. ANY(Input_Opt%AdvectSpc_Name == 'SWTC') ) THEN
+          errMsg = 'brown_carbon: true requires transported PWTC and SWTC'
+          CALL GC_Error(errMsg, RC, thisLoc)
+          RETURN
+       ENDIF
+    ENDIF
+
     ! First set the # of species to the # of advected species
     nSpecies = nAdvect
 
@@ -1740,6 +1769,22 @@ CONTAINS
        IF ( RC /= GC_SUCCESS ) RETURN
        KppVarId = MISSING_INT
 
+    ENDIF
+
+
+    IF ( Input_Opt%LBRC ) THEN
+       IF ( ANY(Species_Names == 'WTC') ) THEN
+          errMsg = 'WTC must be diagnostic-only, not a KPP chemistry species'
+          CALL GC_Error(errMsg, RC, thisLoc)
+          RETURN
+       ENDIF
+       ! Allocatable assignment grows the arrays together; the advected prefix
+       ! is unchanged and the new diagnostic entry has no KPP identity.
+       Species_Names = [CHARACTER(LEN=31) :: Species_Names, 'WTC']
+       KppSpcId = [KppSpcId, MISSING_INT]
+       KppVarId = [KppVarId, MISSING_INT]
+       KppFixId = [KppFixId, MISSING_INT]
+       nSpecies = nSpecies + 1
     ENDIF
 
   END SUBROUTINE Unique_Species_Names

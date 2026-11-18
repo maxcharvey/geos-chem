@@ -292,7 +292,7 @@ MODULE CARBON_MOD
   INTEGER :: id_MTPO,    id_NAP,    id_NK01,   id_NH4,    id_NO
   INTEGER :: id_NO3,     id_OCIL01, id_OCOB01, id_O3,     id_OH
   INTEGER :: id_OCPO,    id_OCPI,   id_OPOA1,  id_OPOG1,  id_OPOA2
-  INTEGER :: id_FFOCPI,  id_FFOCPO
+  INTEGER :: id_FFOCPI,  id_FFOCPO, id_FOCPI, id_FOCPO
   INTEGER :: id_OPOG2,   id_POA1,   id_POA2,   id_POG1,   id_POG2
   INTEGER :: id_TOLU,    id_TSOA0,  id_TSOA1
   INTEGER :: id_TSOA2,   id_TSOA3,  id_TSOG0,  id_TSOG1,  id_TSOG2
@@ -574,6 +574,12 @@ CONTAINS
        IF ( Input_Opt%Verbose ) THEN
           CALL DEBUG_MSG( '### CHEMCARBON: a CHEM_OCPI' )
        ENDIF
+    ENDIF
+
+    ! Preserve fire provenance during standard hydrophobic-to-hydrophilic aging.
+    IF ( Input_Opt%LBRC .AND. id_FOCPO > 0 .AND. id_FOCPI > 0 ) THEN
+       CALL CHEM_FOC( State_Chm, State_Grid, id_FOCPO, id_FOCPI, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
     ENDIF
 
     IF ( Input_Opt%LBRC .AND. id_FFOCPO > 0 ) THEN
@@ -1635,6 +1641,41 @@ CONTAINS
    TC => NULL()
 
  END SUBROUTINE CHEM_FFOCPI
+
+ ! Residual fire OC uses the same rate, chemistry timestep and cutoffs as OCPO.
+ SUBROUTINE CHEM_FOC( State_Chm, State_Grid, id_PO, id_PI, RC )
+   USE ErrCode_Mod
+   USE State_Chm_Mod, ONLY : ChmState
+   USE State_Grid_Mod, ONLY : GrdState
+   USE Time_Mod, ONLY : GET_TS_CHEM
+   TYPE(ChmState), INTENT(INOUT) :: State_Chm
+   TYPE(GrdState), INTENT(IN) :: State_Grid
+   INTEGER, INTENT(IN) :: id_PO, id_PI
+   INTEGER, INTENT(OUT) :: RC
+   INTEGER :: I, J, L
+   REAL(fp) :: DTCHEM, KOC, TC0, CNEW, CCV
+   REAL(fp), PARAMETER :: OC_LIFE = 1.15e+0_fp
+   RC = GC_SUCCESS
+   DTCHEM = GET_TS_CHEM()
+   KOC = 1.e+0_fp / ( 86400e+0_fp * OC_LIFE )
+   !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,L,TC0,CNEW,CCV) COLLAPSE(3)
+   DO L = 1, State_Grid%NZ
+   DO J = 1, State_Grid%NY
+   DO I = 1, State_Grid%NX
+      TC0 = State_Chm%Species(id_PO)%Conc(I,J,L)
+      CNEW = TC0 * EXP( -KOC * DTCHEM )
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+      CCV = TC0 - CNEW
+      State_Chm%Species(id_PO)%Conc(I,J,L) = CNEW
+      CNEW = State_Chm%Species(id_PI)%Conc(I,J,L) + CCV
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+      State_Chm%Species(id_PI)%Conc(I,J,L) = CNEW
+   ENDDO
+   ENDDO
+   ENDDO
+   !$OMP END PARALLEL DO
+ END SUBROUTINE CHEM_FOC
+
 !EOC
 
 
@@ -8115,6 +8156,8 @@ CONTAINS
    id_OCPI     = IND_('OCPI'    )
    id_FFOCPI   = IND_('FFOCPI'  )
    id_FFOCPO   = IND_('FFOCPO'  )
+   id_FOCPI    = IND_('FOCPI'   )
+   id_FOCPO    = IND_('FOCPO'   )
    id_OPOA1    = IND_('OPOA1'   )
    id_OPOG1    = IND_('OPOG1'   )
    id_OPOA2    = IND_('OPOA2'   )

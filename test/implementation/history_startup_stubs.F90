@@ -43,6 +43,7 @@ MODULE History_Fixture_Types
   END TYPE
   TYPE(MetaHistContainer), POINTER :: CollectionList=>NULL()
   INTEGER :: update_calls=0
+  INTEGER :: fixture_wtc_ids(3)=0
 END MODULE
 
 MODULE Charpak_Mod
@@ -82,7 +83,17 @@ MODULE State_Diag_Mod
   USE History_Fixture_Types, ONLY: DgnMap,DgnState
 END MODULE
 MODULE State_Chm_Mod
-  USE History_Fixture_Types, ONLY: ChmState
+  USE History_Fixture_Types, ONLY: ChmState, fixture_wtc_ids
+CONTAINS
+  INTEGER FUNCTION Ind_(Name)
+    CHARACTER(*), INTENT(IN) :: Name
+    Ind_ = 0
+    SELECT CASE(Name)
+    CASE('WTC'); Ind_ = fixture_wtc_ids(1)
+    CASE('PWTC'); Ind_ = fixture_wtc_ids(2)
+    CASE('SWTC'); Ind_ = fixture_wtc_ids(3)
+    END SELECT
+  END FUNCTION
 END MODULE
 MODULE State_Grid_Mod
   USE History_Fixture_Types, ONLY: GrdState
@@ -159,4 +170,9 @@ CONTAINS
     container%captured=state_diag%SpeciesBC(1,1,1,:)
     rc=0
   END SUBROUTINE
+END MODULE
+
+MODULE Precision_Mod
+  USE History_Fixture_Types, ONLY: fp
+  USE, INTRINSIC :: ISO_FORTRAN_ENV, ONLY: f4=>real32
 END MODULE

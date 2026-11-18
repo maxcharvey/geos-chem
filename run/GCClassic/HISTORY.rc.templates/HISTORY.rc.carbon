@@ -362,7 +362,7 @@ COLLECTIONS: 'Restart',
   BoundaryConditions.frequency:  00000000 030000
   BoundaryConditions.duration:   00000001 000000
   BoundaryConditions.mode:       'instantaneous'
-  BoundaryConditions.fields:     'SpeciesBC_?ADV?             ',
+  BoundaryConditions.fields:     'SpeciesBC_?ADVWTC?          ',
 ::
 #==============================================================================
 # %%%%% THE BrCDiagnostics COLLECTION %%%%%
@@ -378,6 +378,9 @@ COLLECTIONS: 'Restart',
   BrCDiagnostics.fields:     'BrCTauBleach              ',
                              'BrCKBleach                ',
                              'BrCEtaBBOA                ',
+                             'BrCWhiteMass              ',
+                             'BrCPriMass                ',
+                             'BrCSecMass                ',
                              'BrCFluxFSOAP2FSOAS        ',
                              'BrCFluxFSOAS2BRC          ',
                              'BrCFluxBRC2WTC            ',

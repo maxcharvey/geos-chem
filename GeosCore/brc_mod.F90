@@ -9,16 +9,16 @@
 !  aerosol chemistry, including the darkening chain:
 !
 !    FSOAP ---(gas-to-particle)---> FSOAS ---(rapid darkening)--->
-!    BRCSOA ---(photobleaching)---> WTC
+!    BRCSOA ---(photobleaching)---> SWTC
 !
 !  In parallel, non-persistent BrC-POA (directly emitted from fires)
-!  also photo-bleaches to WTC via the same viscosity-dependent scheme,
+!  also photo-bleaches to PWTC via the same viscosity-dependent scheme,
 !  while persistent primary BrC-POA is carried as a non-bleaching tracer:
 !
-!    NPBRCPOA ---(photobleaching)---> WTC
+!    NPBRCPOA ---(photobleaching)---> PWTC
 !    PBRCPOA  ---(persistent tracer)---> PBRCPOA
 !
-!  The photobleaching rate (BRCSOA -> WTC) is parameterised as a function
+!  The photobleaching rate (BRCSOA -> SWTC) is parameterised as a function
 !  of local temperature and relative humidity following the viscosity-
 !  dependent kinetic framework of:
 !
@@ -432,7 +432,7 @@ CONTAINS
 ! !IROUTINE: calc_tau_brc
 !
 ! !DESCRIPTION: Returns the e-folding lifetime [seconds] for BrC
-!  photobleaching (BRCSOA -> WTC) at given temperature T and water
+!  photobleaching (BRCSOA -> SWTC) at given temperature T and water
 !  activity AW, using the resistor-model framework of Schnitzler et al.
 !  (2022), Main text Eq. 3:
 !
@@ -555,12 +555,12 @@ CONTAINS
 !  The full chain is:
 !    Step 0: FSOAP -> FSOAS   (gas-to-particle, tau ~ 1 day)
 !    Step 1: FSOAS -> BRCSOA  (rapid darkening, tau ~ 1 day)
-!    Step 2: BRCSOA -> WTC    (viscosity-dependent photobleaching)
-!    Step 2b: NPBRCPOA -> WTC (viscosity-dependent photobleaching)
+!    Step 2: BRCSOA -> SWTC   (viscosity-dependent photobleaching)
+!    Step 2b: NPBRCPOA -> PWTC (viscosity-dependent photobleaching)
 !    Step 2c: PBRCPOA persists as emitted primary BrC-POA
-!    Step 3: WTC receives bleached mass from BRCSOA and NPBRCPOA
+!    Step 3: SWTC receives BRCSOA mass; PWTC receives NPBRCPOA mass
 !
-!  FSOAS, BRCSOA and WTC are required by this chemistry driver. FSOAP and
+!  FSOAS, BRCSOA, WTC, PWTC and SWTC are required. FSOAP and
 !  NPBRCPOA are optional: absent pathways are skipped. PBRCPOA and DBRCPOA
 !  are optional passive species here. The online aerosol mapping can impose
 !  additional species requirements independently of this chemistry guard.
@@ -608,11 +608,11 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
    INTEGER            :: I, J, L
-   INTEGER            :: id_FSOAP, id_FSOAS, id_BRCSOA, id_WTC
+   INTEGER            :: id_FSOAP, id_FSOAS, id_BRCSOA, id_WTC, id_PWTC, id_SWTC
    INTEGER            :: id_NPBRCPOA, id_DBRCPOA, id_PBRCPOA
    REAL(fp)           :: Sum_FSOAP, Sum_FSOAS, Sum_BRCSOA
    REAL(fp)           :: Sum_NPBRCPOA, Sum_WTC, Sum_DBRCPOA, Sum_PBRCPOA
-   REAL(fp)           :: AbsMass, TotMass
+   REAL(fp)           :: AbsMass, TotMass, WhiteMass, PriMass, SecMass
    CHARACTER(LEN=255) :: ErrMsg, ThisLoc
 
    !=================================================================
@@ -624,18 +624,21 @@ CONTAINS
 
    !-----------------------------------------------------------------
    ! Look up species IDs - reject missing required chemistry species
-   ! FSOAP and NPBRCPOA are optional; FSOAS, BRCSOA, WTC are required
+   ! FSOAP and NPBRCPOA are optional; FSOAS, BRCSOA, WTC, PWTC, SWTC are required
    !-----------------------------------------------------------------
    id_FSOAP    = Ind_('FSOAP'   )
    id_FSOAS    = Ind_('FSOAS'   )
    id_BRCSOA   = Ind_('BRCSOA'  )
-   id_WTC      = Ind_('WTC'     )
+   id_WTC      = Ind_('WTC'     ) ! Derived output identity only
+   id_PWTC     = Ind_('PWTC'    )
+   id_SWTC     = Ind_('SWTC'    )
    id_NPBRCPOA = Ind_('NPBRCPOA')
    id_DBRCPOA  = Ind_('DBRCPOA' )
    id_PBRCPOA  = Ind_('PBRCPOA' )
 
    ! Fail before allocating arrays or advancing any BrC chemistry.
-   ErrMsg = BRC_REQUIRED_SPECIES_ERROR( (/ id_FSOAS, id_BRCSOA, id_WTC /) )
+   ErrMsg = BRC_REQUIRED_SPECIES_ERROR( &
+      (/ id_FSOAS, id_BRCSOA, id_WTC, id_PWTC, id_SWTC /) )
    IF ( LEN_TRIM( ErrMsg ) > 0 ) THEN
       CALL GC_Error( ErrMsg, RC, ThisLoc )
       RETURN
@@ -695,7 +698,7 @@ CONTAINS
    ENDIF
 
    !-----------------------------------------------------------------
-   ! Step 2: Add darkened mass to BRCSOA, then bleach BRCSOA -> WTC
+   ! Step 2: Add darkened mass to BRCSOA, then bleach BRCSOA -> SWTC
    !         Bleaching rate depends on local T and RH
    !-----------------------------------------------------------------
    CALL CHEM_BRCSOA( Input_Opt,  State_Chm, State_Diag,  &
@@ -712,7 +715,7 @@ CONTAINS
    ENDIF
 
    !-----------------------------------------------------------------
-   ! Step 2b (optional): NPBRCPOA -> WTC  (viscosity-dependent)
+   ! Step 2b (optional): NPBRCPOA -> PWTC  (viscosity-dependent)
    !   Non-persistent BrC-POA bleaches to WTC using the same
    !   Schnitzler et al. (2022) parameterisation as BRCSOA.
    !   Only runs if NPBRCPOA is defined in the simulation.
@@ -739,8 +742,8 @@ CONTAINS
    ! bleached here.
 
    !-----------------------------------------------------------------
-   ! Step 3: Receive bleached mass into WTC
-   !         (from both BRCSOA and NPBRCPOA)
+   ! Step 3: Preserve provenance: NPBRCPOA -> PWTC, BRCSOA -> SWTC.
+   ! WTC is a derived output and owns no physical stock.
    !-----------------------------------------------------------------
    IF ( Input_Opt%amIRoot ) THEN
       WRITE( 6, '(a,3(1x,a,es12.4))' )                                     &
@@ -751,7 +754,7 @@ CONTAINS
    ENDIF
 
    CALL CHEM_WTC( Input_Opt,  State_Chm, State_Diag, &
-                  State_Grid, id_WTC,    RC          )
+                  State_Grid, id_PWTC, id_SWTC, RC )
 
    IF ( RC /= GC_SUCCESS ) THEN
       ErrMsg = 'Error encountered in "CHEM_WTC"!'
@@ -767,16 +770,19 @@ CONTAINS
    ! BrC-family carbon-mass diagnostics.  FSOAS is transported as OM, so
    ! convert it to carbon with OMOC_BBOA before combining it with the
    ! carbon-mass BrC tracers.  "Abs" follows the RRTMG BRC label:
-   ! absorbing/dark BrC species only, excluding bleached WTC.  "Tot"
-   ! follows the RRTMG BRCT label: absorbing/dark BrC + WTC.
+   ! absorbing/dark BrC species only, excluding all bleached white carbon.
+   ! "Tot" follows BRCT: absorbing/dark BrC + PWTC + SWTC.
    !-----------------------------------------------------------------
    IF ( State_Diag%Archive_BrCAbsMass      .OR. &
         State_Diag%Archive_BrCTotMass      .OR. &
-        State_Diag%Archive_BrCBleachedFrac ) THEN
+        State_Diag%Archive_BrCBleachedFrac .OR. &
+        State_Diag%Archive_BrCWhiteMass    .OR. &
+        State_Diag%Archive_BrCPriMass      .OR. &
+        State_Diag%Archive_BrCSecMass ) THEN
 
       !$OMP PARALLEL DO                                                &
       !$OMP DEFAULT( SHARED                                           )&
-      !$OMP PRIVATE( I, J, L, AbsMass, TotMass                        )&
+      !$OMP PRIVATE( I, J, L, AbsMass, TotMass, WhiteMass, PriMass, SecMass )&
       !$OMP COLLAPSE( 3                                               )
       DO L = 1, State_Grid%NZ
       DO J = 1, State_Grid%NY
@@ -797,7 +803,22 @@ CONTAINS
             AbsMass = AbsMass + State_Chm%Species(id_PBRCPOA)%Conc(I,J,L)
          ENDIF
 
-         TotMass = AbsMass + State_Chm%Species(id_WTC)%Conc(I,J,L)
+         WhiteMass = State_Chm%Species(id_PWTC)%Conc(I,J,L) &
+                   + State_Chm%Species(id_SWTC)%Conc(I,J,L)
+         SecMass = State_Chm%Species(id_FSOAS)%Conc(I,J,L) / OMOC_BBOA &
+                 + State_Chm%Species(id_BRCSOA)%Conc(I,J,L) &
+                 + State_Chm%Species(id_SWTC)%Conc(I,J,L)
+         PriMass = State_Chm%Species(id_PWTC)%Conc(I,J,L)
+         IF ( id_NPBRCPOA > 0 ) &
+            PriMass = PriMass + State_Chm%Species(id_NPBRCPOA)%Conc(I,J,L)
+         IF ( id_PBRCPOA > 0 ) &
+            PriMass = PriMass + State_Chm%Species(id_PBRCPOA)%Conc(I,J,L)
+         IF ( id_DBRCPOA > 0 ) &
+            PriMass = PriMass + State_Chm%Species(id_DBRCPOA)%Conc(I,J,L)
+         TotMass = AbsMass + WhiteMass
+         IF ( State_Diag%Archive_BrCWhiteMass ) State_Diag%BrCWhiteMass(I,J,L) = WhiteMass
+         IF ( State_Diag%Archive_BrCPriMass ) State_Diag%BrCPriMass(I,J,L) = PriMass
+         IF ( State_Diag%Archive_BrCSecMass ) State_Diag%BrCSecMass(I,J,L) = SecMass
 
          IF ( State_Diag%Archive_BrCAbsMass ) THEN
             State_Diag%BrCAbsMass(I,J,L) = AbsMass
@@ -810,7 +831,7 @@ CONTAINS
          IF ( State_Diag%Archive_BrCBleachedFrac ) THEN
             IF ( TotMass > SMALLNUM ) THEN
                State_Diag%BrCBleachedFrac(I,J,L) =                      &
-                  State_Chm%Species(id_WTC)%Conc(I,J,L) / TotMass
+                  WhiteMass / TotMass
             ELSE
                State_Diag%BrCBleachedFrac(I,J,L) = 0.0_fp
             ENDIF
@@ -833,7 +854,9 @@ CONTAINS
       IF ( id_PBRCPOA  > 0 ) Sum_PBRCPOA  = SUM( State_Chm%Species(id_PBRCPOA )%Conc )
       Sum_FSOAS  = SUM( State_Chm%Species(id_FSOAS )%Conc )
       Sum_BRCSOA = SUM( State_Chm%Species(id_BRCSOA)%Conc )
-      Sum_WTC    = SUM( State_Chm%Species(id_WTC   )%Conc )
+      ! WTC retains its archived meaning: derived total white carbon.
+      Sum_WTC = SUM( State_Chm%Species(id_PWTC)%Conc ) &
+              + SUM( State_Chm%Species(id_SWTC)%Conc )
       WRITE( 6, '(a,7(1x,a,es12.4))' )                                     &
          'BRC_DEBUG ChemBrC kg:',                                           &
          'FSOAP=',    Sum_FSOAP,    'FSOAS=',   Sum_FSOAS,                 &
@@ -913,7 +936,7 @@ CONTAINS
    IF ( RC /= GC_SUCCESS ) RETURN
    BRCSOA_CONV = 0e+0_fp
 
-   ! Allocate NPBRC_CONV (NPBRCPOA -> WTC conversion)
+   ! Allocate NPBRC_CONV (NPBRCPOA -> PWTC conversion)
    ALLOCATE( NPBRC_CONV( NX, NY, NZ ), STAT=RC )
    CALL GC_CheckVar( 'brc_mod.F90:NPBRC_CONV', 0, RC )
    IF ( RC /= GC_SUCCESS ) RETURN
@@ -1262,7 +1285,7 @@ CONTAINS
 ! !DESCRIPTION: Subroutine CHEM\_BRCSOA performs two steps:
 !  (1) Adds newly-darkened BrC mass from FSOAS (stored in FSOAS\_CONV)
 !      into the BRCSOA tracer.
-!  (2) Photo-bleaches BRCSOA to WTC using a first-order loss whose
+!  (2) Photo-bleaches BRCSOA to SWTC using a first-order loss whose
 !      rate constant varies with local temperature and relative humidity,
 !      following the viscosity-dependent parameterisation of
 !      Schnitzler et al. (2022), PNAS 119(38), e2205610119.
@@ -1368,7 +1391,7 @@ CONTAINS
    id_O3 = Ind_('O3')
 
    !=================================================================
-   ! Photo-bleaching from BRCSOA to WTC
+   ! Photo-bleaching from BRCSOA to SWTC
    ! Rate constant varies with local T and RH following the
    ! viscosity-dependent parameterisation (Schnitzler et al. 2022)
    !=================================================================
@@ -1495,7 +1518,7 @@ CONTAINS
       TC0 = TC(I,J,L) + CCV
 
       !==============================================================
-      ! 2) Bleach BRCSOA -> WTC as first-order loss over DTCHEM
+      ! 2) Bleach BRCSOA -> SWTC as first-order loss over DTCHEM
       !==============================================================
 
       ! Zero drydep freq (drydep handled in mixing_mod.F90)
@@ -1510,7 +1533,7 @@ CONTAINS
          ! Prevent underflow condition
          IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
-         ! Amount bleached from BRCSOA to WTC [kg/timestep]
+         ! Amount bleached from BRCSOA to SWTC [kg/timestep]
          BRCSOA_CONV(I,J,L) = ( TC0 - CNEW )                       &
                              * KBRCSOA_LOCAL                        &
                              / ( KBRCSOA_LOCAL + FREQ )
@@ -1645,9 +1668,9 @@ CONTAINS
    id_O3 = Ind_('O3')
 
    !=================================================================
-   ! Photo-bleaching from NPBRCPOA to WTC
+   ! Photo-bleaching from NPBRCPOA to PWTC
    ! Uses the same viscosity-dependent Schnitzler et al. (2022)
-   ! parameterisation as BRCSOA -> WTC
+   ! parameterisation as BRCSOA -> SWTC
    !=================================================================
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
@@ -1724,7 +1747,7 @@ CONTAINS
       ENDIF
 
       !==============================================================
-      ! Bleach NPBRCPOA -> WTC as first-order loss over DTCHEM
+      ! Bleach NPBRCPOA -> PWTC as first-order loss over DTCHEM
       !==============================================================
 
       ! Current NPBRCPOA mass [kg]
@@ -1742,7 +1765,7 @@ CONTAINS
          ! Prevent underflow condition
          IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
 
-         ! Amount bleached from NPBRCPOA to WTC [kg/timestep]
+         ! Amount bleached from NPBRCPOA to PWTC [kg/timestep]
          NPBRC_CONV(I,J,L) = ( TC0 - CNEW )                        &
                             * KNPBRC_LOCAL                         &
                             / ( KNPBRC_LOCAL + FREQ )
@@ -1778,13 +1801,14 @@ CONTAINS
 !
 ! !DESCRIPTION: Subroutine CHEM\_WTC receives the bleached mass from
 !  BRCSOA (stored in BRCSOA\_CONV) and from NPBRCPOA (stored in
-!  NPBRC\_CONV, if present) and adds them to the WTC tracer.
+!  NPBRC\_CONV, if present) into SWTC and PWTC respectively.
+!  WTC has no physical stock; both conversion arrays are consumed once.
 !\\
 !\\
 ! !INTERFACE:
 !
  SUBROUTINE CHEM_WTC( Input_Opt,  State_Chm, State_Diag, &
-                      State_Grid, spcId,     RC          )
+                      State_Grid, id_PWTC, id_SWTC, RC )
 !
 ! !USES:
 !
@@ -1799,7 +1823,7 @@ CONTAINS
 !
    TYPE(OptInput), INTENT(IN)    :: Input_Opt    ! Input Options object
    TYPE(GrdState), INTENT(IN)    :: State_Grid   ! Grid State object
-   INTEGER,        INTENT(IN)    :: spcId        ! WTC species Id
+   INTEGER,        INTENT(IN)    :: id_PWTC, id_SWTC ! Attributed receiver IDs
 !
 ! !INPUT/OUTPUT PARAMETERS:
 !
@@ -1824,7 +1848,7 @@ CONTAINS
    REAL(fp) :: TC0, CNEW, CCV
 
    ! Pointers
-   REAL(fp), POINTER :: TC(:,:,:)
+   REAL(fp), POINTER :: PTC(:,:,:), STC(:,:,:)
 
    !=================================================================
    ! CHEM_WTC begins here!
@@ -1832,7 +1856,8 @@ CONTAINS
 
    ! Assume success
    RC = GC_SUCCESS
-   TC => State_Chm%Species(spcId)%Conc
+   PTC => State_Chm%Species(id_PWTC)%Conc
+   STC => State_Chm%Species(id_SWTC)%Conc
 
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
@@ -1842,23 +1867,19 @@ CONTAINS
    DO J = 1, State_Grid%NY
    DO I = 1, State_Grid%NX
 
-      ! Current WTC mass [kg]
-      TC0 = TC(I,J,L)
-
-      ! Bleached mass arriving from BRCSOA [kg]
-      CCV = BRCSOA_CONV(I,J,L)
-
-      ! Also add bleached mass arriving from NPBRCPOA [kg]
-      CCV = CCV + NPBRC_CONV(I,J,L)
-
-      ! Add converted mass to WTC
+      ! Independent physical receivers; WTC output is their derived sum.
+      ! Preserve the existing per-receiver SMALLNUM cutoff.
+      TC0 = PTC(I,J,L)
+      CCV = NPBRC_CONV(I,J,L)
       CNEW = TC0 + CCV
-
-      ! Prevent underflow condition
       IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+      PTC(I,J,L) = CNEW
 
-      ! Store modified concentration back in species array [kg]
-      TC(I,J,L) = CNEW
+      TC0 = STC(I,J,L)
+      CCV = BRCSOA_CONV(I,J,L)
+      CNEW = TC0 + CCV
+      IF ( CNEW < SMALLNUM ) CNEW = 0e+0_fp
+      STC(I,J,L) = CNEW
 
    ENDDO
    ENDDO
@@ -1872,7 +1893,8 @@ CONTAINS
    NPBRC_CONV  = 0e+0_fp
 
    ! Free pointer
-   TC => NULL()
+   PTC => NULL()
+   STC => NULL()
 
  END SUBROUTINE CHEM_WTC
 !EOC

@@ -29,7 +29,7 @@ MODULE State_Diag_Mod
   USE Precision_Mod
   USE Registry_Mod
   USE Species_Mod,        ONLY : Species
-  USE State_Chm_Mod,      ONLY : ChmState
+  USE State_Chm_Mod,      ONLY : ChmState, Ind_
   USE TaggedDiagList_Mod
 
   IMPLICIT NONE
@@ -763,6 +763,15 @@ MODULE State_Diag_Mod
 
      REAL(f4),           POINTER :: BrCTotMass(:,:,:)
      LOGICAL                     :: Archive_BrCTotMass
+
+     REAL(f4),           POINTER :: BrCWhiteMass(:,:,:)
+     LOGICAL                     :: Archive_BrCWhiteMass
+
+     REAL(f4),           POINTER :: BrCPriMass(:,:,:)
+     LOGICAL                     :: Archive_BrCPriMass
+
+     REAL(f4),           POINTER :: BrCSecMass(:,:,:)
+     LOGICAL                     :: Archive_BrCSecMass
 
      REAL(f4),           POINTER :: BrCBleachedFrac(:,:,:)
      LOGICAL                     :: Archive_BrCBleachedFrac
@@ -2307,6 +2316,15 @@ CONTAINS
     State_Diag%BrCTotMass                         => NULL()
     State_Diag%Archive_BrCTotMass                 = .FALSE.
 
+    State_Diag%BrCWhiteMass                         => NULL()
+    State_Diag%Archive_BrCWhiteMass                 = .FALSE.
+
+    State_Diag%BrCPriMass                         => NULL()
+    State_Diag%Archive_BrCPriMass                 = .FALSE.
+
+    State_Diag%BrCSecMass                         => NULL()
+    State_Diag%Archive_BrCSecMass                 = .FALSE.
+
     State_Diag%BrCBleachedFrac                    => NULL()
     State_Diag%Archive_BrCBleachedFrac            = .FALSE.
 
@@ -3155,7 +3173,7 @@ CONTAINS
          archiveData    = State_Diag%Archive_SpeciesBC,                      &
          mapData        = State_Diag%Map_SpeciesBC,                          &
          diagId         = diagId,                                            &
-         diagFlag       = 'A',                                               &
+         diagFlag       = 'S',                                               &
          RC             = RC                                                )
 
     IF ( RC /= GC_SUCCESS ) THEN
@@ -9528,6 +9546,63 @@ CONTAINS
             RETURN
        ENDIF
 
+       diagID = 'BrCWhiteMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCWhiteMass,                          &
+            archiveData    = State_Diag%Archive_BrCWhiteMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       diagID = 'BrCPriMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCPriMass,                          &
+            archiveData    = State_Diag%Archive_BrCPriMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       diagID = 'BrCSecMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCSecMass,                          &
+            archiveData    = State_Diag%Archive_BrCSecMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
        !--------------------------------------------------------------------
        ! WTC fraction of total BrC-family mass [1]
        !--------------------------------------------------------------------
@@ -15144,6 +15219,21 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'BrCWhiteMass',                                  &
+                   Ptr2Data = State_Diag%BrCWhiteMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCPriMass',                                  &
+                   Ptr2Data = State_Diag%BrCPriMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCSecMass',                                  &
+                   Ptr2Data = State_Diag%BrCSecMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
     CALL Finalize( diagId   = 'BrCBleachedFrac',                             &
                    Ptr2Data = State_Diag%BrCBleachedFrac,                    &
                    RC       = RC                                            )
@@ -17832,8 +17922,23 @@ CONTAINS
        IF ( isUnits   ) Units = 'kgC'
        IF ( isRank    ) Rank  =  3
 
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCWHITEMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'White-carbon mass PWTC+SWTC'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCPRIMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'Attributed primary BrC-family aerosol carbon mass'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCSECMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'Attributed secondary BrC-family aerosol carbon mass'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCBLEACHEDFRAC' ) THEN
-       IF ( isDesc    ) Desc  = 'WTC fraction of total BrC-family species mass'
+       IF ( isDesc    ) Desc  = 'PWTC+SWTC fraction of total BrC-family carbon mass'
        IF ( isUnits   ) Units = '1'
        IF ( isRank    ) Rank  =  3
 
@@ -17848,12 +17953,12 @@ CONTAINS
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXBRC2WTC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from BRCSOA to WTC'
+       IF ( isDesc    ) Desc  = 'Mass flux from BRCSOA to SWTC'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXNPBRC2WTC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to WTC'
+       IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to PWTC'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
@@ -18025,6 +18130,10 @@ CONTAINS
           numTags = State_Chm%nSpecies
        CASE( 'ADV',     'A' )
           numTags = State_Chm%nAdvect
+       CASE( 'ADVWTC' )
+          ! Output-only wildcard: physical tracers plus derived WTC when active.
+          numTags = State_Chm%nAdvect
+          IF ( Ind_('WTC') > State_Chm%nAdvect ) numTags = numTags + 1
        CASE( 'AER'          )
           numTags = State_Chm%nAeroSpc
        CASE( 'DRY',     'D' )
@@ -18177,6 +18286,9 @@ CONTAINS
     ! Get mapping index
     !=======================================================================
     SELECT CASE( TRIM( tagID ) )
+       CASE( 'ADVWTC' )
+          D = N
+          IF ( N > State_Chm%nAdvect ) D = Ind_('WTC')
        CASE( 'ALL', 'ADV',   'DUSTBIN', 'TOMASBIN', 'PRD',                   &
              'LOS', 'RRTMG', 'UVFLX',   'RXN'                               )
           D = N

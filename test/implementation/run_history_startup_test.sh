@@ -17,6 +17,7 @@ timeout 30 "${FC:-gfortran}" -O0 -cpp -fopenmp -fcheck=all \
   -fbacktrace -ffree-line-length-none -Wall -Wno-unused-dummy-argument \
   -I"$task_build" \
   "$task_core/test/implementation/history_startup_stubs.F90" \
+  "$task_core/Headers/brc_wtc_output_mod.F90" \
   "$task_core/test/implementation/history_startup_test.F90" \
   -o history_startup_test
 OMP_NUM_THREADS=2 timeout 10 ./history_startup_test

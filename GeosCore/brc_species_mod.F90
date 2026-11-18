@@ -6,10 +6,10 @@ MODULE BRC_Species_Mod
   PUBLIC :: BRC_REQUIRED_SPECIES_ERROR
 CONTAINS
   PURE FUNCTION BRC_REQUIRED_SPECIES_ERROR( Ids ) RESULT( Message )
-    INTEGER, INTENT(IN) :: Ids(3)  ! FSOAS, BRCSOA, WTC, in that order
+    INTEGER, INTENT(IN) :: Ids(5)  ! FSOAS, BRCSOA, WTC, PWTC, SWTC, in that order
     CHARACTER(LEN=255) :: Message
-    CHARACTER(LEN=6), PARAMETER :: Names(3) = &
-         (/ 'FSOAS ', 'BRCSOA', 'WTC   ' /)
+    CHARACTER(LEN=6), PARAMETER :: Names(5) = &
+         (/ 'FSOAS ', 'BRCSOA', 'WTC   ', 'PWTC  ', 'SWTC  ' /)
     INTEGER :: N
 
     Message = ''

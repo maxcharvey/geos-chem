@@ -1515,6 +1515,7 @@ CONTAINS
 ! !USES:
 !
     USE CMN_SIZE_MOD,       ONLY : NDUST, NAER
+    USE BRC_WTC_Output_Mod
     USE ErrCode_Mod
     USE Input_Opt_Mod,      ONLY : OptInput
     USE Ncdf_Mod,           ONLY : GET_TAU0
@@ -1563,6 +1564,8 @@ CONTAINS
 !
 ! !LOCAL VARIABLES:
 !
+    TYPE(BRC_WTC_Map) :: WtcOutput
+!
     LOGICAL, SAVE       :: FIRST = .TRUE.
     LOGICAL             :: IS_FULLCHEM, LINTERP
     INTEGER             :: I, J, L, M, N, R, PR, V, NUM
@@ -1608,6 +1611,7 @@ CONTAINS
 
     ! Initialize
     RC = GC_SUCCESS
+    WtcOutput = BRC_WTC_Output_Ids()
 
     ! Get fields from Input_Opt
     IS_FULLCHEM = Input_Opt%ITS_A_FULLCHEM_SIM
@@ -1744,7 +1748,7 @@ CONTAINS
 
                    ! Species concentration [v/v dry] -> [molec/cm3]
                    N       = PVAR(V)
-                   VARI(V) = Spc(N)%Conc(I,J,L)                              &
+                   VARI(V) = BRC_Species_Output_Cell(State_Chm, N, I, J, L, WtcOutput)                              &
                            / AIRMW                                           &
                            * State_Met%AIRDEN(I,J,L)                         &
                            * AVO                                             &
@@ -2284,7 +2288,7 @@ CONTAINS
                 N       = PVAR(V) - 100000
 
                 ! Species concentration is in [v/v dry]
-                VARI(V) = Spc(N)%Conc(I,J,L)
+                VARI(V) = BRC_Species_Output_Cell(State_Chm, N, I, J, L, WtcOutput)
 
                 IF ( VARI(V) < TINY ) VARI(V) = 0.0_fp
 

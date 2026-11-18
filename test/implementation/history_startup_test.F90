@@ -109,6 +109,29 @@ PROGRAM History_Startup_Test
   CALL expect(rc/=0,'invalid startup species units still rejected')
   CALL expect(ALL(containers%writes==0),'error prevents startup writes')
 
+  ! Same production startup path with a poisoned derived-total state slot.
+  DO i=1,SIZE(chemistry%Species)
+    DEALLOCATE(chemistry%Species(i)%Conc)
+  ENDDO
+  DEALLOCATE(chemistry%Species)
+  ALLOCATE(chemistry%Species(3))
+  DO i=1,3
+    ALLOCATE(chemistry%Species(i)%Conc(1,1,1))
+  ENDDO
+  fixture_wtc_ids=[1,2,3]
+  chemistry%Species(1)%Conc=999._fp
+  chemistry%Species(2)%Conc=2._fp
+  chemistry%Species(3)%Conc=3._fp
+  mapping%slot2id=[1,2]
+  CALL setup([2,1,3,4])
+  CALL History_Write(input,chemistry,diagnostics,grid,rc)
+  CALL expect(rc==0,'derived WTC startup succeeds')
+  CALL expect(ALL(containers(1)%captured==[5._fp,2._fp]),'startup BC WTC equals current components')
+  CALL expect(chemistry%Species(1)%Conc(1,1,1)==999._fp,'startup never updates dummy state')
+  chemistry%Species(3)%Conc=7._fp
+  CALL setup([1])
+  CALL History_Write(input,chemistry,diagnostics,grid,rc)
+  CALL expect(ALL(containers(1)%captured==[9._fp,2._fp]),'startup re-samples changed components')
   WRITE(*,'(a,i0,a,i0,a)') 'PASS: ',permutations,' collection orders, ',assertions,' assertions'
 CONTAINS
   SUBROUTINE setup(order)

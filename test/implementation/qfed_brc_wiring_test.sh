@@ -23,8 +23,8 @@ for config in "$config_fullchem" "$config_aerosol"; do
     require "QFED_DBRCPOA_BRC_HS_FT" "$config"
     require "QFED_NPBRCPOA_BRC_HS_PBL" "$config"
     require "QFED_PBRCPOA_BRC_HS_FT" "$config"
-    require "QFED_OCPI_BRC_HS_PBL" "$config"
-    require "QFED_OCPO_BRC_HS_FT" "$config"
+    require "QFED_FOCPI_BRC_HS_PBL" "$config"
+    require "QFED_FOCPO_BRC_HS_FT" "$config"
     require "311 QFED_PBL_FRAC 0.65" "$config"
     require "312 QFED_FT_FRAC  0.35" "$config"
 done

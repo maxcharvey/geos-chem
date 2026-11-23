@@ -1262,12 +1262,13 @@ CONTAINS
 !
     USE CMN_SIZE_Mod,   ONLY : NAER, NRH, NDUST, NSTRATAER
     USE BRC_Optics_Mod, ONLY : BRC_DRY_AOD_AT_WAVELENGTH
+    USE BRC_Aerosol_Map_Mod, ONLY : BRC_DRY_AEROSOL_BIN
     USE ErrCode_Mod
     USE ERROR_MOD,      ONLY : ERROR_STOP, Safe_Div
     USE Input_Opt_Mod,  ONLY : OptInput
     USE PhysConstants,  ONLY : CONSVAP
-    USE State_Chm_Mod,  ONLY : ChmState
-    USE State_Diag_Mod, ONLY : DgnState
+    USE State_Chm_Mod,  ONLY : ChmState, Ind_
+    USE State_Diag_Mod, ONLY : DgnState, DgnMap, BrC_Optical_Species
     USE State_Grid_Mod, ONLY : GrdState
     USE State_Met_Mod,  ONLY : MetState
     USE TIME_MOD,       ONLY : ITS_A_NEW_MONTH
@@ -1322,6 +1323,17 @@ CONTAINS
     REAL*8              :: BCSCAT_AE  !(xnw, 8/24/15)
     REAL*8              :: DBG_AOD_STD(6)
     REAL*8              :: BrCDryAOD
+
+    TYPE :: AAOD_Diagnostic
+       REAL(f4),     POINTER :: data(:,:,:,:) => NULL()
+       TYPE(DgnMap), POINTER :: map => NULL()
+    END TYPE AAOD_Diagnostic
+    TYPE(AAOD_Diagnostic) :: AAOD(3)
+    INTEGER             :: BrC_Optical_Index(NAER)
+    INTEGER             :: AAOD_Slot(3), BrC_Tag
+    LOGICAL             :: SaveAAOD, SaveAAOD_Bin
+    LOGICAL             :: AAOD_Seen(2,3)
+    REAL(f8)            :: AAOD_Weight(3), BrC_Absorptance, Extinction
 
     ! Variables for speed diagnostics
     INTEGER             :: ITIMEVALS(8)
@@ -1397,6 +1409,7 @@ CONTAINS
     INTEGER,  POINTER   :: IRHARR     (:,:,:)
     REAL*8,   POINTER   :: ACOEF_WV (:)
     REAL*8,   POINTER   :: BCOEF_WV (:)
+    REAL*8,   POINTER   :: CCOEF_WV (:)
     REAL*8,   POINTER   :: REAA     (:,:,:)
     REAL*8,   POINTER   :: QQAA     (:,:,:,:)
     REAL*8,   POINTER   :: ALPHAA   (:,:,:,:)
@@ -1456,6 +1469,7 @@ CONTAINS
     IRHARR      => State_Chm%Phot%IRHARR      ! Relative humidity indexes
     ACOEF_WV    => State_Chm%Phot%ACOEF_WV    ! Coeffs for WL interpolation
     BCOEF_WV    => State_Chm%Phot%BCOEF_WV    ! Coeffs for WL interpolation
+    CCOEF_WV    => State_Chm%Phot%CCOEF_WV    ! Linear WL interpolation fraction
     REAA        => State_Chm%Phot%REAA
     QQAA        => State_Chm%Phot%QQAA
     ALPHAA      => State_Chm%Phot%ALPHAA
@@ -1743,6 +1757,38 @@ CONTAINS
        ENDIF
     ENDIF
 
+    ! Use requested diagnostic storage for the absorption fractions until
+    ! the paired extinction optical depths are available. BrC-off output
+    ! remains zero even when the same AAOD fields are requested.
+    IF ( ODSWITCH == 1 ) THEN
+       IF ( State_Diag%Archive_BrCAAODWL1 ) THEN
+          AAOD(1)%data => State_Diag%BrCAAODWL1
+          AAOD(1)%map  => State_Diag%Map_BrCAAODWL1
+       ENDIF
+       IF ( State_Diag%Archive_BrCAAODWL2 ) THEN
+          AAOD(2)%data => State_Diag%BrCAAODWL2
+          AAOD(2)%map  => State_Diag%Map_BrCAAODWL2
+       ENDIF
+       IF ( State_Diag%Archive_BrCAAODWL3 ) THEN
+          AAOD(3)%data => State_Diag%BrCAAODWL3
+          AAOD(3)%map  => State_Diag%Map_BrCAAODWL3
+       ENDIF
+    ENDIF
+    SaveAAOD = .FALSE.
+    DO W = 1, Input_Opt%NWVSELECT
+       IF ( .NOT. ASSOCIATED( AAOD(W)%data ) ) CYCLE
+       AAOD(W)%data = 0.0_f4
+       SaveAAOD = Input_Opt%LBRC
+    ENDDO
+    BrC_Optical_Index = 0
+    AAOD_Seen = .FALSE.
+    IF ( SaveAAOD ) THEN
+       DO BrC_Tag = 1, SIZE( BrC_Optical_Species )
+          NA = Ind_( BrC_Optical_Species(BrC_Tag), 'H' )
+          IF ( NA > 0 ) BrC_Optical_Index( Map_NRHAER(NA) ) = BrC_Tag
+       ENDDO
+    ENDIF
+
     DO IIWV = 1, NWVS
        !now select the correct LUT wavelength
        IF (ODSWITCH .EQ. 0) THEN
@@ -1768,6 +1814,26 @@ CONTAINS
           ENDIF
        ENDIF
 
+       ! A lookup wavelength can occur more than once in IWVREQUIRED
+       ! when two requested wavelengths share a bracket. Count each
+       ! bracket once for each diagnostic.
+       AAOD_Weight = 0.0_f8
+       IF ( SaveAAOD ) THEN
+          DO W = 1, Input_Opt%NWVSELECT
+             IF ( .NOT. ASSOCIATED( AAOD(W)%data ) ) CYCLE
+             IF ( IWV == IWVSELECT(1,W) ) THEN
+                IF ( AAOD_Seen(1,W) ) CYCLE
+                AAOD_Seen(1,W) = .TRUE.
+                AAOD_Weight(W) = 1.0_f8
+                IF ( IWVSELECT(1,W) /= IWVSELECT(2,W) ) AAOD_Weight(W) = 1.0_f8 - CCOEF_WV(W)
+             ELSE IF ( IWV == IWVSELECT(2,W) ) THEN
+                IF ( AAOD_Seen(2,W) ) CYCLE
+                AAOD_Seen(2,W) = .TRUE.
+                AAOD_Weight(W) = CCOEF_WV(W)
+             ENDIF
+          ENDDO
+       ENDIF
+
        ! Loop over types of aerosol with hygroscopic growth
        DO NA = 1, NAER
 
@@ -1777,6 +1843,16 @@ CONTAINS
           ELSE
              N = NA
           ENDIF
+
+          AAOD_Slot = 0
+          BrC_Tag = BrC_Optical_Index(N)
+          IF ( BrC_Tag > 0 ) THEN
+             DO W = 1, Input_Opt%NWVSELECT
+                IF ( AAOD_Weight(W) <= 0.0_f8 ) CYCLE
+                AAOD_Slot(W) = AAOD(W)%map%id2slot(BrC_Tag)
+             ENDDO
+          ENDIF
+          SaveAAOD_Bin = ANY( AAOD_Slot > 0 )
 
           !index for strat aerosol (only >0 for strat aero)
           ISTRAT=N-NRHAER
@@ -1832,6 +1908,7 @@ CONTAINS
 #endif
           !$OMP PRIVATE( RHOSTRAT, RAER,    SADSTRAT, XSASTRAT            ) &
           !$OMP PRIVATE( VDRY,     VH2O,    S,        g                   ) &
+          !$OMP PRIVATE( W, BrC_Absorptance                                ) &
           !$OMP SCHEDULE( DYNAMIC, 8                                      ) &
           !$OMP COLLAPSE( 3                                               )
           DO L = 1, State_Grid%NZ
@@ -2110,6 +2187,24 @@ CONTAINS
                 ! Aerosol optical depth
                 ODAER(I,J,L,IWV,N) = BXHEIGHT(I,J,L) * XSASTRAT * QW(1) 
 
+             ENDIF
+
+             IF ( SaveAAOD_Bin ) THEN
+                IF ( N == BRC_DRY_AEROSOL_BIN ) THEN
+                   ! The DBRC carrier uses dry optical properties.
+                   BrC_Absorptance = 1.0_f8 - SSW(1)
+                ELSE IF ( IRH == NRH ) THEN
+                   BrC_Absorptance = 1.0_f8 - SSW(NRH)
+                ELSE
+                   BrC_Absorptance = 1.0_f8 - ( FRAC * SSW(IRH+1) + (1.0_f8 - FRAC) * SSW(IRH) )
+                ENDIF
+                BrC_Absorptance = MAX( 0.0_f8, MIN( 1.0_f8, BrC_Absorptance ) )
+                DO W = 1, Input_Opt%NWVSELECT
+                   S = AAOD_Slot(W)
+                   IF ( S <= 0 ) CYCLE
+                   AAOD(W)%data(I,J,L,S) = AAOD(W)%data(I,J,L,S) + &
+                        REAL( AAOD_Weight(W) * BrC_Absorptance, f4 )
+                ENDDO
              ENDIF
 
              ! LSTRATOD controls every optical consumer, including RRTMG and
@@ -2425,6 +2520,33 @@ CONTAINS
 
     ENDDO ! end loop over stratospheric aerosols
 
+    ! Combine the contemporaneous, interpolated absorption fraction with
+    ! the same extinction optical depth used by the AOD diagnostics.
+    IF ( SaveAAOD ) THEN
+       DO W = 1, Input_Opt%NWVSELECT
+          IF ( .NOT. ASSOCIATED( AAOD(W)%data ) ) CYCLE
+          DO N = 1, NAER
+             BrC_Tag = BrC_Optical_Index(N)
+             IF ( BrC_Tag <= 0 ) CYCLE
+             S = AAOD(W)%map%id2slot(BrC_Tag)
+             IF ( S <= 0 ) CYCLE
+             !$OMP PARALLEL DO PRIVATE(I,J,L,Extinction) COLLAPSE(3)
+             DO L = 1, State_Grid%NZ
+             DO J = 1, State_Grid%NY
+             DO I = 1, State_Grid%NX
+                ! This interpolation is shared with the DBRC AOD diagnostic.
+                Extinction = BRC_DRY_AOD_AT_WAVELENGTH( &
+                     ODAER(I,J,L,IWVSELECT(1,W),N), ODAER(I,J,L,IWVSELECT(2,W),N), &
+                     IWVSELECT(1,W) /= IWVSELECT(2,W), ACOEF_WV(W), BCOEF_WV(W) )
+                AAOD(W)%data(I,J,L,S) = REAL( Extinction * AAOD(W)%data(I,J,L,S), f4 )
+             ENDDO
+             ENDDO
+             ENDDO
+             !$OMP END PARALLEL DO
+          ENDDO
+       ENDDO
+    ENDIF
+
     !==============================================================
     ! Non-stratospheric cloud diagnostics
     ! NOTE: The cloud optical depths are actually recorded at
@@ -2723,6 +2845,7 @@ CONTAINS
     IRHARR      => NULL()
     ACOEF_WV    => NULL()
     BCOEF_WV    => NULL()
+    CCOEF_WV    => NULL()
     REAA        => NULL()
     QQAA        => NULL()
     ALPHAA      => NULL()

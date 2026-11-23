@@ -166,7 +166,8 @@ COLLECTIONS: 'Restart',
 #==============================================================================
 # %%%%% The Aerosols COLLECTION %%%%%
 #
-# Aerosol optical depth, surface area, number density, and hygroscopic growth
+# Aerosol optical depth, surface area, number density, and hygroscopic growth.
+# For BrC absorption, add 'BrCAAODWL1_?BRCOPT?' (and WL2/WL3 if configured).
 #==============================================================================
   Aerosols.template:          '%y4%m2%d2_%h2%n2z.nc4',
   Aerosols.frequency:         ${RUNDIR_HIST_TIME_AVG_FREQ}

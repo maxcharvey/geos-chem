@@ -9,13 +9,18 @@ scattering and absorption. `BrCAbsMass` reports carbon mass.
 
 ## Online diagnostic source
 
-Use the online aerosol optics calculation in `aerosol_mod.F90` at the
-same grid cell, layer, wavelength, humidity and radius as its extinction.
-For each species and layer, absorption optical depth is
-`AAOD = extinction_optical_depth * (1 - single_scattering_albedo)`.
-Species-resolved AAOD should be calculated before HISTORY time averaging.
-A mean extinction multiplied by one minus a separately averaged single
-scattering albedo generally produces a different result.
+Request `BrCAAODWL1_?BRCOPT?` in HISTORY to archive all six BrC optical
+carriers. Use `BrCAAODWL1_BRCSOA` for a single species. WL2 and WL3 work
+the same way when those wavelength slots are configured. The NetCDF field
+includes the wavelength, for example `BrCAAOD550nm_BRCSOA`. A matched
+BrC-off case can request the same fields and reports zeros.
+
+The online aerosol optics calculation forms each layer's
+`AAOD = extinction_optical_depth * (1 - single_scattering_albedo)` before
+HISTORY time averaging. At wavelengths between table entries it uses
+the same log-log interpolation as AOD for extinction and linear
+interpolation for single scattering albedo. A mean extinction multiplied by
+one minus a separately averaged albedo generally gives a different result.
 
 For DBRCPOA use the dry-carrier extinction and dry single scattering
 albedo. NPBRCPOA, PBRCPOA and BRCSOA use hydrophilic aerosol bins in the
@@ -43,11 +48,10 @@ layer thickness in meters, then multiply by 1e6 for inverse megameters.
 Sample at measurement wavelength, time, position and altitude and match
 the instrument humidity and reporting conditions.
 
-## Validation remaining
+## Validation
 
-Add HISTORY output for the online species-resolved AAOD and test it in
-a positive-mass fixture with qualified optical tables. Include multiple
-wavelengths, bounds from zero to extinction, an independent dry-carrier
-calculation, and a matched BrC-off run. Current archived extinction
-fields do not contain the contemporaneous single scattering albedo
-necessary to reconstruct this output exactly.
+Use a positive-mass fixture and matched BrC-off control to verify multiple
+wavelengths, bounds from zero to extinction, and an independent dry-carrier
+calculation. Archived extinction alone lacks the contemporaneous single
+scattering albedo needed to reconstruct AAOD exactly. A sum of the six
+fields is BrC-carrier AAOD and excludes absorption from all other aerosols.

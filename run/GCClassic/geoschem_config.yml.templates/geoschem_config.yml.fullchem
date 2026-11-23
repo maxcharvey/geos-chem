@@ -433,6 +433,10 @@ aerosols:
   carbon:
     activate: true
     brown_carbon: false
+    # 0: zero bleaching; 1: one day everywhere.
+    # 2: one day for box tops at or below 1 km AGL; zero bleaching above.
+    # 3: viscosity-dependent, fixed O3 partial pressure (3.5e-8 atm).
+    # 4: viscosity-dependent, model O3 with a fixed-partial-pressure fallback.
     bleach_scheme: 4
     # organic is the portable placeholder; dedicated requires brc.dat,
     # pbrc.dat, and dbrc.dat supplied by the user.

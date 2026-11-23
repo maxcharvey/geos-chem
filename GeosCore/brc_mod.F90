@@ -219,7 +219,7 @@ MODULE BRC_MOD
   REAL(fp), PARAMETER :: A_PARTICLE   = 150.0e-9_fp
 
   ! P_O3_ATM: assumed tropospheric O3 partial pressure [atm]
-  !   35 ppb globally averaged, multiplied by mean pressure
+  !   Equivalent to 35 ppbv at 1 atm
   !   (Main text p.4; Tarasick et al. 2019; Lefohn et al. 2018)
   REAL(fp), PARAMETER :: P_O3_ATM     = 3.5e-8_fp
 
@@ -263,14 +263,14 @@ MODULE BRC_MOD
   ! BrC_Bleach_Scheme in geoschem_config.yml selects photobleaching:
   !   0 = No bleaching (BRCSOA/NPBRCPOA persist indefinitely)
   !   1 = Fixed 1-day lifetime everywhere
-  !   2 = Fixed 1-day lifetime below 1 km AGL only
-  !   3 = Viscosity-dependent (Schnitzler et al. 2022), fixed 35 ppb O3
+  !   2 = Fixed 1-day lifetime for box tops at or below 1 km AGL
+  !   3 = Viscosity-dependent (Schnitzler et al. 2022), fixed O3 partial pressure
   !   4 = Viscosity-dependent (Schnitzler et al. 2022), local O3 (default)
 
   ! Fixed bleaching lifetime [s] for schemes 1 and 2
   REAL(fp), PARAMETER :: TAU_1DAY = 86400.0_fp
 
-  ! Altitude threshold [m] for scheme 2 (bleach below this height AGL)
+  ! Maximum box-top height [m AGL] for scheme 2 bleaching
   REAL(fp), PARAMETER :: ALT_THRESH = 1000.0_fp
 CONTAINS
 !EOC
@@ -1371,8 +1371,8 @@ CONTAINS
    REAL(fp)            :: ETA_LOCAL      ! Local BBOA viscosity [Pa s]
    REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
    REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
-   REAL(fp)            :: O3PPBV_LOCAL   ! Local O3 mixing ratio [ppbv]
    REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
+   LOGICAL             :: NO_BLEACH      ! Exact zero-rate control
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1394,7 +1394,7 @@ CONTAINS
    TC          => State_Chm%Species(spcId)%Conc
 
    ! Look up O3 species index for local partial pressure
-   ! Falls back to global constant P_O3_ATM (35 ppb) if O3 not found
+   ! Falls back to global constant P_O3_ATM if O3 is not found
    id_O3 = Ind_('O3')
 
    !=================================================================
@@ -1405,8 +1405,8 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3, O3PPBV_LOCAL       )&
-   !$OMP PRIVATE( ALT_TOP                                          )&
+   !$OMP PRIVATE( ETA_LOCAL, P_O3_LOCAL, X_O3                    )&
+   !$OMP PRIVATE( ALT_TOP, NO_BLEACH                               )&
    !$OMP PRIVATE( KBRCSOA_LOCAL, CCV, TC0, FREQ, RKT, CNEW        )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1426,8 +1426,9 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
-      P_O3_LOCAL   = P_O3_ATM
-      O3PPBV_LOCAL = P_O3_ATM * 1.0e+9_fp
+      P_O3_LOCAL = P_O3_ATM
+
+      NO_BLEACH = .FALSE.
 
       ! Determine bleaching lifetime based on selected scheme
       SELECT CASE ( Input_Opt%BrC_Bleach_Scheme )
@@ -1435,22 +1436,24 @@ CONTAINS
       CASE ( 0 )
          !--- No bleaching ---
          TAU_LOCAL = TAU_MAX
+         NO_BLEACH = .TRUE.
 
       CASE ( 1 )
          !--- Fixed 1-day lifetime everywhere ---
          TAU_LOCAL = TAU_1DAY
 
       CASE ( 2 )
-         !--- Fixed 1-day below 1 km AGL, no bleaching above ---
+         !--- Fixed 1-day at or below 1 km AGL, no bleaching above ---
          ALT_TOP = SUM( State_Met%BXHEIGHT(I,J,1:L) )
          IF ( ALT_TOP <= ALT_THRESH ) THEN
             TAU_LOCAL = TAU_1DAY
          ELSE
             TAU_LOCAL = TAU_MAX
+            NO_BLEACH = .TRUE.
          ENDIF
 
       CASE ( 3 )
-         !--- Viscosity-dependent, fixed 35 ppb O3 ---
+         !--- Viscosity-dependent, fixed O3 partial pressure ---
          TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_ATM )
 
       CASE ( 4 )
@@ -1461,12 +1464,8 @@ CONTAINS
             X_O3 = MAX( X_O3, 0.0_fp )
             P_O3_LOCAL = X_O3 * State_Met%PMID(I,J,L) * HPA2ATM
             P_O3_LOCAL = MAX( P_O3_LOCAL, 1.0e-12_fp )
-            O3PPBV_LOCAL = P_O3_LOCAL                                   &
-                         / MAX( State_Met%PMID(I,J,L) * HPA2ATM,        &
-                                SMALLNUM ) * 1.0e+9_fp
          ELSE
             P_O3_LOCAL = P_O3_ATM
-            O3PPBV_LOCAL = P_O3_ATM * 1.0e+9_fp
          ENDIF
          TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_LOCAL )
 
@@ -1475,9 +1474,8 @@ CONTAINS
 
       END SELECT
 
-      ! First-order rate constant [s^-1]. Scheme 0 is an exact tracer
-      ! control, rather than the finite TAU_MAX approximation.
-      IF ( Input_Opt%BrC_Bleach_Scheme == 0 ) THEN
+      ! TAU_MAX remains the finite lifetime diagnostic for zero-rate cells.
+      IF ( NO_BLEACH ) THEN
          KBRCSOA_LOCAL = 0.0_fp
       ELSE
          KBRCSOA_LOCAL = 1.0_fp / TAU_LOCAL
@@ -1510,7 +1508,9 @@ CONTAINS
       ENDIF
 
       IF ( State_Diag%Archive_BrCO3ppbv ) THEN
-         State_Diag%BrCO3ppbv(I,J,L) = O3PPBV_LOCAL
+         State_Diag%BrCO3ppbv(I,J,L) = P_O3_LOCAL                      &
+              / MAX( State_Met%PMID(I,J,L) * HPA2ATM, SMALLNUM )       &
+              * 1.0e+9_fp
       ENDIF
 
       !==============================================================
@@ -1651,6 +1651,7 @@ CONTAINS
    REAL(fp)            :: P_O3_LOCAL     ! Local O3 partial pressure [atm]
    REAL(fp)            :: X_O3           ! Local O3 mixing ratio [mol/mol]
    REAL(fp)            :: ALT_TOP        ! Height of box top AGL [m]
+   LOGICAL             :: NO_BLEACH      ! Exact zero-rate control
 
    ! Pointers
    REAL(fp), POINTER   :: TC(:,:,:)
@@ -1671,7 +1672,7 @@ CONTAINS
    TC          => State_Chm%Species(spcId)%Conc
 
    ! Look up O3 species index for local partial pressure
-   ! Falls back to global constant P_O3_ATM (35 ppb) if O3 not found
+   ! Falls back to global constant P_O3_ATM if O3 is not found
    id_O3 = Ind_('O3')
 
    !=================================================================
@@ -1682,7 +1683,7 @@ CONTAINS
    !$OMP PARALLEL DO                                                &
    !$OMP DEFAULT( SHARED                                           )&
    !$OMP PRIVATE( I, J, L, T_LOCAL, AW_LOCAL, TAU_LOCAL            )&
-   !$OMP PRIVATE( P_O3_LOCAL, X_O3, ALT_TOP                        )&
+   !$OMP PRIVATE( P_O3_LOCAL, X_O3, ALT_TOP, NO_BLEACH              )&
    !$OMP PRIVATE( KNPBRC_LOCAL, TC0, FREQ, RKT, CNEW              )&
    !$OMP COLLAPSE( 3                                               )
    DO L = 1, State_Grid%NZ
@@ -1703,28 +1704,32 @@ CONTAINS
       AW_LOCAL = MAX( AW_LOCAL, 0.0_fp  )
       AW_LOCAL = MIN( AW_LOCAL, 0.99_fp )
 
+      NO_BLEACH = .FALSE.
+
       ! Determine bleaching lifetime based on selected scheme
       SELECT CASE ( Input_Opt%BrC_Bleach_Scheme )
 
       CASE ( 0 )
          !--- No bleaching ---
          TAU_LOCAL = TAU_MAX
+         NO_BLEACH = .TRUE.
 
       CASE ( 1 )
          !--- Fixed 1-day lifetime everywhere ---
          TAU_LOCAL = TAU_1DAY
 
       CASE ( 2 )
-         !--- Fixed 1-day below 1 km AGL, no bleaching above ---
+         !--- Fixed 1-day at or below 1 km AGL, no bleaching above ---
          ALT_TOP = SUM( State_Met%BXHEIGHT(I,J,1:L) )
          IF ( ALT_TOP <= ALT_THRESH ) THEN
             TAU_LOCAL = TAU_1DAY
          ELSE
             TAU_LOCAL = TAU_MAX
+            NO_BLEACH = .TRUE.
          ENDIF
 
       CASE ( 3 )
-         !--- Viscosity-dependent, fixed 35 ppb O3 ---
+         !--- Viscosity-dependent, fixed O3 partial pressure ---
          TAU_LOCAL = CALC_TAU_BRC( T_LOCAL, AW_LOCAL, P_O3_ATM )
 
       CASE ( 4 )
@@ -1745,9 +1750,8 @@ CONTAINS
 
       END SELECT
 
-      ! First-order rate constant [s^-1]. Scheme 0 is an exact tracer
-      ! control, rather than the finite TAU_MAX approximation.
-      IF ( Input_Opt%BrC_Bleach_Scheme == 0 ) THEN
+      ! TAU_MAX remains the finite lifetime diagnostic for zero-rate cells.
+      IF ( NO_BLEACH ) THEN
          KNPBRC_LOCAL = 0.0_fp
       ELSE
          KNPBRC_LOCAL = 1.0_fp / TAU_LOCAL

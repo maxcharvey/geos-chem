@@ -4737,6 +4737,7 @@ CONTAINS
 !
    INTEGER              :: N_DYN              ! Dynamic timestep in seconds
    INTEGER              :: D(2)               ! Variable for date and time
+   INTEGER              :: StartSecond, IntervalStart
    LOGICAL              :: FOUND              ! Found in restart file?
    LOGICAL              :: Update_MR          ! Update species mixing ratio?
    CHARACTER(LEN=255)   :: v_name             ! Variable name
@@ -4812,15 +4813,6 @@ CONTAINS
          ! Compute avg moist pressure near polar caps
          CALL AvgPole( State_Grid, State_Met%PS1_WET )
 
-         ! Initialize surface pressures prior to interpolation
-         ! to allow initialization of floating pressures
-         State_Met%PSC2_WET = State_Met%PS1_WET
-         State_Met%PSC2_DRY = State_Met%PS1_DRY
-         CALL Set_Floating_Pressures( State_Grid, State_Met, RC )
-
-         ! Call AIRQNT to compute initial air mass quantities
-         CALL AirQnt( Input_Opt, State_Chm, State_Grid, State_Met, RC )
-
       ENDIF ! not 0.125x0.15625
 
    ENDIF
@@ -4844,6 +4836,25 @@ CONTAINS
 
       ENDIF ! not 0.125x0.15625
 
+   ENDIF
+
+   IF ( Phase == 0 .AND. TRIM(State_Grid%GridRes) /= '0.125x0.15625' ) THEN
+      ! The restart reader compares its saved layer pressures with these
+      ! startup pressures. Between I3 records, interpolate to the restart
+      ! clock just as the preceding dynamics step did in the continuous run.
+      StartSecond = 3600 * GET_HOUR() + 60 * GET_MINUTE() + GET_SECOND()
+      IntervalStart = ( StartSecond / 10800 ) * 10800
+      State_Met%PSC2_WET = State_Met%PS1_WET
+      State_Met%PSC2_DRY = State_Met%PS1_DRY
+      IF ( StartSecond /= IntervalStart ) THEN
+         N_DYN = GET_TS_DYN()
+         CALL Interp( IntervalStart, StartSecond - N_DYN, N_DYN, &
+                      Input_Opt, State_Grid, State_Met )
+      ENDIF
+      CALL Set_Floating_Pressures( State_Grid, State_Met, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
+      CALL AirQnt( Input_Opt, State_Chm, State_Grid, State_Met, RC )
+      IF ( RC /= GC_SUCCESS ) RETURN
    ENDIF
 
    !----------------------------------

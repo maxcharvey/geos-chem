@@ -147,8 +147,12 @@ def extract_native(target):
     """Extract unchanged production statements; only model interfaces are mocked."""
     text = (ROOT / 'GeosCore/brc_mod.F90').read_text()
     receiver = ' SUBROUTINE CHEM_WTC(' + text.split(' SUBROUTINE CHEM_WTC(', 1)[1].split(' END SUBROUTINE CHEM_WTC', 1)[0] + ' END SUBROUTINE CHEM_WTC\n'
-    body = text[text.index('   IF ( State_Diag%Archive_BrCAbsMass'):]
-    body = body.split('   IF ( Input_Opt%amIRoot ) THEN', 1)[0]
+    # Extract the complete outer diagnostics block, excluding the following
+    # debug summary and its independent verbosity guard.
+    body = re.search(
+        r'^   IF \( State_Diag%Archive_BrCAbsMass\s+\.OR\..*?^   ENDIF$',
+        text, re.M | re.S,
+    ).group(0) + '\n'
     small = re.search(r'^  REAL\(fp\), PARAMETER :: SMALLNUM = .*$', text, re.M).group(0)
     omoc = re.search(r'^  REAL\(fp\).*:: OMOC_BBOA\s*=\s*[^!\n]+', text, re.M).group(0).replace('SAVE', 'PARAMETER')
     prefix = '''MODULE Precision_Mod

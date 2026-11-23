@@ -39,11 +39,13 @@ CONTAINS
     valid=.TRUE.
   END FUNCTION
 
-  SUBROUTINE Restart_Validate_File(ncid,lon,lat,lev,date,clock,valid,message)
+  SUBROUTINE Restart_Validate_File(ncid,lon,lat,lev,date,clock,valid,message,validate_rh)
     INTEGER, INTENT(IN) :: ncid,date,clock
     REAL(fp), INTENT(IN) :: lon(:),lat(:),lev(:)
     LOGICAL, INTENT(OUT) :: valid
     CHARACTER(*), INTENT(OUT) :: message
+    LOGICAL, OPTIONAL, INTENT(IN) :: validate_rh
+    LOGICAL :: check_rh
     INTEGER :: ids(4),lens(4),i,v,nvars,rank,dims(NF90_MAX_VAR_DIMS),kind,stat
     REAL(fp) :: times(1),scale,origin_seconds,expected_seconds
     CHARACTER(4), PARAMETER :: names(4)=[CHARACTER(4)::'lon','lat','lev','time']
@@ -84,13 +86,16 @@ CONTAINS
     valid=.FALSE.
     IF(.NOT.IEEE_IS_FINITE(times(1)*scale)) RETURN
     IF(ABS(origin_seconds+times(1)*scale-expected_seconds)>1.0e-6_fp) RETURN
+    check_rh=.FALSE.
+    IF(PRESENT(validate_rh)) check_rh=validate_rh
     ! Validate the layout of every field the local reader can load, before mutation.
     message='Invalid local REAL8 restart field layout'
     stat=NF90_INQUIRE(ncid,nVariables=nvars);IF(stat/=NF90_NOERR) RETURN
     DO v=1,nvars
        stat=NF90_INQUIRE_VARIABLE(ncid,v,name=name,xtype=kind,ndims=rank,dimids=dims)
        IF(stat/=NF90_NOERR) RETURN
-       IF(INDEX(name,'SpeciesRst_')/=1.AND.INDEX(name,'Chem_')/=1.AND.name/='Met_DELPDRY') CYCLE
+       IF(INDEX(name,'SpeciesRst_')/=1.AND.INDEX(name,'Chem_')/=1.AND.name/='Met_DELPDRY'.AND. &
+          .NOT.(check_rh.AND.name=='Met_RH')) CYCLE
        message='Invalid local REAL8 restart field layout: '//TRIM(name)
        IF(rank/=3.AND.rank/=4) RETURN
        IF(rank==3) THEN
@@ -119,6 +124,12 @@ CONTAINS
           units='';stat=NF90_GET_ATT(ncid,v,'units',units);IF(stat/=NF90_NOERR) RETURN
           ! Existing Classic History writes these cache fields with units '1'.
           IF(TRIM(units)/='1'.AND.TRIM(units)/='s-1') RETURN
+       ENDIF
+       IF(name=='Met_RH') THEN
+          IF(rank/=4) RETURN
+          IF(kind/=NF90_DOUBLE.AND.kind/=NF90_FLOAT) RETURN
+          units='';stat=NF90_GET_ATT(ncid,v,'units',units);IF(stat/=NF90_NOERR) RETURN
+          IF(TRIM(units)/='%') RETURN
        ENDIF
        IF(name=='Met_DELPDRY') THEN
           units='';stat=NF90_GET_ATT(ncid,v,'units',units);IF(stat/=NF90_NOERR) RETURN

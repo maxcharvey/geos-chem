@@ -1571,6 +1571,7 @@ CONTAINS
 !
 ! !USES:
 !
+   USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY : IEEE_IS_FINITE
    USE Restart_Validation_Mod
    USE BRC_WTC_Output_Mod
    USE CMN_SIZE_Mod,     ONLY  : NDUST
@@ -1674,7 +1675,7 @@ CONTAINS
 
    ! For species mass conservation
    TYPE(BRC_WTC_Map) :: WtcOutput
-   LOGICAL            :: restart_valid
+   LOGICAL            :: restart_valid, restore_rh, found_rh, filled_rh
    REAL(fp)           :: restart_dp(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
    REAL(fp)           :: pressure_factors(State_Grid%NX,State_Grid%NY,State_Grid%NZ)
    LOGICAL            :: update_mixing_ratio
@@ -1745,6 +1746,10 @@ CONTAINS
    ! breaking up a run in time since HEMCO only reads in values as REAL4 while fields
    ! are saved in the restart file and in the model as REAL8
    Use_HEMCO_for_restart_read = .NOT. Input_Opt%read_restart_as_real8
+   ! UCX updates working RH between A3 meteorology reads. At an A3 boundary
+   ! the new meteorology replaces that state in both continuous and split runs.
+   restore_rh = Input_Opt%ITS_A_FULLCHEM_SIM .AND. Input_Opt%LACTIVEH2O .AND. &
+                MOD(Input_Opt%NHMSb,030000) /= 0
    IF ( .NOT. Use_HEMCO_for_restart_read ) THEN
       IF ( State_Grid%NestedGrid ) THEN
          CALL GC_Error( 'Nested grid restart files must be read through HEMCO', RC, Loc )
@@ -1815,7 +1820,7 @@ CONTAINS
       CALL Ncop_Rd( fId, TRIM(nc_path) )
       CALL Restart_Validate_File(fId,State_Grid%Lon,State_Grid%Lat, &
            State_Grid%Lev, &
-           Input_Opt%NYMDb,Input_Opt%NHMSb,restart_valid,Msg)
+           Input_Opt%NYMDb,Input_Opt%NHMSb,restart_valid,Msg,restore_rh)
       IF (.NOT.restart_valid) THEN
          CALL NcCl(fId)
          CALL GC_Error(Msg,RC,Loc)
@@ -1840,6 +1845,40 @@ CONTAINS
             CALL GC_Error( Msg, RC, Loc )
             RETURN
          ENDIF
+      ENDIF
+   ENDIF
+
+   IF ( restore_rh ) THEN
+      IF ( Use_HEMCO_for_restart_read ) THEN
+         CALL HCO_GC_GetPtr( Input_Opt, State_Grid, 'RESTART_RH', Ptr3D, RC, &
+                             FOUND=found_rh, FILLED=filled_rh )
+         found_rh = found_rh .AND. filled_rh
+         IF ( .NOT. Restart_HCO_Valid(Ptr3D,found_rh,RC,GC_SUCCESS,SHAPE(State_Met%RH)) ) THEN
+            CALL GC_Error('Invalid HEMCO restart relative humidity field',RC,Loc)
+            RETURN
+         ENDIF
+         IF ( found_rh ) Temp4D_r8(:,:,:,1) = Ptr3D
+         Ptr3D => NULL()
+      ELSE
+         ierr = NF90_Inq_VarId(fId,'Met_RH',varid)
+         found_rh = (ierr == NF90_NOERR)
+         IF ( found_rh ) ierr = NF90_Get_Var(fId,varid,Temp4D_r8)
+         IF ( ierr /= NF90_NOERR .AND. ierr /= NF90_ENOTVAR ) THEN
+            CALL NcCl(fId)
+            CALL GC_Error('Could not read restart Met_RH',RC,Loc)
+            RETURN
+         ENDIF
+      ENDIF
+      IF ( found_rh ) THEN
+         ! RH can legitimately be supersaturated. Exclude fill values as well as
+         ! NaN and infinity without imposing a physical clipping threshold.
+         IF ( ANY(.NOT. IEEE_IS_FINITE(Temp4D_r8)) .OR. &
+              ANY(ABS(Temp4D_r8) >= REAL(NF90_FILL_FLOAT,KIND=8)) ) THEN
+            IF ( .NOT. Use_HEMCO_for_restart_read ) CALL NcCl(fId)
+            CALL GC_Error('Invalid values in restart Met_RH',RC,Loc)
+            RETURN
+         ENDIF
+         State_Met%RH = Temp4D_r8(:,:,:,1)
       ENDIF
    ENDIF
 

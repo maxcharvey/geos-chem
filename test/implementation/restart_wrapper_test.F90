@@ -11,12 +11,16 @@ PROGRAM wrapper_tests
  REAL(REAL32),TARGET :: a2(2,2),a3(2,2,2),bad(1,2)
  CHARACTER(512) :: msg,arg
  n=0
- DO k=0,22
+ DO k=0,25
    CALL make_file(k)
    CALL ck(NF90_OPEN('wrapper_fixture.nc',NF90_NOWRITE,f))
    CALL Restart_Validate_File(f,lon,lat,lev,20190601,30000,valid,msg)
-   expect=(k==0.OR.k==16.OR.k==17.OR.k==18.OR.k==19)
+   expect=(k==0.OR.k==16.OR.k==17.OR.k==18.OR.k==19.OR.k>=23)
    CALL must(valid.EQV.expect,'NetCDF wrapper '//TRIM(num(k))//' '//TRIM(msg))
+   IF(k==0.OR.k>=23)THEN
+      CALL Restart_Validate_File(f,lon,lat,lev,20190601,30000,valid,msg,validate_rh=.TRUE.)
+      CALL must(valid.EQV.(k==0.OR.k==23),'RH checkpoint layout '//TRIM(num(k))//' '//TRIM(msg))
+   ENDIF
    CALL ck(NF90_CLOSE(f))
  ENDDO
  p2=>NULL();p3=>NULL()
@@ -113,6 +117,15 @@ CONTAINS
       CALL ck(NF90_DEF_VAR(f,'Chem_JOH',NF90_DOUBLE,[ids(1),ids(2),ids(4)],v))
    ENDIF
    units='1';IF(k==15)units='invalid'
+   CALL ck(NF90_PUT_ATT(f,v,'units',TRIM(units)))
+ ENDIF
+ IF(k>=23)THEN
+   IF(k==25)THEN
+      CALL ck(NF90_DEF_VAR(f,'Met_RH',NF90_DOUBLE,[ids(1),ids(2),ids(4)],v))
+   ELSE
+      CALL ck(NF90_DEF_VAR(f,'Met_RH',NF90_DOUBLE,ids,v))
+   ENDIF
+   units='%';IF(k==24)units='1'
    CALL ck(NF90_PUT_ATT(f,v,'units',TRIM(units)))
  ENDIF
  CALL ck(NF90_ENDDEF(f))

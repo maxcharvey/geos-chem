@@ -77,15 +77,16 @@ require "brown_carbon is missing canonical aerosol bin" "${aerosol}"
 require "DO N = 1, State_Chm%nHygGrth" "${aerosol}"
 require "DO NA = 1, State_Chm%nHygGrth" "${aerosol}"
 
-# BrC PM accounting covers every BrC carrier.  DBRCPOA stays dry; WTC is
-# reported with primary OC because it is the bleached primary-BrC product.
+# BrC PM includes aggregate white carbon once; primary/secondary diagnostics
+# use the attributed stocks, leaving legacy WTC unclassified.
 require "State_Chm%AerMass%BRCPI(I,J,L) * ORG_GROWTH" "${aerosol}"
 require "State_Chm%AerMass%NPBRC(I,J,L) * ORG_GROWTH" "${aerosol}"
 require "State_Chm%AerMass%WTCPI(I,J,L) * ORG_GROWTH" "${aerosol}"
 require "State_Chm%AerMass%FSOAS(I,J,L) * ORG_GROWTH" "${aerosol}"
 require "State_Chm%AerMass%PBRC(I,J,L)  * ORG_GROWTH" "${aerosol}"
 require "+ State_Chm%AerMass%BRCPO(I,J,L)" "${aerosol}"
-require "WTC is classified as primary OC here" "${aerosol}"
+require "State_Chm%AerMass%PWTCPI(I,J,L)  * ORG_GROWTH" "${aerosol}"
+require "State_Chm%AerMass%SWTCPI(I,J,L) * ORG_GROWTH" "${aerosol}"
 
 # The DBRC optical carrier is dry through all RRTMG properties, and its
 # diagnostic is emitted after wavelength interpolation.
@@ -111,7 +112,7 @@ require "IOPT,    IR_OPT, J" "${fjx_interface}"
 brc="${geos_root}/GeosCore/brc_mod.F90"
 state_diag="${geos_root}/Headers/state_diag_mod.F90"
 require "USE BRC_Species_Mod, ONLY : BRC_REQUIRED_SPECIES_ERROR" "${brc}"
-require "ErrMsg = BRC_REQUIRED_SPECIES_ERROR( (/ id_FSOAS, id_BRCSOA, id_WTC /) )" "${brc}"
+require "(/ id_FSOAS, id_BRCSOA, id_WTC, id_PWTC, id_SWTC /) )" "${brc}"
 require "IF ( LEN_TRIM( ErrMsg ) > 0 ) THEN" "${brc}"
 forbid "IF ( id_FSOAS  <= 0 ) RETURN" "${brc}"
 forbid "IF ( id_BRCSOA <= 0 ) RETURN" "${brc}"
@@ -146,6 +147,9 @@ require "DO M=1,NRHAER" "${fastjx}"
 forbid "DO M=1,5" "${fastjx}"
 forbid "LBRC" "${fastjx}"
 require "FAST-JX BrC optics: organic-equivalence OC records 36-40" "${photolysis}"
+require "Dedicated BrC photolysis optics require Cloud-J" "${photolysis}"
+forbid "FAST-JX BrC optics: dedicated" "${photolysis}"
+forbid "BrC entries 57-63" "${geos_root}/Headers/CMN_FJX_MOD.F90"
 require "fast-jx:" "${fullchem_config}"
 require "FAST_JX/v2024-05/" "${fullchem_config}"
 

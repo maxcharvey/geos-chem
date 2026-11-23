@@ -21,10 +21,22 @@ require() {
     fi
 }
 
-entry_scale() {
-    local file="${1}"
-    local name="${2}"
-    awk -v name="${name}" '$2 == name { print $(NF-2); exit }' "${file}"
+require_route() {
+    local file="${1}" name="${2}" species="${3}" factors="${4}" mode="${5}"
+    awk -v name="${name}" -v species="${species}" -v factors="${factors}" -v mode="${mode}" '
+        /^\(\(\(\.not\.FINNV25_BRC_HARMONIZED_SENSITIVITY$/ { branch="off" }
+        /^\(\(\(FINNV25_BRC_HARMONIZED_SENSITIVITY$/ { branch="on" }
+        /^\)\)\)(\.not\.)?FINNV25_BRC_HARMONIZED_SENSITIVITY$/ { branch="" }
+        $2 == name && branch == mode {
+            count++
+            if ($(NF-3) != species || $(NF-2) != factors ||
+                (factors == "-" ? $3 != "0" : $3 == "0")) bad=1
+        }
+        END { if (count != 1 || bad) exit 1 }
+    ' "${file}" || {
+        echo "FAIL: ${mode} route ${name} to ${species} with scales ${factors} in ${file}" >&2
+        exit 1
+    }
 }
 
 factor() {
@@ -54,19 +66,19 @@ check_sensitivity_condition_balance() {
             on_close++
         }
         in_finn && /^\)\)\)FINNv25$/ {
-            # One sensitivity pair is required for each mutually exclusive
-            # surface and injection path.
+            # Each surface and injection path gates SOAP and residual OC
+            # in separate sensitivity pairs.
             if (surface_open != 1 || surface_close != 1 ||
                 inject_open != 1 || inject_close != 1 ||
-                off_open != 2 || off_close != 2 ||
-                on_open != 2 || on_close != 2) bad=1
+                off_open != 4 || off_close != 4 ||
+                on_open != 4 || on_close != 4) bad=1
             in_finn=0
         }
         END {
             if (in_finn || surface_open != 1 || surface_close != 1 ||
                 inject_open != 1 || inject_close != 1 ||
-                off_open != 2 || off_close != 2 ||
-                on_open != 2 || on_close != 2 || bad) exit 1
+                off_open != 4 || off_close != 4 ||
+                on_open != 4 || on_close != 4 || bad) exit 1
         }
     ' "${file}" || {
         echo "FAIL: unbalanced FINNv2.5 sensitivity conditions in ${file}" >&2
@@ -76,24 +88,41 @@ check_sensitivity_condition_balance() {
 
 check_config() {
     local config="${1}"
+    local name name_scales scales
 
     # Opt-in only; ordinary FINNv2.5 OC mapping remains explicit.
     require "--> FINNV25_BRC_HARMONIZED_SENSITIVITY : false" "${config}"
     require "165     FINNv25_Inject          : off" "${config}"
     require "(((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY" "${config}"
-    [[ $(entry_scale "${config}" FINNv25_OCPI) == "75/72" ]]
-    [[ $(entry_scale "${config}" FINNv25_OCPO) == "75/73" ]]
+    require_route "${config}" FINNv25_OCPI OCPI 75/72 off
+    require_route "${config}" FINNv25_OCPO OCPO 75/73 off
+    require_route "${config}" FINNV25_INJECT_OCPI OCPI 75/72 off
+    require_route "${config}" FINNV25_INJECT_OCPO OCPO 75/73 off
 
-    # Controlled mappings and molecule-to-mass correction are explicit.
-    for name in FSOAP DBRCPOA NPBRCPOA PBRCPOA; do
-        require "0 FINNv25_${name}_BRC_HS " "${config}"
-        require "165 FINNV25_INJECT_${name}" "${config}"
+    require_route "${config}" FINNv25_SOAP SOAP 75/281 off
+    require_route "${config}" FINNV25_INJECT_SOAP SOAP 75/281 off
+    require_route "${config}" FINNv25_SOAP SOAP - on
+    require_route "${config}" FINNV25_INJECT_SOAP SOAP - on
+
+    # The controlled branches route residual OC to the fire-specific tracers.
+    require_route "${config}" FINNv25_FOCPI_BRC_HS FOCPI 75/282/72 on
+    require_route "${config}" FINNv25_FOCPO_BRC_HS FOCPO 75/282/73 on
+    require_route "${config}" FINNV25_INJECT_FOCPI FOCPI 75/282/72 on
+    require_route "${config}" FINNV25_INJECT_FOCPO FOCPO 75/282/73 on
+    for name in FOCPI FOCPO FSOAP DBRCPOA NPBRCPOA PBRCPOA; do
+        require_route "${config}" "FINNV25_INJECT_${name}" "${name}" - off
     done
-    [[ $(entry_scale "${config}" FINNv25_OCPI_BRC_HS) == "75/282/72" ]]
-    [[ $(entry_scale "${config}" FINNv25_OCPO_BRC_HS) == "75/282/73" ]]
-    require "165 FINNV25_INJECT_OCPI " "${config}"
-    require "165 FINNV25_INJECT_OCPO " "${config}"
-    require "165 FINNV25_INJECT_FSOAP 0 -" "${config}"
+    for name in OCPI OCPO; do
+        require_route "${config}" "FINNV25_INJECT_${name}" "${name}" - on
+    done
+
+    # Both controlled branches use the same proxy factors.
+    for name_scales in FSOAP:75/286/287 DBRCPOA:75/285 NPBRCPOA:75/283 PBRCPOA:75/284; do
+        name="${name_scales%%:*}"
+        scales="${name_scales#*:}"
+        require_route "${config}" "FINNv25_${name}_BRC_HS" "${name}" "${scales}" on
+        require_route "${config}" "FINNV25_INJECT_${name}" "${name}" "${scales}" on
+    done
 
     for id in 282 283 284 285 286 287; do
         if [[ $(awk -v id="${id}" '$1 == id { n++ } END { print n+0 }' "${config}") -ne 1 ]]; then
@@ -147,10 +176,12 @@ require "FINNv25_CO_field_scaled_to_SOAP_mass_flux_existing_path" "${aerosol_dia
 # examples.  Detailed surface FINN diagnostics are aerosol-template-specific.
 for diagn in "${fullchem_diagn}" "${aerosol_diagn}"; do
     require "EmisFSOAP_Total" "${diagn}"
+    require "EmisFOCPI_TotalColumn" "${diagn}"
+    require "EmisFOCPO_TotalColumn" "${diagn}"
     require "InvFINNv25Inject_FSOAP" "${diagn}"
 done
 
-for species in FSOAS BRCSOA WTC DBRCPOA FSOAP NPBRCPOA PBRCPOA; do
+for species in FSOAS BRCSOA PWTC SWTC DBRCPOA FSOAP NPBRCPOA PBRCPOA FOCPI FOCPO; do
     require "      - ${species}" "${aerosol_geoschem}"
 done
 

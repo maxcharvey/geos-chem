@@ -25,6 +25,7 @@ add_library(Headers
   species_database_mod.F90
   species_mod.F90
   state_chm_mod.F90
+  brc_wtc_output_mod.F90
   state_diag_mod.F90
   state_grid_mod.F90
   state_met_mod.F90

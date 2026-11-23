@@ -29,7 +29,7 @@ MODULE State_Diag_Mod
   USE Precision_Mod
   USE Registry_Mod
   USE Species_Mod,        ONLY : Species
-  USE State_Chm_Mod,      ONLY : ChmState
+  USE State_Chm_Mod,      ONLY : ChmState, Ind_
   USE TaggedDiagList_Mod
 
   IMPLICIT NONE
@@ -75,6 +75,10 @@ MODULE State_Diag_Mod
 !
 ! !PUBLIC DATA MEMBERS:
 !
+  ! Species labels for the canonical BrC optical carriers (including WTC).
+  CHARACTER(LEN=8), PARAMETER, PUBLIC :: BrC_Optical_Species(6) = &
+       [ CHARACTER(LEN=8) :: 'BRCSOA', 'NPBRCPOA', 'WTC', 'FSOAS', 'PBRCPOA', 'DBRCPOA' ]
+
   !=========================================================================
   ! Type for mapping objects
   !=========================================================================
@@ -571,6 +575,18 @@ MODULE State_Diag_Mod
      TYPE(DgnMap),       POINTER :: Map_AODHygWL3
      LOGICAL                     :: Archive_AODHygWL3
 
+     REAL(f4),           POINTER :: BrCAAODWL1(:,:,:,:)
+     TYPE(DgnMap),       POINTER :: Map_BrCAAODWL1
+     LOGICAL                     :: Archive_BrCAAODWL1
+
+     REAL(f4),           POINTER :: BrCAAODWL2(:,:,:,:)
+     TYPE(DgnMap),       POINTER :: Map_BrCAAODWL2
+     LOGICAL                     :: Archive_BrCAAODWL2
+
+     REAL(f4),           POINTER :: BrCAAODWL3(:,:,:,:)
+     TYPE(DgnMap),       POINTER :: Map_BrCAAODWL3
+     LOGICAL                     :: Archive_BrCAAODWL3
+
      REAL(f4),           POINTER :: AODSOAfromAqIsopWL1(:,:,:)
      LOGICAL                     :: Archive_AODSOAfromAqIsopWL1
 
@@ -763,6 +779,15 @@ MODULE State_Diag_Mod
 
      REAL(f4),           POINTER :: BrCTotMass(:,:,:)
      LOGICAL                     :: Archive_BrCTotMass
+
+     REAL(f4),           POINTER :: BrCWhiteMass(:,:,:)
+     LOGICAL                     :: Archive_BrCWhiteMass
+
+     REAL(f4),           POINTER :: BrCPriMass(:,:,:)
+     LOGICAL                     :: Archive_BrCPriMass
+
+     REAL(f4),           POINTER :: BrCSecMass(:,:,:)
+     LOGICAL                     :: Archive_BrCSecMass
 
      REAL(f4),           POINTER :: BrCBleachedFrac(:,:,:)
      LOGICAL                     :: Archive_BrCBleachedFrac
@@ -2116,6 +2141,18 @@ CONTAINS
     State_Diag%Map_AODHygWL3                       => NULL()
     State_Diag%Archive_AODHygWL3                   = .FALSE.
 
+    State_Diag%BrCAAODWL1                           => NULL()
+    State_Diag%Map_BrCAAODWL1                       => NULL()
+    State_Diag%Archive_BrCAAODWL1                   = .FALSE.
+
+    State_Diag%BrCAAODWL2                           => NULL()
+    State_Diag%Map_BrCAAODWL2                       => NULL()
+    State_Diag%Archive_BrCAAODWL2                   = .FALSE.
+
+    State_Diag%BrCAAODWL3                           => NULL()
+    State_Diag%Map_BrCAAODWL3                       => NULL()
+    State_Diag%Archive_BrCAAODWL3                   = .FALSE.
+
     State_Diag%AODSOAfromAqIsopWL1                 => NULL()
     State_Diag%Archive_AODSOAfromAqIsopWL1         = .FALSE.
 
@@ -2306,6 +2343,15 @@ CONTAINS
 
     State_Diag%BrCTotMass                         => NULL()
     State_Diag%Archive_BrCTotMass                 = .FALSE.
+
+    State_Diag%BrCWhiteMass                         => NULL()
+    State_Diag%Archive_BrCWhiteMass                 = .FALSE.
+
+    State_Diag%BrCPriMass                         => NULL()
+    State_Diag%Archive_BrCPriMass                 = .FALSE.
+
+    State_Diag%BrCSecMass                         => NULL()
+    State_Diag%Archive_BrCSecMass                 = .FALSE.
 
     State_Diag%BrCBleachedFrac                    => NULL()
     State_Diag%Archive_BrCBleachedFrac            = .FALSE.
@@ -3155,7 +3201,7 @@ CONTAINS
          archiveData    = State_Diag%Archive_SpeciesBC,                      &
          mapData        = State_Diag%Map_SpeciesBC,                          &
          diagId         = diagId,                                            &
-         diagFlag       = 'A',                                               &
+         diagFlag       = 'S',                                               &
          RC             = RC                                                )
 
     IF ( RC /= GC_SUCCESS ) THEN
@@ -8897,6 +8943,81 @@ CONTAINS
        ENDIF
 
        !-------------------------------------------------------------------
+       ! BrC Species Absorption Optical Depth at 1st Wavelength
+       !-------------------------------------------------------------------
+       TmpWL  = RadWL(1)
+       diagID = 'BrCAAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCAAODWL1,                           &
+            archiveData    = State_Diag%Archive_BrCAAODWL1,                   &
+            mapData        = State_Diag%Map_BrCAAODWL1,                       &
+            diagId         = diagId,                                         &
+            diagFlag       = 'Q',                                            &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       !-------------------------------------------------------------------
+       ! BrC Species Absorption Optical Depth at 2nd Wavelength
+       !-------------------------------------------------------------------
+       TmpWL  = RadWL(2)
+       diagID = 'BrCAAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCAAODWL2,                           &
+            archiveData    = State_Diag%Archive_BrCAAODWL2,                   &
+            mapData        = State_Diag%Map_BrCAAODWL2,                       &
+            diagId         = diagId,                                         &
+            diagFlag       = 'Q',                                            &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       !-------------------------------------------------------------------
+       ! BrC Species Absorption Optical Depth at 3rd Wavelength
+       !-------------------------------------------------------------------
+       TmpWL  = RadWL(3)
+       diagID = 'BrCAAOD' // TRIM( TmpWL ) // 'nm'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCAAODWL3,                           &
+            archiveData    = State_Diag%Archive_BrCAAODWL3,                   &
+            mapData        = State_Diag%Map_BrCAAODWL3,                       &
+            diagId         = diagId,                                         &
+            diagFlag       = 'Q',                                            &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+          errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
+
+       !-------------------------------------------------------------------
        ! Isoprene SOA Optical Depth at 1st Wavelength
        !-------------------------------------------------------------------
        TmpWL   = RadWL(1)
@@ -9519,6 +9640,63 @@ CONTAINS
             TaggedDiagList = TaggedDiag_List,                                &
             Ptr2Data       = State_Diag%BrCTotMass,                          &
             archiveData    = State_Diag%Archive_BrCTotMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       diagID = 'BrCWhiteMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCWhiteMass,                          &
+            archiveData    = State_Diag%Archive_BrCWhiteMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       diagID = 'BrCPriMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCPriMass,                          &
+            archiveData    = State_Diag%Archive_BrCPriMass,                  &
+            diagId         = diagId,                                         &
+            RC             = RC                                             )
+
+       IF ( RC /= GC_SUCCESS ) THEN
+            errMsg = TRIM( errMsg_ir ) // TRIM( diagId )
+            CALL GC_Error( errMsg, RC, thisLoc )
+            RETURN
+       ENDIF
+
+       diagID = 'BrCSecMass'
+       CALL Init_and_Register(                                               &
+            Input_Opt      = Input_Opt,                                      &
+            State_Chm      = State_Chm,                                      &
+            State_Diag     = State_Diag,                                     &
+            State_Grid     = State_Grid,                                     &
+            DiagList       = Diag_List,                                      &
+            TaggedDiagList = TaggedDiag_List,                                &
+            Ptr2Data       = State_Diag%BrCSecMass,                          &
+            archiveData    = State_Diag%Archive_BrCSecMass,                  &
             diagId         = diagId,                                         &
             RC             = RC                                             )
 
@@ -13260,6 +13438,9 @@ CONTAINS
     State_Diag%Archive_AOD  = ( State_Diag%Archive_AODHygWL1            .or. &
                                 State_Diag%Archive_AODHygWL2            .or. &
                                 State_Diag%Archive_AODHygWL3            .or. &
+                                State_Diag%Archive_BrCAAODWL1           .or. &
+                                State_Diag%Archive_BrCAAODWL2           .or. &
+                                State_Diag%Archive_BrCAAODWL3           .or. &
                                 State_Diag%Archive_PDER                 .or. & ! H. Zhu, April 05, 2024
                                 State_Diag%Archive_AODSOAfromAqIsopWL1  .or. &
                                 State_Diag%Archive_AODSOAfromAqIsopWL2  .or. &
@@ -14366,6 +14547,24 @@ CONTAINS
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
+    CALL Finalize( diagId   = 'BrCAAODWL1',                                   &
+                   Ptr2Data = State_Diag%BrCAAODWL1,                          &
+                   mapData  = State_Diag%Map_BrCAAODWL1,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCAAODWL2',                                   &
+                   Ptr2Data = State_Diag%BrCAAODWL2,                          &
+                   mapData  = State_Diag%Map_BrCAAODWL2,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCAAODWL3',                                   &
+                   Ptr2Data = State_Diag%BrCAAODWL3,                          &
+                   mapData  = State_Diag%Map_BrCAAODWL3,                      &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
     CALL Finalize( diagId   = 'AODSOAfromAqIsopWL1',                         &
                    Ptr2Data = State_Diag%AODSOAfromAqIsopWL1,                &
                    RC       = RC                                            )
@@ -15141,6 +15340,21 @@ CONTAINS
 
     CALL Finalize( diagId   = 'BrCTotMass',                                  &
                    Ptr2Data = State_Diag%BrCTotMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCWhiteMass',                                  &
+                   Ptr2Data = State_Diag%BrCWhiteMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCPriMass',                                  &
+                   Ptr2Data = State_Diag%BrCPriMass,                         &
+                   RC       = RC                                            )
+    IF ( RC /= GC_SUCCESS ) RETURN
+
+    CALL Finalize( diagId   = 'BrCSecMass',                                  &
+                   Ptr2Data = State_Diag%BrCSecMass,                         &
                    RC       = RC                                            )
     IF ( RC /= GC_SUCCESS ) RETURN
 
@@ -16717,6 +16931,27 @@ CONTAINS
        IF ( isRank    ) Rank  =  3
        IF ( isTagged  ) TagId = 'HYG'
 
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCAAOD' // TRIM(RadWL(1)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC carrier absorption optical depth at ' // &
+                                  TRIM(RadWL(1)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  = 3
+       IF ( isTagged  ) TagId = 'BRCOPT'
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCAAOD' // TRIM(RadWL(2)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC carrier absorption optical depth at ' // &
+                                  TRIM(RadWL(2)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  = 3
+       IF ( isTagged  ) TagId = 'BRCOPT'
+
+    ELSE IF ( TRIM(Name_AllCaps) == 'BRCAAOD' // TRIM(RadWL(3)) // 'NM' ) THEN
+       IF ( isDesc    ) Desc  = 'BrC carrier absorption optical depth at ' // &
+                                  TRIM(RadWL(3)) // ' nm'
+       IF ( isUnits   ) Units = '1'
+       IF ( isRank    ) Rank  = 3
+       IF ( isTagged  ) TagId = 'BRCOPT'
+
     ELSE IF ( TRIM(Name_AllCaps) == 'AODSOAFROMAQISOPRENE' //  &
                                     TRIM(RadWL(1)) // 'NM' ) THEN
        IF ( isDesc    ) Desc  = 'Optical depth for SOA from aqueous ' // &
@@ -17832,28 +18067,43 @@ CONTAINS
        IF ( isUnits   ) Units = 'kgC'
        IF ( isRank    ) Rank  =  3
 
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCWHITEMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'White-carbon mass PWTC+SWTC'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCPRIMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'Attributed primary BrC-family aerosol carbon mass'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
+    ELSE IF ( TRIM( Name_AllCaps ) == 'BRCSECMASS' ) THEN
+       IF ( isDesc    ) Desc  = 'Attributed secondary BrC-family aerosol carbon mass'
+       IF ( isUnits   ) Units = 'kgC'
+       IF ( isRank    ) Rank  =  3
+
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCBLEACHEDFRAC' ) THEN
-       IF ( isDesc    ) Desc  = 'WTC fraction of total BrC-family species mass'
+       IF ( isDesc    ) Desc  = 'PWTC+SWTC fraction of total BrC-family carbon mass'
        IF ( isUnits   ) Units = '1'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAP2FSOAS' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from FSOAP to FSOAS'
+       IF ( isDesc    ) Desc  = 'Precursor mass transferred from FSOAP to FSOAS per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAS2BRC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from FSOAS to BRCSOA'
+       IF ( isDesc    ) Desc  = 'Organic matter removed from FSOAS to form BRCSOA per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXBRC2WTC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from BRCSOA to WTC'
+       IF ( isDesc    ) Desc  = 'Carbon mass transferred from BRCSOA to SWTC per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXNPBRC2WTC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to WTC'
+       IF ( isDesc    ) Desc  = 'Carbon mass transferred from NPBRCPOA to PWTC per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
@@ -18025,6 +18275,10 @@ CONTAINS
           numTags = State_Chm%nSpecies
        CASE( 'ADV',     'A' )
           numTags = State_Chm%nAdvect
+       CASE( 'ADVWTC' )
+          ! Output-only wildcard: physical tracers plus derived WTC when active.
+          numTags = State_Chm%nAdvect
+          IF ( Ind_('WTC') > State_Chm%nAdvect ) numTags = numTags + 1
        CASE( 'AER'          )
           numTags = State_Chm%nAeroSpc
        CASE( 'DRY',     'D' )
@@ -18039,6 +18293,8 @@ CONTAINS
           numTags = State_Chm%nKppFix
        CASE( 'GAS',     'G' )
           numTags = State_Chm%nGasSpc
+       CASE( 'BRCOPT',  'Q' )
+          numTags = SIZE(BrC_Optical_Species)
        CASE( 'HYG',     'H' )
           numTags = State_Chm%nHygGrth
        CASE( 'KPP',     'K' )
@@ -18177,8 +18433,11 @@ CONTAINS
     ! Get mapping index
     !=======================================================================
     SELECT CASE( TRIM( tagID ) )
+       CASE( 'ADVWTC' )
+          D = N
+          IF ( N > State_Chm%nAdvect ) D = Ind_('WTC')
        CASE( 'ALL', 'ADV',   'DUSTBIN', 'TOMASBIN', 'PRD',                   &
-             'LOS', 'RRTMG', 'UVFLX',   'RXN'                               )
+             'LOS', 'RRTMG', 'UVFLX',   'RXN', 'BRCOPT'                       )
           D = N
        CASE( 'AER'  )
           D = State_Chm%Map_Aero(N)
@@ -18263,6 +18522,9 @@ CONTAINS
              CALL GC_Error( errMsg, RC, thisLoc )
              RETURN
           ENDIF
+
+       CASE( 'BRCOPT' )
+          tagName = BrC_Optical_Species(D)
 
        ! Default tag name is the name in the species database
        CASE DEFAULT
@@ -20063,6 +20325,7 @@ CONTAINS
     LOGICAL                   :: isRxnRate
     LOGICAL                   :: isUvFlx
     LOGICAL                   :: isWildCard
+    LOGICAL                   :: isBrCOpt
     LOGICAL                   :: skipInd
     INTEGER                   :: index
     INTEGER                   :: numTags
@@ -20099,6 +20362,7 @@ CONTAINS
     isUvFlx    = ( indFlag == 'U'                        )
     isLoss     = ( indFlag == 'X'                        )
     isProd     = ( indFlag == 'Y'                        )
+    isBrCOpt   = ( indFlag == 'Q'                        )
     skipInd    = ( isRxnRate .or. isUvFlx .or. isDustBin .or. isTomasBin )
     spcName    = ''
     wcName     = ''
@@ -20193,8 +20457,10 @@ CONTAINS
              RETURN
           ENDIF
 
-          ! Save the in the mapping object
-          IF ( skipInd ) THEN
+          ! Save the index in the mapping object
+          IF ( isBrCOpt ) THEN
+             mapData%slot2id(index) = BrC_Optical_Tag_Index(spcName)
+          ELSE IF ( skipInd ) THEN
              mapData%slot2id(index) = index
           ELSE IF ( isLoss ) THEN
              mapData%slot2id(index) = State_Chm%Map_Loss(index)
@@ -20242,6 +20508,10 @@ CONTAINS
              S = LEN_TRIM( TagItem%Name )
              READ( TagItem%Name(S-1:S), '(I2.2)' ) index
              mapData%slot2id(TagItem%index) = index
+
+          ELSE IF ( isBrCOpt ) THEN
+
+             mapData%slot2id(TagItem%index) = BrC_Optical_Tag_Index(TagItem%name)
 
           ELSE IF ( isLoss ) THEN
 
@@ -20331,6 +20601,25 @@ CONTAINS
 
   END SUBROUTINE Get_Mapping
 !EOC
+!------------------------------------------------------------------------------
+!                  GEOS-Chem Global Chemical Transport Model                  !
+!------------------------------------------------------------------------------
+!
+  INTEGER FUNCTION BrC_Optical_Tag_Index( Name ) RESULT( TagIndex )
+    USE Charpak_Mod, ONLY : To_Uppercase
+    CHARACTER(LEN=*), INTENT(IN) :: Name
+    CHARACTER(LEN=LEN(Name))    :: Upper_Name
+    INTEGER                     :: N
+
+    ! Return a missing index for tags outside the supported BrC optical family.
+    Upper_Name = To_Uppercase(Name)
+    TagIndex = -1
+    DO N = 1, SIZE(BrC_Optical_Species)
+       IF ( Upper_Name /= BrC_Optical_Species(N) ) CYCLE
+       TagIndex = N
+       RETURN
+    ENDDO
+  END FUNCTION BrC_Optical_Tag_Index
 !------------------------------------------------------------------------------
 !                  GEOS-Chem Global Chemical Transport Model                  !
 !------------------------------------------------------------------------------

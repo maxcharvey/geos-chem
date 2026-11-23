@@ -186,14 +186,15 @@ VerboseOnCores:              root       # Accepted values: root all
     --> GFED_subgrid_coag      :       false
     --> GFED_vertical_injection_fraction : 0.0
     --> GFED_vertical_injection_levels   : 0
-112     GFAS                   : ${RUNDIR_GFAS_EXT}   ACET/ACR/ACTA/ALD2/ALK4/BCPI/BCPO/BENZ/C2H2/C2H4/C2H6/C3H8/C4H6/CH2O/CO/DMS/EOH/FURA/GLYX/HCOOH/ISOP/MEK/MGLY/MOH/MTPA/MVK/NAP/NH3/NO/OCPI/OCPO/pFe/PHEN/POG1/POG2/PRPE/RCHO/SO2/SOAP/STYR/TOLU/XYLE/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA
+112     GFAS                   : ${RUNDIR_GFAS_EXT}   ACET/ACR/ACTA/ALD2/ALK4/BCPI/BCPO/BENZ/C2H2/C2H4/C2H6/C3H8/C4H6/CH2O/CO/DMS/EOH/FURA/GLYX/HCOOH/ISOP/MEK/MGLY/MOH/MTPA/MVK/NAP/NH3/NO/OCPI/OCPO/pFe/PHEN/POG1/POG2/PRPE/RCHO/SO2/SOAP/STYR/TOLU/XYLE/FOCPI/FOCPO/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA
     --> Vertical Profile Species:      CO
 # FINNv25 file inventory must also be true. Disable GFED/GFAS when selecting it.
-165     FINNv25_Inject          : off   SOAP/BCPI/BCPO/OCPI/OCPO/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA/SO2/NH3/ACET/ALK4/PRPE/C2H2/C2H4/C2H6/C3H8/CH2O/ISOP/BENZ/TOLU/XYLE/GLYC/MGLY/HAC/MEK/HCOOH/HNO2/ALD2/EOH/MOH/ACTA/MVK/MACR
+165     FINNv25_Inject          : off   SOAP/BCPI/BCPO/OCPI/OCPO/FOCPI/FOCPO/FSOAP/DBRCPOA/NPBRCPOA/PBRCPOA/SO2/NH3/ACET/ALK4/PRPE/C2H2/C2H4/C2H6/C3H8/CH2O/ISOP/BENZ/TOLU/XYLE/GLYC/MGLY/HAC/MEK/HCOOH/HNO2/ALD2/EOH/MOH/ACTA/MVK/MACR
     --> FINNv25_vertical_injection_fraction : 0.0
     --> FINNv25_vertical_injection_levels   : 0
     --> FINNV25_GFAS_PROFILE    : false
     --> FINNv25_profile_fallback : pbl
+    --> FINNv25_GFAS_height_scale : 1.0
 117     Volcano                : on    SO2
     --> Volcano_Source         :       AeroCom
     --> Volcano_Table          :       ${RUNDIR_VOLC_TABLE}
@@ -1615,13 +1616,25 @@ VerboseOnCores:              root       # Accepted values: root all
 0 QFED_OCPO_FT   -                                                                 -       -                             -   -             -       OCPO 73/75/312     5 2
 ))).not.QFED2_BRC_HARMONIZED_SENSITIVITY
 (((QFED2_BRC_HARMONIZED_SENSITIVITY
-0 QFED_OCPI_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s OCPI 72/75/288/311 5 2
-0 QFED_OCPI_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s OCPI 72/75/288/312 5 2
-0 QFED_OCPO_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s OCPO 73/75/288/311 5 2
-0 QFED_OCPO_BRC_HS_FT  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s OCPO 73/75/288/312 5 2
+0 QFED_FOCPI_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s FOCPI 72/75/288/311 5 2
+0 QFED_FOCPI_BRC_HS_FT $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s FOCPI 72/75/288/312 5 2
+0 QFED_FOCPO_BRC_HS_PBL $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL kg/m2/s FOCPO 73/75/288/311 5 2
+0 QFED_FOCPO_BRC_HS_FT $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_oc.006.$YYYY$MM$DD.nc4 biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s FOCPO 73/75/288/312 5 2
 )))QFED2_BRC_HARMONIZED_SENSITIVITY
+# Fire precursor is reclassified to FSOAP only in the BrC mode.
+(((.not.QFED2_BRC_HARMONIZED_SENSITIVITY
 0 QFED_SOAP_PBL  $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_co.006.$YYYY$MM$DD.nc4   biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL     kg/m2/s SOAP 54/75/281/311 5 2
+))).not.QFED2_BRC_HARMONIZED_SENSITIVITY
+(((QFED2_BRC_HARMONIZED_SENSITIVITY
+0 QFED_SOAP_PBL 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s SOAP - 5 2
+)))QFED2_BRC_HARMONIZED_SENSITIVITY
+# Fire precursor is reclassified to FSOAP only in the BrC mode.
+(((.not.QFED2_BRC_HARMONIZED_SENSITIVITY
 0 QFED_SOAP_FT   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_co.006.$YYYY$MM$DD.nc4   biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s SOAP 54/75/281/312 5 2
+))).not.QFED2_BRC_HARMONIZED_SENSITIVITY
+(((QFED2_BRC_HARMONIZED_SENSITIVITY
+0 QFED_SOAP_FT 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s SOAP - 5 2
+)))QFED2_BRC_HARMONIZED_SENSITIVITY
 0 QFED_NH3_PBL   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_nh3.006.$YYYY$MM$DD.nc4  biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL     kg/m2/s NH3  75/311        5 2
 0 QFED_NH3_FT    $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_nh3.006.$YYYY$MM$DD.nc4  biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=PBL:5500m kg/m2/s NH3  75/312        5 2
 0 QFED_SO2_PBL   $ROOT/QFED/v2018-07/$YYYY/$MM/qfed2.emis_so2.006.$YYYY$MM$DD.nc4  biomass 2000-2022/1-12/1-31/0/+12hour EFY xyL=1:PBL     kg/m2/s SO2  75/311        5 2
@@ -1652,7 +1665,13 @@ VerboseOnCores:              root       # Accepted values: root all
 #==============================================================================
 (((FINNv25
 (((.not.FINNv25_Inject
+# Fire precursor is reclassified to FSOAP only in the BrC mode.
+(((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY
 0 FINNv25_SOAP  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_CO              2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s SOAP   75/281 5 3
+))).not.FINNV25_BRC_HARMONIZED_SENSITIVITY
+(((FINNV25_BRC_HARMONIZED_SENSITIVITY
+0 FINNv25_SOAP 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s SOAP - 5 3
+)))FINNV25_BRC_HARMONIZED_SENSITIVITY
 0 FINNv25_BCPI  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_BC              2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s BCPI   75/70  5 3
 0 FINNv25_BCPO  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc              fire_modisviirs_BC              2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s BCPO   75/71  5 3
 (((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY
@@ -1666,8 +1685,8 @@ VerboseOnCores:              root       # Accepted values: root all
 (((FINNV25_BRC_HARMONIZED_SENSITIVITY
 0 FINNv25_FSOAP_BRC_HS   $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_CO 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s FSOAP    75/286/287 5 3
 0 FINNv25_DBRCPOA_BRC_HS $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s DBRCPOA  75/285     5 3
-0 FINNv25_OCPI_BRC_HS    $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s OCPI     75/282/72  5 3
-0 FINNv25_OCPO_BRC_HS    $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s OCPO     75/282/73  5 3
+0 FINNv25_FOCPI_BRC_HS $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s FOCPI 75/282/72 5 3
+0 FINNv25_FOCPO_BRC_HS $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s FOCPO 75/282/73 5 3
 0 FINNv25_NPBRCPOA_BRC_HS $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s NPBRCPOA 75/283     5 3
 0 FINNv25_PBRCPOA_BRC_HS  $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s PBRCPOA  75/284     5 3
 )))FINNV25_BRC_HARMONIZED_SENSITIVITY
@@ -1701,12 +1720,20 @@ VerboseOnCores:              root       # Accepted values: root all
 # Optional injection path evaluates the same inventory and scale factors.
 # Extension records replace (never add to) the surface records above.
 (((FINNv25_Inject
+# Fire precursor is reclassified to FSOAP only in the BrC mode.
+(((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY
 165 FINNV25_INJECT_SOAP $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_CO 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s SOAP 75/281 5 3
+))).not.FINNV25_BRC_HARMONIZED_SENSITIVITY
+(((FINNV25_BRC_HARMONIZED_SENSITIVITY
+165 FINNV25_INJECT_SOAP 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s SOAP - 5 3
+)))FINNV25_BRC_HARMONIZED_SENSITIVITY
 165 FINNV25_INJECT_BCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s BCPI 75/70 5 3
 165 FINNV25_INJECT_BCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s BCPO 75/71 5 3
 (((.not.FINNV25_BRC_HARMONIZED_SENSITIVITY
 165 FINNV25_INJECT_OCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s OCPI 75/72 5 3
+165 FINNV25_INJECT_FOCPI 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s FOCPI - 5 3
 165 FINNV25_INJECT_OCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s OCPO 75/73 5 3
+165 FINNV25_INJECT_FOCPO 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s FOCPO - 5 3
 165 FINNV25_INJECT_FSOAP 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s FSOAP - 5 3
 165 FINNV25_INJECT_DBRCPOA 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s DBRCPOA - 5 3
 165 FINNV25_INJECT_NPBRCPOA 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s NPBRCPOA - 5 3
@@ -1719,8 +1746,10 @@ VerboseOnCores:              root       # Accepted values: root all
 (((FINNV25_BRC_HARMONIZED_SENSITIVITY
 165 FINNV25_INJECT_FSOAP $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_CO_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_CO 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s FSOAP 75/286/287 5 3
 165 FINNV25_INJECT_DBRCPOA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_BC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_BC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s DBRCPOA 75/285 5 3
-165 FINNV25_INJECT_OCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s OCPI 75/282/72 5 3
-165 FINNV25_INJECT_OCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s OCPO 75/282/73 5 3
+165 FINNV25_INJECT_FOCPI $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s FOCPI 75/282/72 5 3
+165 FINNV25_INJECT_OCPI 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s OCPI - 5 3
+165 FINNV25_INJECT_FOCPO $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s FOCPO 75/282/73 5 3
+165 FINNV25_INJECT_OCPO 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s OCPO - 5 3
 165 FINNV25_INJECT_NPBRCPOA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s NPBRCPOA 75/283 5 3
 165 FINNV25_INJECT_PBRCPOA $ROOT/FINNv25/v2025-06/$YYYY/emissions-finnv2.5modvrs_OC_bb_surface_daily_$YYYY0101-$YYYY1231_0.1x0.1.nc fire_modisviirs_OC 2012-2023/1-12/1-31/0 RF xy molecules/cm^2/s PBRCPOA 75/284 5 3
 )))FINNV25_BRC_HARMONIZED_SENSITIVITY
@@ -1999,7 +2028,13 @@ VerboseOnCores:              root       # Accepted values: root all
 (((GFAS
 112 GFAS_CO_3D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire_3d     2003-2100/1-12/1-31/0 EFY xyz kg/m2/s * 75       1 1
 112 GFAS_CO_2D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
+# Fire precursor is reclassified to FSOAP only in the BrC mode.
+(((.not.GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_SOAP_2D  -                                                       -             -                     -   -   -       * 75/281   1 1
+))).not.GFAS_BRC_HARMONIZED_SENSITIVITY
+(((GFAS_BRC_HARMONIZED_SENSITIVITY
+112 GFAS_SOAP_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
+)))GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_BCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 70/75    1 1
 112 GFAS_BCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 71/75    1 1
 112 GFAS_DMS_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h6sfire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
@@ -2007,7 +2042,9 @@ VerboseOnCores:              root       # Accepted values: root all
 # Ordinary GFAS remains unchanged when the controlled BrC proxy is off.
 (((.not.GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_OCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 72/75    1 1
+112 GFAS_FOCPI_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_OCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 73/75    1 1
+112 GFAS_FOCPO_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_FSOAP_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_DBRCPOA_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_NPBRCPOA_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
@@ -2016,8 +2053,10 @@ VerboseOnCores:              root       # Accepted values: root all
 # Preserve 0.5 residual OC + 0.375 NPBRC + 0.125 PBRC carbon closure.
 # GFAS is already mass-based: do not apply FINN molecule/MW factor 287.
 (((GFAS_BRC_HARMONIZED_SENSITIVITY
-112 GFAS_OCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 72/75/282    1 1
-112 GFAS_OCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 73/75/282    1 1
+112 GFAS_FOCPI_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 72/75/282 1 1
+112 GFAS_OCPI_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
+112 GFAS_FOCPO_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 73/75/282 1 1
+112 GFAS_OCPO_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_FSOAP_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/286 1 1
 112 GFAS_DBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/285 1 1
 112 GFAS_NPBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/283 1 1

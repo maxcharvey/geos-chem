@@ -10,7 +10,7 @@ FIELDS = ("source", "variable", "date", "cycle", "dimension", "units",
 PROXY_CHAINS = {
     "FSOAP": ("54", "75", "292"), "DBRCPOA": ("75", "291"),
     "NPBRCPOA": ("75", "289"), "PBRCPOA": ("75", "290"),
-    "OCPI": ("72", "75", "288"), "OCPO": ("73", "75", "288"),
+    "FOCPI": ("72", "75", "288"), "FOCPO": ("73", "75", "288"),
 }
 
 
@@ -102,8 +102,11 @@ def check(text: str, has_pog: bool) -> None:
         assert factors[ident] == value, (ident, factors.get(ident))
     off, on = effective_rows(text, False), effective_rows(text, True)
     assert not any("BRC_HS" in name for name in off), off
-    for name, species in (("QFED_OCPI_PBL", "OCPI"), ("QFED_OCPO_FT", "OCPO")):
-        assert off[name].species == species
+    for species, factor in (("OCPI", "72"), ("OCPO", "73")):
+        for suffix, level in (("PBL", "311"), ("FT", "312")):
+            name = f"QFED_{species}_{suffix}"
+            assert_row(off[name], species, (factor, "75"), level)
+            assert name not in on, name
     for species, chain in PROXY_CHAINS.items():
         for suffix, level in (("PBL", "311"), ("FT", "312")):
             assert_row(on[f"QFED_{species}_BRC_HS_{suffix}"], species, chain, level)
@@ -116,7 +119,7 @@ def check(text: str, has_pog: bool) -> None:
 
     # A non-unit TOD factor proves every chain uses the operational scale 75.
     tod, pbl = 2.3, factors["311"]
-    oc_rows = (on["QFED_OCPI_BRC_HS_PBL"], on["QFED_OCPO_BRC_HS_PBL"],
+    oc_rows = (on["QFED_FOCPI_BRC_HS_PBL"], on["QFED_FOCPO_BRC_HS_PBL"],
                on["QFED_NPBRCPOA_BRC_HS_PBL"], on["QFED_PBRCPOA_BRC_HS_PBL"])
     assert abs(sum(scaled(row, factors, tod) for row in oc_rows) - tod * pbl) < 1e-12
     assert abs(scaled(on["QFED_DBRCPOA_BRC_HS_PBL"], factors, tod) - 4. * tod * pbl) < 1e-12

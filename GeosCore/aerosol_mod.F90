@@ -101,12 +101,14 @@ MODULE AEROSOL_MOD
   INTEGER :: id_SOAIE,   id_INDIOL,  id_LVOCOA
 
   ! BrC species IDs (M. Harvey, 19 Mar 2026)
-  INTEGER :: id_BRC_WTC, id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_BRC_SOA, id_BRC_DBRC, id_BRC_NPBRC
+  INTEGER :: id_BRC_WTC  ! Canonical bin-8 density metadata only
+  INTEGER :: id_BRC_PWTC, id_BRC_SWTC
   INTEGER :: id_BRC_PBRC
   INTEGER :: id_FSOAS  ! darkened fire SOA precursor piggybacks SOAS optics
 
   ! FF-OC species IDs
-  INTEGER :: id_FFOCPI, id_FFOCPO
+  INTEGER :: id_FFOCPI, id_FFOCPO, id_FOCPI, id_FOCPO
 
   ! Index to map between NRHAER and species database hygroscopic species
   ! NOTE: Increasing value of NRHAER in CMN_SIZE_Mod.F90 (e.g. if there is
@@ -556,7 +558,7 @@ CONTAINS
           ! Each BrC species has its own AerMass field and WAERSL bin:
           !   BRCPI  -> WAERSL(6)  (BRCSOA, N=6)
           !   NPBRC  -> WAERSL(7)  (NPBRCPOA, N=7)
-          !   WTCPI  -> WAERSL(8)  (WTC, N=8)
+          !   WTCPI  -> WAERSL(8)  (PWTC+SWTC derived total, N=8)
           !   FSOAS  -> WAERSL(9)  (FSOAS, N=9)
           !   PBRC   -> WAERSL(10) (PBRCPOA, N=10)
           !   BRCPO  -> DAERSL(3), add-on to N=11 (DBRCPOA)
@@ -575,6 +577,8 @@ CONTAINS
           State_Chm%AerMass%BRCPO(I,J,L) = 0.0_fp
           State_Chm%AerMass%NPBRC(I,J,L) = 0.0_fp
           State_Chm%AerMass%WTCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%PWTCPI(I,J,L) = 0.0_fp
+          State_Chm%AerMass%SWTCPI(I,J,L) = 0.0_fp
           State_Chm%AerMass%FSOAS(I,J,L) = 0.0_fp
           State_Chm%AerMass%PBRC(I,J,L)  = 0.0_fp
 
@@ -596,13 +600,20 @@ CONTAINS
                 / AIRVOL(I,J,L)
           ENDIF
 
-          ! WTC -> WTCPI (bin N=8, org.dat; bleached, transparent OC)
-          IF ( id_BRC_WTC > 0 ) THEN
-             State_Chm%AerMass%WTCPI(I,J,L) =                      &
-                Spc(id_BRC_WTC)%Conc(I,J,L)                        &
-                * State_Chm%AerMass%OCFOPOA(I,J)                   &
-                / AIRVOL(I,J,L)
+          ! Attributed stocks share the existing white-carbon growth/optics.
+          IF ( id_BRC_PWTC > 0 ) THEN
+             State_Chm%AerMass%PWTCPI(I,J,L) = &
+                Spc(id_BRC_PWTC)%Conc(I,J,L) &
+                * State_Chm%AerMass%OCFOPOA(I,J) / AIRVOL(I,J,L)
           ENDIF
+          IF ( id_BRC_SWTC > 0 ) THEN
+             State_Chm%AerMass%SWTCPI(I,J,L) = &
+                Spc(id_BRC_SWTC)%Conc(I,J,L) &
+                * State_Chm%AerMass%OCFOPOA(I,J) / AIRVOL(I,J,L)
+          ENDIF
+          ! WTC is derived: count each physical component once.
+          State_Chm%AerMass%WTCPI(I,J,L) = &
+             State_Chm%AerMass%PWTCPI(I,J,L) + State_Chm%AerMass%SWTCPI(I,J,L)
 
           ! FSOAS -> FSOAS (bin N=9; already kg_OM, no OM:OC)
           IF ( id_FSOAS > 0 ) THEN
@@ -640,6 +651,23 @@ CONTAINS
              State_Chm%AerMass%OCPO(I,J,L) =                       &
                 State_Chm%AerMass%OCPO(I,J,L)                      &
                 + Spc(id_FFOCPO)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFPOA(I,J)                    &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          ! Source-tagged residual fire OC shares the existing OC carriers.
+          IF ( Input_Opt%LBRC .AND. (id_FOCPI > 0) ) THEN
+             State_Chm%AerMass%OCPI(I,J,L) =                       &
+                State_Chm%AerMass%OCPI(I,J,L)                      &
+                + Spc(id_FOCPI)%Conc(I,J,L)                       &
+                * State_Chm%AerMass%OCFOPOA(I,J)                   &
+                / AIRVOL(I,J,L)
+          ENDIF
+
+          IF ( Input_Opt%LBRC .AND. (id_FOCPO > 0) ) THEN
+             State_Chm%AerMass%OCPO(I,J,L) =                       &
+                State_Chm%AerMass%OCPO(I,J,L)                      &
+                + Spc(id_FOCPO)%Conc(I,J,L)                       &
                 * State_Chm%AerMass%OCFPOA(I,J)                    &
                 / AIRVOL(I,J,L)
           ENDIF
@@ -985,8 +1013,8 @@ CONTAINS
        ENDIF
 
        ! BrC is fine organic aerosol in both simple- and complex-SOA runs.
-       ! WTC is classified as primary OC here: it is the bleached product of
-       ! primary BrC, rather than a secondary-organic production pathway.
+       ! Total PM includes all white carbon once. PM25oc/PM25soa below
+       ! classify PWTC/SWTC separately; WTC is only the derived total.
        ! DBRCPOA is a dry carrier, so do not apply hygroscopic OM growth.
        IF ( Input_Opt%LBRC ) THEN
           State_Chm%AerMass%PM25(I,J,L) = State_Chm%AerMass%PM25(I,J,L)      &
@@ -1107,7 +1135,7 @@ CONTAINS
                = ( State_Chm%AerMass%OCPO(I,J,L)                             &
                +   State_Chm%AerMass%OCPI(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%NPBRC(I,J,L)  * ORG_GROWTH              &
-               +   State_Chm%AerMass%WTCPI(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%PWTCPI(I,J,L)  * ORG_GROWTH              &
                +   State_Chm%AerMass%PBRC(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%BRCPO(I,J,L)                )           &
                * ( P_SFC_STD                       / PMID(I,J,L) )           &
@@ -1144,6 +1172,7 @@ CONTAINS
                +   State_Chm%AerMass%SOAS(I,J,L)   * ORG_GROWTH              &
                +   State_Chm%AerMass%ISOAAQ(I,J,L) * ORG_GROWTH              &
                +   State_Chm%AerMass%BRCPI(I,J,L)  * ORG_GROWTH              &
+               +   State_Chm%AerMass%SWTCPI(I,J,L) * ORG_GROWTH              &
                +   State_Chm%AerMass%FSOAS(I,J,L)  * ORG_GROWTH  )           &
                * ( P_SFC_STD                       / PMID(I,J,L) )           &
                * ( T(I,J,L)                        / T_298_K     )           &
@@ -1233,12 +1262,13 @@ CONTAINS
 !
     USE CMN_SIZE_Mod,   ONLY : NAER, NRH, NDUST, NSTRATAER
     USE BRC_Optics_Mod, ONLY : BRC_DRY_AOD_AT_WAVELENGTH
+    USE BRC_Aerosol_Map_Mod, ONLY : BRC_DRY_AEROSOL_BIN
     USE ErrCode_Mod
     USE ERROR_MOD,      ONLY : ERROR_STOP, Safe_Div
     USE Input_Opt_Mod,  ONLY : OptInput
     USE PhysConstants,  ONLY : CONSVAP
-    USE State_Chm_Mod,  ONLY : ChmState
-    USE State_Diag_Mod, ONLY : DgnState
+    USE State_Chm_Mod,  ONLY : ChmState, Ind_
+    USE State_Diag_Mod, ONLY : DgnState, DgnMap, BrC_Optical_Species
     USE State_Grid_Mod, ONLY : GrdState
     USE State_Met_Mod,  ONLY : MetState
     USE TIME_MOD,       ONLY : ITS_A_NEW_MONTH
@@ -1293,6 +1323,17 @@ CONTAINS
     REAL*8              :: BCSCAT_AE  !(xnw, 8/24/15)
     REAL*8              :: DBG_AOD_STD(6)
     REAL*8              :: BrCDryAOD
+
+    TYPE :: AAOD_Diagnostic
+       REAL(f4),     POINTER :: data(:,:,:,:) => NULL()
+       TYPE(DgnMap), POINTER :: map => NULL()
+    END TYPE AAOD_Diagnostic
+    TYPE(AAOD_Diagnostic) :: AAOD(3)
+    INTEGER             :: BrC_Optical_Index(NAER)
+    INTEGER             :: AAOD_Slot(3), BrC_Tag
+    LOGICAL             :: SaveAAOD, SaveAAOD_Bin
+    LOGICAL             :: AAOD_Seen(2,3)
+    REAL(f8)            :: AAOD_Weight(3), BrC_Absorptance, Extinction
 
     ! Variables for speed diagnostics
     INTEGER             :: ITIMEVALS(8)
@@ -1368,6 +1409,7 @@ CONTAINS
     INTEGER,  POINTER   :: IRHARR     (:,:,:)
     REAL*8,   POINTER   :: ACOEF_WV (:)
     REAL*8,   POINTER   :: BCOEF_WV (:)
+    REAL*8,   POINTER   :: CCOEF_WV (:)
     REAL*8,   POINTER   :: REAA     (:,:,:)
     REAL*8,   POINTER   :: QQAA     (:,:,:,:)
     REAL*8,   POINTER   :: ALPHAA   (:,:,:,:)
@@ -1427,6 +1469,7 @@ CONTAINS
     IRHARR      => State_Chm%Phot%IRHARR      ! Relative humidity indexes
     ACOEF_WV    => State_Chm%Phot%ACOEF_WV    ! Coeffs for WL interpolation
     BCOEF_WV    => State_Chm%Phot%BCOEF_WV    ! Coeffs for WL interpolation
+    CCOEF_WV    => State_Chm%Phot%CCOEF_WV    ! Linear WL interpolation fraction
     REAA        => State_Chm%Phot%REAA
     QQAA        => State_Chm%Phot%QQAA
     ALPHAA      => State_Chm%Phot%ALPHAA
@@ -1714,6 +1757,49 @@ CONTAINS
        ENDIF
     ENDIF
 
+    ! Use requested diagnostic storage for the absorption fractions until
+    ! the paired extinction optical depths are available. BrC-off output
+    ! remains zero even when the same AAOD fields are requested.
+    IF ( ODSWITCH == 1 ) THEN
+       IF ( State_Diag%Archive_BrCAAODWL1 ) THEN
+          AAOD(1)%data => State_Diag%BrCAAODWL1
+          AAOD(1)%map  => State_Diag%Map_BrCAAODWL1
+       ENDIF
+       IF ( State_Diag%Archive_BrCAAODWL2 ) THEN
+          AAOD(2)%data => State_Diag%BrCAAODWL2
+          AAOD(2)%map  => State_Diag%Map_BrCAAODWL2
+       ENDIF
+       IF ( State_Diag%Archive_BrCAAODWL3 ) THEN
+          AAOD(3)%data => State_Diag%BrCAAODWL3
+          AAOD(3)%map  => State_Diag%Map_BrCAAODWL3
+       ENDIF
+    ENDIF
+    SaveAAOD = .FALSE.
+    DO W = 1, Input_Opt%NWVSELECT
+       IF ( .NOT. ASSOCIATED( AAOD(W)%data ) ) CYCLE
+       AAOD(W)%data = 0.0_f4
+       SaveAAOD = Input_Opt%LBRC
+    ENDDO
+    BrC_Optical_Index = 0
+    AAOD_Seen = .FALSE.
+    IF ( SaveAAOD ) THEN
+       DO BrC_Tag = 1, SIZE( BrC_Optical_Species )
+          NA = Ind_( BrC_Optical_Species(BrC_Tag), 'H' )
+          IF ( NA < 1 .OR. NA > State_Chm%nHygGrth .OR. NA > NRHAER ) THEN
+             ErrMsg = 'Missing hygroscopic BrC optical carrier: ' // TRIM(BrC_Optical_Species(BrC_Tag))
+             CALL GC_Error( ErrMsg, RC, 'RDAER in aerosol_mod.F90' )
+             RETURN
+          ENDIF
+          N = Map_NRHAER(NA)
+          IF ( N < 1 .OR. N > NRHAER ) THEN
+             ErrMsg = 'Invalid BrC optical bin for: ' // TRIM(BrC_Optical_Species(BrC_Tag))
+             CALL GC_Error( ErrMsg, RC, 'RDAER in aerosol_mod.F90' )
+             RETURN
+          ENDIF
+          BrC_Optical_Index(N) = BrC_Tag
+       ENDDO
+    ENDIF
+
     DO IIWV = 1, NWVS
        !now select the correct LUT wavelength
        IF (ODSWITCH .EQ. 0) THEN
@@ -1739,6 +1825,26 @@ CONTAINS
           ENDIF
        ENDIF
 
+       ! A lookup wavelength can occur more than once in IWVREQUIRED
+       ! when two requested wavelengths share a bracket. Count each
+       ! bracket once for each diagnostic.
+       AAOD_Weight = 0.0_f8
+       IF ( SaveAAOD ) THEN
+          DO W = 1, Input_Opt%NWVSELECT
+             IF ( .NOT. ASSOCIATED( AAOD(W)%data ) ) CYCLE
+             IF ( IWV == IWVSELECT(1,W) ) THEN
+                IF ( AAOD_Seen(1,W) ) CYCLE
+                AAOD_Seen(1,W) = .TRUE.
+                AAOD_Weight(W) = 1.0_f8
+                IF ( IWVSELECT(1,W) /= IWVSELECT(2,W) ) AAOD_Weight(W) = 1.0_f8 - CCOEF_WV(W)
+             ELSE IF ( IWV == IWVSELECT(2,W) ) THEN
+                IF ( AAOD_Seen(2,W) ) CYCLE
+                AAOD_Seen(2,W) = .TRUE.
+                AAOD_Weight(W) = CCOEF_WV(W)
+             ENDIF
+          ENDDO
+       ENDIF
+
        ! Loop over types of aerosol with hygroscopic growth
        DO NA = 1, NAER
 
@@ -1748,6 +1854,16 @@ CONTAINS
           ELSE
              N = NA
           ENDIF
+
+          AAOD_Slot = 0
+          BrC_Tag = BrC_Optical_Index(N)
+          IF ( BrC_Tag > 0 ) THEN
+             DO W = 1, Input_Opt%NWVSELECT
+                IF ( AAOD_Weight(W) <= 0.0_f8 ) CYCLE
+                AAOD_Slot(W) = AAOD(W)%map%id2slot(BrC_Tag)
+             ENDDO
+          ENDIF
+          SaveAAOD_Bin = ANY( AAOD_Slot > 0 )
 
           !index for strat aerosol (only >0 for strat aero)
           ISTRAT=N-NRHAER
@@ -1803,6 +1919,7 @@ CONTAINS
 #endif
           !$OMP PRIVATE( RHOSTRAT, RAER,    SADSTRAT, XSASTRAT            ) &
           !$OMP PRIVATE( VDRY,     VH2O,    S,        g                   ) &
+          !$OMP PRIVATE( W, BrC_Absorptance                                ) &
           !$OMP SCHEDULE( DYNAMIC, 8                                      ) &
           !$OMP COLLAPSE( 3                                               )
           DO L = 1, State_Grid%NZ
@@ -2081,6 +2198,24 @@ CONTAINS
                 ! Aerosol optical depth
                 ODAER(I,J,L,IWV,N) = BXHEIGHT(I,J,L) * XSASTRAT * QW(1) 
 
+             ENDIF
+
+             IF ( SaveAAOD_Bin ) THEN
+                IF ( N == BRC_DRY_AEROSOL_BIN ) THEN
+                   ! The DBRC carrier uses dry optical properties.
+                   BrC_Absorptance = 1.0_f8 - SSAA(IWV,1,N,State_Chm%Phot%DRg)
+                ELSE IF ( IRH == NRH ) THEN
+                   BrC_Absorptance = 1.0_f8 - SSW(NRH)
+                ELSE
+                   BrC_Absorptance = 1.0_f8 - ( FRAC * SSW(IRH+1) + (1.0_f8 - FRAC) * SSW(IRH) )
+                ENDIF
+                BrC_Absorptance = MAX( 0.0_f8, MIN( 1.0_f8, BrC_Absorptance ) )
+                DO W = 1, Input_Opt%NWVSELECT
+                   S = AAOD_Slot(W)
+                   IF ( S <= 0 ) CYCLE
+                   AAOD(W)%data(I,J,L,S) = AAOD(W)%data(I,J,L,S) + &
+                        REAL( AAOD_Weight(W) * BrC_Absorptance, f4 )
+                ENDDO
              ENDIF
 
              ! LSTRATOD controls every optical consumer, including RRTMG and
@@ -2396,6 +2531,33 @@ CONTAINS
 
     ENDDO ! end loop over stratospheric aerosols
 
+    ! Combine the contemporaneous, interpolated absorption fraction with
+    ! the same extinction optical depth used by the AOD diagnostics.
+    IF ( SaveAAOD ) THEN
+       DO W = 1, Input_Opt%NWVSELECT
+          IF ( .NOT. ASSOCIATED( AAOD(W)%data ) ) CYCLE
+          DO N = 1, NAER
+             BrC_Tag = BrC_Optical_Index(N)
+             IF ( BrC_Tag <= 0 ) CYCLE
+             S = AAOD(W)%map%id2slot(BrC_Tag)
+             IF ( S <= 0 ) CYCLE
+             !$OMP PARALLEL DO PRIVATE(I,J,L,Extinction) COLLAPSE(3)
+             DO L = 1, State_Grid%NZ
+             DO J = 1, State_Grid%NY
+             DO I = 1, State_Grid%NX
+                ! This interpolation is shared with the DBRC AOD diagnostic.
+                Extinction = BRC_DRY_AOD_AT_WAVELENGTH( &
+                     ODAER(I,J,L,IWVSELECT(1,W),N), ODAER(I,J,L,IWVSELECT(2,W),N), &
+                     IWVSELECT(1,W) /= IWVSELECT(2,W), ACOEF_WV(W), BCOEF_WV(W) )
+                AAOD(W)%data(I,J,L,S) = REAL( Extinction * AAOD(W)%data(I,J,L,S), f4 )
+             ENDDO
+             ENDDO
+             ENDDO
+             !$OMP END PARALLEL DO
+          ENDDO
+       ENDDO
+    ENDIF
+
     !==============================================================
     ! Non-stratospheric cloud diagnostics
     ! NOTE: The cloud optical depths are actually recorded at
@@ -2694,6 +2856,7 @@ CONTAINS
     IRHARR      => NULL()
     ACOEF_WV    => NULL()
     BCOEF_WV    => NULL()
+    CCOEF_WV    => NULL()
     REAA        => NULL()
     QQAA        => NULL()
     ALPHAA      => NULL()
@@ -2830,7 +2993,9 @@ CONTAINS
        id_LVOCOA     = Ind_( 'LVOCOA'  )
 
        ! BrC species IDs (M. Harvey, 19 Mar 2026)
-       id_BRC_WTC    = Ind_( 'WTC'     )
+       id_BRC_WTC    = Ind_( 'WTC'     ) ! Metadata only, never mass
+       id_BRC_PWTC   = Ind_( 'PWTC'    )
+       id_BRC_SWTC   = Ind_( 'SWTC'    )
        id_BRC_SOA    = Ind_( 'BRCSOA'  )
        id_BRC_DBRC   = Ind_( 'DBRCPOA' )
        id_BRC_NPBRC  = Ind_( 'NPBRCPOA')
@@ -2838,6 +3003,8 @@ CONTAINS
        id_FSOAS      = Ind_( 'FSOAS'   )
        id_FFOCPI     = Ind_( 'FFOCPI'  )
        id_FFOCPO     = Ind_( 'FFOCPO'  )
+       id_FOCPI      = Ind_( 'FOCPI'   )
+       id_FOCPO      = Ind_( 'FOCPO'   )
        
        ! Define logical flags
        IS_OCPI       = ( id_OCPI     > 0                                    )
@@ -3082,6 +3249,7 @@ CONTAINS
     CHARACTER(LEN=255) :: FileMsg
     CHARACTER(LEN=255) :: ErrMsg
     CHARACTER(LEN=255) :: ThisLoc
+    CHARACTER(LEN=255) :: IOMessage
 
     ! String arrays
     CHARACTER(LEN=30)  :: SPECFIL(14)
@@ -3108,7 +3276,7 @@ CONTAINS
     ! Initialize
     RC       = GC_SUCCESS
     ErrMsg   = ''
-    ThisLoc  = ' -> at RD_AOD (in module GeosCore/photolysis_mod.F90)'
+    ThisLoc  = ' -> at RD_AOD (in module GeosCore/aerosol_mod.F90)'
     LBRC     = Input_Opt%LBRC
     DATA_DIR = TRIM( Input_Opt%AER_OPTICS_DIR )
 
@@ -3205,14 +3373,14 @@ CONTAINS
        ENDIF
 
        ! Read header lines
-       READ(  NJ1, '(A)' ) TITLE0
+       READ( NJ1, '(A)', IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) TITLE0
        IF ( Input_Opt%amIRoot ) WRITE( 6, '(1X,A)' ) TITLE0
 
        ! Second header line added for more info
-       READ(  NJ1, '(A)' ) TITLE0
+       READ( NJ1, '(A)', IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) TITLE0
        IF ( Input_Opt%amIRoot ) WRITE( 6, '(1X,A)' ) TITLE0
 
-       READ(  NJ1, '(A)' ) TITLE0
+       READ( NJ1, '(A)', IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) TITLE0
 110    FORMAT( 3x, a20 )
 
        IF ( k == 1 .OR. k == 3 .OR. ( k >= 6 .AND. k <= 11 ) ) THEN
@@ -3222,7 +3390,8 @@ CONTAINS
        DO i = 1, State_Chm%Phot%NRAA
        DO j = 1, State_Chm%Phot%NWVAA
 
-          READ(NJ1,*) WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
+          READ( NJ1, *, IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) &
+                      WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
                       RDAA(i,k,g),RWAA(i,k,g),SGAA(i,k),QQAA(j,i,k,g),   &
                       ALPHAA(j,i,k,g),REAA(i,k,g),SSAA(j,i,k,g),         &
                       ASYMAA(j,i,k,g),(PHAA(j,i,k,n,g),n=1,8)
@@ -3240,7 +3409,8 @@ CONTAINS
        DO i = 1, State_Chm%Phot%NRAA
        DO j = 1, State_Chm%Phot%NWVAA
 
-          READ(NJ1,*) WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
+          READ( NJ1, *, IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) &
+                      WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
                       RDAA(i,k,g),RWAA(i,k,g),SGAA(i,k),QQAA(j,i,k,g),   &
                       ALPHAA(j,i,k,g),REAA(i,k,g),SSAA(j,i,k,g),         &
                       ASYMAA(j,i,k,g),(PHAA(j,i,k,n,g),n=1,8)
@@ -3276,6 +3446,18 @@ CONTAINS
     SSAA   => NULL()
     ASYMAA => NULL()
     PHAA   => NULL()
+
+    RETURN
+
+900 CONTINUE
+    CLOSE( NJ1 )
+#if defined( MODEL_CESM )
+    CALL freeUnit(NJ1)
+#endif
+    RC = GC_FAILURE
+    ErrMsg = 'Cannot read aerosol optics table ' // TRIM( ThisFile ) // &
+             ': ' // TRIM( IOMessage )
+    CALL GC_Error( ErrMsg, RC, ThisLoc )
 
   END SUBROUTINE RD_AOD
 !EOC

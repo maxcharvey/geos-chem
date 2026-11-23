@@ -50,6 +50,7 @@ add_library(GeosCore
   hco_state_gc_mod.F90
   hco_interface_gc_mod.F90
   hco_utilities_gc_mod.F90
+  restart_validation_mod.F90
   input_mod.F90
   kppsa_interface_mod.F90
   land_mercury_mod.F90

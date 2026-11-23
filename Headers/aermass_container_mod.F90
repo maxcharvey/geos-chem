@@ -100,7 +100,9 @@ MODULE AerMass_Container_Mod
      REAL(fp), POINTER :: BRCPI      (:,:,:)  ! BRCSOA only [kg_OM/m3]
      REAL(fp), POINTER :: BRCPO      (:,:,:)  ! DBRCPOA [kg_OM/m3]
      REAL(fp), POINTER :: NPBRC      (:,:,:)  ! NPBRCPOA [kg_OM/m3]
-     REAL(fp), POINTER :: WTCPI      (:,:,:)  ! WTC [kg_OM/m3]
+     REAL(fp), POINTER :: WTCPI      (:,:,:)  ! PWTC+SWTC derived total [kg_OM/m3]
+     REAL(fp), POINTER :: PWTCPI     (:,:,:)  ! Primary WTC [kg_OM/m3]
+     REAL(fp), POINTER :: SWTCPI     (:,:,:)  ! Secondary WTC [kg_OM/m3]
      REAL(fp), POINTER :: FSOAS      (:,:,:)  ! FSOAS [kg_OM/m3]
      REAL(fp), POINTER :: PBRC       (:,:,:)  ! PBRCPOA [kg_OM/m3]
      REAL(fp), POINTER :: DAERSL     (:,:,:,:)
@@ -491,6 +493,26 @@ CONTAINS
     ENDIF
     Aer%WTCPI = 0.0_fp
 
+    ! Hydrophilic PWTCPI: bleached BrC (bin N=8) [kg_OM/m3]
+    ALLOCATE( Aer%PWTCPI( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'PWTCPI', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array PWTCPI!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%PWTCPI = 0.0_fp
+
+    ! Hydrophilic SWTCPI: bleached BrC (bin N=8) [kg_OM/m3]
+    ALLOCATE( Aer%SWTCPI( NX, NY, NZ ), STAT=RC )
+    CALL GC_CheckVar( 'SWTCPI', 0, RC )
+    IF ( RC /= GC_SUCCESS ) THEN
+       errMsg = 'Error allocating array SWTCPI!'
+       CALL GC_Error( errMsg, RC, thisLoc )
+       RETURN
+    ENDIF
+    Aer%SWTCPI = 0.0_fp
+
     ! Hydrophilic FSOAS: fire SOA (bin N=9) [kg_OM/m3]
     ALLOCATE( Aer%FSOAS( NX, NY, NZ ), STAT=RC )
     CALL GC_CheckVar( 'FSOAS', 0, RC )
@@ -800,6 +822,20 @@ CONTAINS
        CALL GC_CheckVar( 'Aer%WTCPI', 2, RC )
        IF ( RC /= GC_SUCCESS ) RETURN
        Aer%WTCPI => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%PWTCPI ) ) THEN
+       DEALLOCATE( Aer%PWTCPI, STAT=RC )
+       CALL GC_CheckVar( 'Aer%PWTCPI', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%PWTCPI => NULL()
+    ENDIF
+
+    IF ( ASSOCIATED( Aer%SWTCPI ) ) THEN
+       DEALLOCATE( Aer%SWTCPI, STAT=RC )
+       CALL GC_CheckVar( 'Aer%SWTCPI', 2, RC )
+       IF ( RC /= GC_SUCCESS ) RETURN
+       Aer%SWTCPI => NULL()
     ENDIF
 
     IF ( ASSOCIATED( Aer%FSOAS ) ) THEN

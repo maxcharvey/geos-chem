@@ -105,7 +105,8 @@ operations:
       num_wavelength_bins: 18
       use_H2O_UV_absorption: true
     fast-jx:
-      # Used only by a FASTJX build; organic BrC maps to existing OC records.
+      # FASTJX builds support organic BrC photolysis optics using existing OC records.
+      # Dedicated BrC photolysis optics require Cloud-J.
       fastjx_input_dir: ${RUNDIR_DATA_ROOT}/CHEM_INPUTS/FAST_JX/v2024-05/
     overhead_O3:
       use_online_O3_from_model: ${RUNDIR_USE_ONLINE_O3}
@@ -408,9 +409,12 @@ operations:
       - XYLE
       - FFOCPI
       - FFOCPO
+      - FOCPI
+      - FOCPO
       - FSOAS
       - BRCSOA
-      - WTC
+      - PWTC  # NPBRCPOA bleaching product
+      - SWTC  # BRCSOA bleaching product
       - DBRCPOA
       - FSOAP
       - NPBRCPOA
@@ -430,6 +434,10 @@ aerosols:
   carbon:
     activate: true
     brown_carbon: false
+    # 0: zero bleaching; 1: one day everywhere.
+    # 2: one day for box tops at or below 1 km AGL; zero bleaching above.
+    # 3: viscosity-dependent, fixed O3 partial pressure (3.5e-8 atm).
+    # 4: viscosity-dependent, model O3 with a fixed-partial-pressure fallback.
     bleach_scheme: 4
     # organic is the portable placeholder; dedicated requires brc.dat,
     # pbrc.dat, and dbrc.dat supplied by the user.

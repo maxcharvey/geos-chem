@@ -110,9 +110,12 @@ operations:
       - SO4s
       - SOAP
       - SOAS
+      - FOCPI
+      - FOCPO
       - FSOAS
       - BRCSOA
-      - WTC
+      - PWTC  # NPBRCPOA bleaching product
+      - SWTC  # BRCSOA bleaching product
       - DBRCPOA
       - FSOAP
       - NPBRCPOA

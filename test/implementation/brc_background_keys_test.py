@@ -14,6 +14,7 @@ class BackgroundKeysTest(unittest.TestCase):
         blocks = dict(re.findall(r'^([A-Za-z0-9_]+):\n(.*?)(?=^[A-Za-z0-9_]+:|\Z)', text, re.M | re.S))
         expected = {n: 1e-18 for n in ['FSOAS', 'BRCSOA', 'WTC', 'DBRCPOA', 'NPBRCPOA', 'PBRCPOA']}
         expected['FSOAP'] = 1e-20
+        expected.update(WTC=0.0, PWTC=0.0, SWTC=0.0)
         for name, value in expected.items():
             with self.subTest(species=name):
                 keys = re.findall(r'^  Background_VV:\s*(\S+)', blocks[name], re.M)

@@ -2969,6 +2969,7 @@ CONTAINS
 ! !USES:
 !
     USE Charpak_Mod,           ONLY : To_UpperCase
+    USE BRC_WTC_Output_Mod
     USE ErrCode_Mod
     USE HistContainer_Mod
     USE HistItem_Mod,          ONLY : HistItem
@@ -3010,6 +3011,8 @@ CONTAINS
 !
 ! !LOCAL VARIABLES:
 !
+    TYPE(BRC_WTC_Map) :: WtcOutput
+!
     ! Scalars
     LOGICAL                          :: DoClose
     LOGICAL                          :: DoWrite
@@ -3035,6 +3038,7 @@ CONTAINS
     ! Initialize
     !=======================================================================
     RC         =  GC_SUCCESS
+    WtcOutput = BRC_WTC_Output_Ids()
     DoClose    = .FALSE.
     DoWrite    = .FALSE.
     Collection => NULL()
@@ -3068,7 +3072,11 @@ CONTAINS
           IF ( isBndCond ) THEN
              Container%FileWriteAlarm = 0.0_fp
           ELSE
-             RETURN
+             ! Other collections do not write at startup.  Keep looking
+             ! for BoundaryConditions regardless of the collection order.
+             Container  => NULL()
+             Collection => Collection%Next
+             CYCLE
           ENDIF
        ENDIF             
 
@@ -3103,7 +3111,7 @@ CONTAINS
           !$OMP PRIVATE( N, S   )
           DO S = 1, mapData%nSlots
              N = mapData%slot2id(S)
-             State_Diag%SpeciesBC(:,:,:,S) = State_Chm%Species(N)%Conc(:,:,:)
+             CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%SpeciesBC(:,:,:,S), WtcOutput)
           ENDDO
           !$OMP END PARALLEL DO
 

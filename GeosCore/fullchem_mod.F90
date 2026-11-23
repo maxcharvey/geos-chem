@@ -152,6 +152,7 @@ CONTAINS
 ! !USES:
 !
     USE ErrCode_Mod
+    USE BRC_WTC_Output_Mod
     USE ERROR_MOD
 #ifdef KPP_INTEGRATOR_AUTOREDUCE
     USE fullchem_AutoReduceFuncs, ONLY : fullchem_AR_KeepHalogensActive
@@ -220,6 +221,8 @@ CONTAINS
 !BOC
 !
 ! !LOCAL VARIABLES:
+!
+    TYPE(BRC_WTC_Map) :: WtcOutput
 !
     ! Scalars
     LOGICAL            :: IsLocNoon,  Size_Res,  Failed2x, doSuppress
@@ -313,6 +316,7 @@ CONTAINS
 
     ! Initialize
     RC         =  GC_SUCCESS
+    WtcOutput = BRC_WTC_Output_Ids()
     ErrMsg     =  ''
     ThisLoc    =  ' -> at Do_FullChem (in module GeosCore/FullChem_mod.F90)'
     SpcInfo    => NULL()
@@ -499,7 +503,7 @@ CONTAINS
        !$OMP PRIVATE( N, S   )
        DO S = 1, mapData%nSlots
           N = mapData%slot2id(S)
-          State_Diag%ConcBeforeChem(:,:,:,S) = State_Chm%Species(N)%Conc(:,:,:)
+          CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%ConcBeforeChem(:,:,:,S), WtcOutput)
        ENDDO
        !$OMP END PARALLEL DO
 
@@ -2476,7 +2480,7 @@ CONTAINS
        !$OMP PRIVATE( N, S   )
        DO S = 1, mapData%nSlots
           N = mapData%slot2id(S)
-          State_Diag%ConcAfterChem(:,:,:,S) = State_Chm%Species(N)%Conc(:,:,:)
+          CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%ConcAfterChem(:,:,:,S), WtcOutput)
        ENDDO
        !$OMP END PARALLEL DO
 

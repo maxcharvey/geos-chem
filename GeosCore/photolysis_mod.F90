@@ -63,6 +63,9 @@ CONTAINS
 !
 ! !USES:
 !
+#ifdef MODEL_CLASSIC
+    USE Restart_Validation_Mod, ONLY: Restart_Restore_Surface
+#endif
     USE Charpak_Mod,    ONLY : CSTRIP
 #ifdef FASTJX
     USE CMN_FJX_Mod,    ONLY : JVN_, W_, JLABEL, RNAMES, WL, JFACTA
@@ -112,6 +115,7 @@ CONTAINS
 
     ! Scalars
     LOGICAL            :: notDryRun
+    LOGICAL :: restart_cache_valid
     INTEGER            :: J, K
     REAL(fp)           :: ND64MULT
 
@@ -486,6 +490,22 @@ CONTAINS
        ENDIF
     ENDIF
 
+#ifdef MODEL_CLASSIC
+    ! Saved surface photolysis history persists through dark columns.
+    IF (.NOT.Input_Opt%DryRun.AND.Input_Opt%ITS_A_FULLCHEM_SIM.AND.Input_Opt%Do_Photolysis) THEN
+       IF (.NOT.ASSOCIATED(State_Chm%JOH).OR..NOT.ASSOCIATED(State_Chm%JNO2)) THEN
+          CALL GC_Error('Missing fullchem photolysis cache state',RC,ThisLoc)
+          RETURN
+       ENDIF
+       CALL Restart_Restore_Surface(State_Chm%JOH,State_Chm%JNO2,State_Chm%Phot%ZPJ, &
+            State_Chm%Phot%RXN_O3_1,State_Chm%Phot%RXN_NO2,restart_cache_valid)
+       IF (.NOT.restart_cache_valid) THEN
+          CALL GC_Error('Invalid fullchem surface photolysis cache',RC,ThisLoc)
+          RETURN
+       ENDIF
+    ENDIF
+#endif
+
     ! Free pointers
     GC_Photo_ID => NULL()
     
@@ -842,6 +862,15 @@ CONTAINS
     ErrMsg = ''
     ThisLoc = ' -> at Set_Aer (in module GeosCore/photolysis_mod.F90)'
 
+#ifdef FASTJX
+    ! The legacy FAST-JX table cannot carry the dedicated WB/PB/DB records.
+    IF ( Input_Opt%LBRC .AND. TRIM(Input_Opt%CloudJ_BrC_Optics) == 'DEDICATED' ) THEN
+       ErrMsg = 'Dedicated BrC photolysis optics require Cloud-J. Use organic with FAST-JX.'
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
+#endif
+
     CALL BUILD_BRC_CLOUDJ_MAP( Input_Opt%LBRC,                         &
                                Input_Opt%CloudJ_BrC_Optics, NAA,      &
                                TITLAA, AerMap, RC, ErrMsg )
@@ -857,10 +886,8 @@ CONTAINS
 #else
           WRITE(6,'(a)') 'Cloud-J BrC optics: organic-equivalence records'
 #endif
+#ifndef FASTJX
        ELSE
-#ifdef FASTJX
-          WRITE(6,'(a)') 'FAST-JX BrC optics: dedicated records 64-74'
-#else
           WRITE(6,'(a)') 'Cloud-J BrC optics: dedicated records 64-74'
 #endif
        ENDIF

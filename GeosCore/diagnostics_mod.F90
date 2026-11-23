@@ -580,6 +580,7 @@ CONTAINS
 ! !USES:
 !
     USE Input_Opt_Mod,  ONLY : OptInput
+    USE BRC_WTC_Output_Mod
     USE State_Met_Mod,  ONLY : MetState
     USE State_Chm_Mod,  ONLY : ChmState
     USE State_Diag_Mod, ONLY : DgnMap
@@ -613,6 +614,8 @@ CONTAINS
 !
 ! !LOCAL VARIABLES:
 !
+    TYPE(BRC_WTC_Map) :: WtcOutput
+!
     ! Scalars
     INTEGER               :: D, I, J, L, N, S
     REAL(fp)              :: TmpVal, Conv, LT, GOOD
@@ -629,6 +632,7 @@ CONTAINS
 
     ! Assume success
     RC      =  GC_SUCCESS
+    WtcOutput = BRC_WTC_Output_Ids()
     ThisLoc = &
          ' -> at Set_SpcConc_Diags_VVDry (in GeosCore/diagnostics_mod.F90)'
 
@@ -652,7 +656,7 @@ CONTAINS
        !$OMP PRIVATE( N, S   )
        DO S = 1, mapData%nSlots
           N = mapData%slot2id(S)
-          State_Diag%SpeciesConcVV(:,:,:,S) = State_Chm%Species(N)%Conc(:,:,:)
+          CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%SpeciesConcVV(:,:,:,S), WtcOutput)
        ENDDO
        !$OMP END PARALLEL DO
 
@@ -685,8 +689,8 @@ CONTAINS
           ! Archie into SatDiagnConc diagnostic array
           DO S = 1, State_Diag%Map_SatDiagnConc%nSlots
              N = State_Diag%Map_SatDiagnConc%slot2id(S)
-             State_Diag%SatDiagnConc(I,:,:,S) =      &
-                  State_Chm%Species(N)%Conc(I,:,:) * GOOD
+             CALL BRC_Copy_Species_Slab(State_Chm, N, I, State_Diag%SatDiagnConc(I,:,:,S), WtcOutput)
+             State_Diag%SatDiagnConc(I,:,:,S) = State_Diag%SatDiagnConc(I,:,:,S) * GOOD
           ENDDO
        ENDDO
        !$OMP END PARALLEL DO
@@ -705,7 +709,7 @@ CONTAINS
        !$OMP PRIVATE( N, S   )
        DO S = 1, mapData%nSlots
           N = mapData%slot2id(S)
-          State_Diag%SpeciesBC(:,:,:,S) = State_Chm%Species(N)%Conc(:,:,:)
+          CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%SpeciesBC(:,:,:,S), WtcOutput)
        ENDDO
        !$OMP END PARALLEL DO
 
@@ -722,7 +726,7 @@ CONTAINS
        !$OMP DEFAULT( SHARED ) &
        !$OMP PRIVATE( N      )
        DO N = 1, State_Chm%nSpecies
-          State_Diag%SpeciesRst(:,:,:,N) = State_Chm%Species(N)%Conc(:,:,:)
+          CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%SpeciesRst(:,:,:,N), WtcOutput)
        ENDDO
        !$OMP END PARALLEL DO
    ENDIF
@@ -815,6 +819,7 @@ CONTAINS
 ! !USES:
 !
     USE Input_Opt_Mod,  ONLY : OptInput
+    USE BRC_WTC_Output_Mod
     USE PhysConstants,  ONLY : AVO
     USE State_Met_Mod,  ONLY : MetState
     USE State_Chm_Mod,  ONLY : ChmState
@@ -847,6 +852,8 @@ CONTAINS
 !
 ! !LOCAL VARIABLES:
 !
+    TYPE(BRC_WTC_Map) :: WtcOutput
+!
     ! Scalars
     INTEGER               :: N, S
     REAL(fp)              :: MW_kg
@@ -863,6 +870,7 @@ CONTAINS
 
     ! Assume success
     RC      =  GC_SUCCESS
+    WtcOutput = BRC_WTC_Output_Ids()
     ThisLoc = &
          ' -> at Set_SpcConc_Diags_MND (in GeosCore/diagnostics_mod.F90)'
 
@@ -890,8 +898,9 @@ CONTAINS
           ! Molecular weight for the species [kg]
           MW_kg = State_Chm%SpcData(N)%Info%MW_g * 1.e-3_fp
 
-          State_Diag%SpeciesConcMND(:,:,:,S) =                      &
-               State_Chm%Species(N)%Conc(:,:,:) *                   &
+          CALL BRC_Copy_Species_Output(State_Chm, N, State_Diag%SpeciesConcMND(:,:,:,S), WtcOutput)
+          State_Diag%SpeciesConcMND(:,:,:,S) = &
+               State_Diag%SpeciesConcMND(:,:,:,S) * &
                State_Met%AIRDEN(:,:,:) * ( AVO / MW_kg ) / 1e+6_fp
        ENDDO
        !$OMP END PARALLEL DO

@@ -2956,6 +2956,9 @@ CONTAINS
    ! Clean up
    !=================================================================
 
+   ! All direct NetCDF reads are complete.
+   IF ( .NOT. Use_HEMCO_for_restart_read ) CALL NcCl( fId )
+
    ! Free pointer
    Spc => NULL()
 

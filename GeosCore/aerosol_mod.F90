@@ -3115,6 +3115,7 @@ CONTAINS
     CHARACTER(LEN=255) :: FileMsg
     CHARACTER(LEN=255) :: ErrMsg
     CHARACTER(LEN=255) :: ThisLoc
+    CHARACTER(LEN=255) :: IOMessage
 
     ! String arrays
     CHARACTER(LEN=30)  :: SPECFIL(14)
@@ -3141,7 +3142,7 @@ CONTAINS
     ! Initialize
     RC       = GC_SUCCESS
     ErrMsg   = ''
-    ThisLoc  = ' -> at RD_AOD (in module GeosCore/photolysis_mod.F90)'
+    ThisLoc  = ' -> at RD_AOD (in module GeosCore/aerosol_mod.F90)'
     LBRC     = Input_Opt%LBRC
     DATA_DIR = TRIM( Input_Opt%AER_OPTICS_DIR )
 
@@ -3238,14 +3239,14 @@ CONTAINS
        ENDIF
 
        ! Read header lines
-       READ(  NJ1, '(A)' ) TITLE0
+       READ( NJ1, '(A)', IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) TITLE0
        IF ( Input_Opt%amIRoot ) WRITE( 6, '(1X,A)' ) TITLE0
 
        ! Second header line added for more info
-       READ(  NJ1, '(A)' ) TITLE0
+       READ( NJ1, '(A)', IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) TITLE0
        IF ( Input_Opt%amIRoot ) WRITE( 6, '(1X,A)' ) TITLE0
 
-       READ(  NJ1, '(A)' ) TITLE0
+       READ( NJ1, '(A)', IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) TITLE0
 110    FORMAT( 3x, a20 )
 
        IF ( k == 1 .OR. k == 3 .OR. ( k >= 6 .AND. k <= 11 ) ) THEN
@@ -3255,7 +3256,8 @@ CONTAINS
        DO i = 1, State_Chm%Phot%NRAA
        DO j = 1, State_Chm%Phot%NWVAA
 
-          READ(NJ1,*) WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
+          READ( NJ1, *, IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) &
+                      WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
                       RDAA(i,k,g),RWAA(i,k,g),SGAA(i,k),QQAA(j,i,k,g),   &
                       ALPHAA(j,i,k,g),REAA(i,k,g),SSAA(j,i,k,g),         &
                       ASYMAA(j,i,k,g),(PHAA(j,i,k,n,g),n=1,8)
@@ -3273,7 +3275,8 @@ CONTAINS
        DO i = 1, State_Chm%Phot%NRAA
        DO j = 1, State_Chm%Phot%NWVAA
 
-          READ(NJ1,*) WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
+          READ( NJ1, *, IOSTAT=IOS, IOMSG=IOMessage, ERR=900, END=900 ) &
+                      WVAA(j,k),RHAA(i,k),NRLAA(j,i,k),NCMAA(j,i,k), &
                       RDAA(i,k,g),RWAA(i,k,g),SGAA(i,k),QQAA(j,i,k,g),   &
                       ALPHAA(j,i,k,g),REAA(i,k,g),SSAA(j,i,k,g),         &
                       ASYMAA(j,i,k,g),(PHAA(j,i,k,n,g),n=1,8)
@@ -3309,6 +3312,18 @@ CONTAINS
     SSAA   => NULL()
     ASYMAA => NULL()
     PHAA   => NULL()
+
+    RETURN
+
+900 CONTINUE
+    CLOSE( NJ1 )
+#if defined( MODEL_CESM )
+    CALL freeUnit(NJ1)
+#endif
+    RC = GC_FAILURE
+    ErrMsg = 'Cannot read aerosol optics table ' // TRIM( ThisFile ) // &
+             ': ' // TRIM( IOMessage )
+    CALL GC_Error( ErrMsg, RC, ThisLoc )
 
   END SUBROUTINE RD_AOD
 !EOC

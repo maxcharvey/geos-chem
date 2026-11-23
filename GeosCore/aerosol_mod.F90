@@ -1785,7 +1785,18 @@ CONTAINS
     IF ( SaveAAOD ) THEN
        DO BrC_Tag = 1, SIZE( BrC_Optical_Species )
           NA = Ind_( BrC_Optical_Species(BrC_Tag), 'H' )
-          IF ( NA > 0 ) BrC_Optical_Index( Map_NRHAER(NA) ) = BrC_Tag
+          IF ( NA < 1 .OR. NA > State_Chm%nHygGrth .OR. NA > NRHAER ) THEN
+             ErrMsg = 'Missing hygroscopic BrC optical carrier: ' // TRIM(BrC_Optical_Species(BrC_Tag))
+             CALL GC_Error( ErrMsg, RC, 'RDAER in aerosol_mod.F90' )
+             RETURN
+          ENDIF
+          N = Map_NRHAER(NA)
+          IF ( N < 1 .OR. N > NRHAER ) THEN
+             ErrMsg = 'Invalid BrC optical bin for: ' // TRIM(BrC_Optical_Species(BrC_Tag))
+             CALL GC_Error( ErrMsg, RC, 'RDAER in aerosol_mod.F90' )
+             RETURN
+          ENDIF
+          BrC_Optical_Index(N) = BrC_Tag
        ENDDO
     ENDIF
 
@@ -2192,7 +2203,7 @@ CONTAINS
              IF ( SaveAAOD_Bin ) THEN
                 IF ( N == BRC_DRY_AEROSOL_BIN ) THEN
                    ! The DBRC carrier uses dry optical properties.
-                   BrC_Absorptance = 1.0_f8 - SSW(1)
+                   BrC_Absorptance = 1.0_f8 - SSAA(IWV,1,N,State_Chm%Phot%DRg)
                 ELSE IF ( IRH == NRH ) THEN
                    BrC_Absorptance = 1.0_f8 - SSW(NRH)
                 ELSE

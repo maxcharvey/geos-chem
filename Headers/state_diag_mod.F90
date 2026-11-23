@@ -20605,14 +20605,17 @@ CONTAINS
 !                  GEOS-Chem Global Chemical Transport Model                  !
 !------------------------------------------------------------------------------
 !
-  PURE INTEGER FUNCTION BrC_Optical_Tag_Index( Name ) RESULT( TagIndex )
+  INTEGER FUNCTION BrC_Optical_Tag_Index( Name ) RESULT( TagIndex )
+    USE Charpak_Mod, ONLY : To_Uppercase
     CHARACTER(LEN=*), INTENT(IN) :: Name
+    CHARACTER(LEN=LEN(Name))    :: Upper_Name
     INTEGER                     :: N
 
     ! Return a missing index for tags outside the supported BrC optical family.
+    Upper_Name = To_Uppercase(Name)
     TagIndex = -1
     DO N = 1, SIZE(BrC_Optical_Species)
-       IF ( Name /= BrC_Optical_Species(N) ) CYCLE
+       IF ( Upper_Name /= BrC_Optical_Species(N) ) CYCLE
        TagIndex = N
        RETURN
     ENDDO

@@ -610,6 +610,8 @@ CONTAINS
    INTEGER            :: I, J, L
    INTEGER            :: id_FSOAP, id_FSOAS, id_BRCSOA, id_WTC, id_PWTC, id_SWTC
    INTEGER            :: id_NPBRCPOA, id_DBRCPOA, id_PBRCPOA
+   LOGICAL            :: DebugBrC
+   REAL(fp)           :: Flux_FSOAP
    REAL(fp)           :: Sum_FSOAP, Sum_FSOAS, Sum_BRCSOA
    REAL(fp)           :: Sum_NPBRCPOA, Sum_WTC, Sum_DBRCPOA, Sum_PBRCPOA
    REAL(fp)           :: AbsMass, TotMass, WhiteMass, PriMass, SecMass
@@ -619,6 +621,8 @@ CONTAINS
    ! ChemBrC begins here!
    !=================================================================
    RC      = GC_SUCCESS
+   DebugBrC = Input_Opt%amIRoot .AND. Input_Opt%Verbose
+   Flux_FSOAP = 0.0_fp
    ErrMsg  = ''
    ThisLoc = ' -> at ChemBrC (in module GeosCore/brc_mod.F90)'
 
@@ -673,6 +677,9 @@ CONTAINS
          CALL GC_Error( ErrMsg, RC, ThisLoc )
          RETURN
       ENDIF
+
+      ! CHEM_FSOAS consumes and clears the conversion buffer.
+      IF ( DebugBrC ) Flux_FSOAP = SUM( FSOAP_CONV )
 
       IF ( Input_Opt%Verbose ) THEN
          CALL DEBUG_MSG( '### CHEMBRC: after CHEM_FSOAP' )
@@ -745,10 +752,10 @@ CONTAINS
    ! Step 3: Preserve provenance: NPBRCPOA -> PWTC, BRCSOA -> SWTC.
    ! WTC is a derived output and owns no physical stock.
    !-----------------------------------------------------------------
-   IF ( Input_Opt%amIRoot ) THEN
+   IF ( DebugBrC ) THEN
       WRITE( 6, '(a,3(1x,a,es12.4))' )                                     &
          'BRC_DEBUG ChemBrC flux kg/tstep:',                               &
-         'FSOAP2FSOAS=', SUM( FSOAP_CONV  ),                               &
+         'FSOAP2FSOAS=', Flux_FSOAP,                                        &
          'BRC2WTC=',     SUM( BRCSOA_CONV ),                               &
          'NPBRC2WTC=',   SUM( NPBRC_CONV  )
    ENDIF
@@ -843,7 +850,7 @@ CONTAINS
       !$OMP END PARALLEL DO
    ENDIF
 
-   IF ( Input_Opt%amIRoot ) THEN
+   IF ( DebugBrC ) THEN
       Sum_FSOAP    = 0.0_fp
       Sum_NPBRCPOA = 0.0_fp
       Sum_DBRCPOA  = 0.0_fp

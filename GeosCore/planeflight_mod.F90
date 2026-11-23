@@ -297,6 +297,7 @@ CONTAINS
 
     ! Close the file
     CLOSE( IU_FILE )
+    IF ( RC /= GC_SUCCESS ) RETURN
 
     ! Set the pointer to the first record
     PPOINT = 1
@@ -899,6 +900,7 @@ CONTAINS
 !
 ! !USES:
 !
+    USE, INTRINSIC :: IEEE_ARITHMETIC, ONLY : IEEE_IS_FINITE
     USE ErrCode_Mod
     USE FILE_MOD,           ONLY : IOERROR
     USE GC_GRID_MOD,        ONLY : GET_IJ
@@ -932,7 +934,8 @@ CONTAINS
     REAL*4             :: LAT, LON, PRES, OBS
     REAL*4             :: TAMB, H2OMR, POTTEMP, GPSALT
     CHARACTER(LEN=7)   :: TYPE
-    CHARACTER(LEN=7)   :: NAME
+    CHARACTER(LEN=7)   :: NAME, verticalField
+    CHARACTER(LEN=255) :: inputFile
     CHARACTER(LEN=255) :: thisLoc
     CHARACTER(LEN=512) :: errMsg
 
@@ -963,14 +966,27 @@ CONTAINS
 
        ! Read a line from the file
        READ( IU_FILE, 100, IOSTAT=IOS ) &
-            TYPE, QDD, QMM, QYY, QHH, QMN, LAT, LON, PRES, OBS
-100    FORMAT( 5x,a7,x,i2,x,i2,x,i4,x,i2,x,i2,x,f7.2,x,f7.2,x,f7.2,x,f10.3 )
+            TYPE, QDD, QMM, QYY, QHH, QMN, LAT, LON, verticalField, OBS
+100    FORMAT( 5x,a7,x,i2,x,i2,x,i4,x,i2,x,i2,x,f7.2,x,f7.2,x,a7,x,f10.3 )
 
        ! Error check
        IF ( IOS /= 0 ) CALL IOERROR( IOS, IU_FILE, 'read_points:2' )
 
        ! Exit if the word END is found
        IF ( INDEX( TYPE, 'END' ) > 0 ) EXIT
+
+       ! A blank F7.2 field would otherwise be silently read as zero.
+       READ( verticalField, '(f7.2)', IOSTAT=IOS ) PRES
+       IF ( IOS /= 0 ) PRES = 0.0
+       IF ( IOS /= 0 .OR. LEN_TRIM(verticalField) == 0 .OR. &
+            .NOT. IEEE_IS_FINITE(PRES) ) THEN
+          INQUIRE( UNIT=IU_FILE, NAME=inputFile )
+          WRITE( errMsg, '(a,a,a,i0)' ) &
+               'Invalid Planeflight pressure/altitude in ', TRIM(inputFile), &
+               ', point row ', N
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
+       ENDIF
 
        !==============================================================
        ! Read date and time coordinates -- also do error checks
@@ -1118,14 +1134,32 @@ CONTAINS
           ! divide by g0 again (see issue geoschem/geos-chem #531)
           L_ALT = 0
           IJ = GET_IJ( LON, LAT, State_Grid )
+          MOD_ELEV = State_Met%PHIS(IJ(1),IJ(2))
           DO L = 1, State_Grid%NZ
-             MOD_ELEV = State_Met%PHIS(IJ(1),IJ(2))                         &
-                        + SUM( State_Met%BXHEIGHT(IJ(1),IJ(2),1:L) )
-             IF ( (L_ALT .EQ. 0)  .AND. (MOD_ELEV .GT. PRES) ) THEN
+             MOD_ELEV = MOD_ELEV + State_Met%BXHEIGHT(IJ(1),IJ(2),L)
+             IF ( MOD_ELEV > PRES ) THEN
                 L_ALT = L
+                EXIT
              ENDIF
           ENDDO
+          IF ( L_ALT == 0 ) THEN
+             INQUIRE( UNIT=IU_FILE, NAME=inputFile )
+             WRITE( errMsg, '(a,a,a,i0)' ) &
+                'Planeflight altitude at or above model top in ', TRIM(inputFile), &
+                ', point row ', N
+             CALL GC_Error( errMsg, RC, thisLoc )
+             RETURN
+          ENDIF
           PRES = State_Met%PMID(IJ(1),IJ(2),L_ALT)
+       ENDIF
+
+       IF ( PRES <= 0.0 ) THEN
+          INQUIRE( UNIT=IU_FILE, NAME=inputFile )
+          WRITE( errMsg, '(a,a,a,i0)' ) &
+               'Nonpositive Planeflight pressure in ', TRIM(inputFile), &
+               ', point row ', N
+          CALL GC_Error( errMsg, RC, thisLoc )
+          RETURN
        ENDIF
 
        ! Assign LAT value into global PLATTD array
@@ -1573,7 +1607,7 @@ CONTAINS
     INTEGER             :: IWV, ISPC, K
     REAL(fp)            :: TK, PTAUS, PTAUE, CONSEXP, VPRESH2O, SAODnm
     REAL(fp)            :: VARI(NPVAR)
-    LOGICAL             :: CHEMSTEP
+    INTEGER             :: DIAG_STEP, DYN_STEP, PHASE, WINDOW
     REAL(f8)            :: FLTGMT   ! eam (06/2015)
     REAL(f8)            :: XRH      ! MET field RH (eam, 08/2015)
     CHARACTER(LEN=63)   :: OrigUnit
@@ -1598,6 +1632,7 @@ CONTAINS
 ! !DEFINED PARAMETERS:
 !
     REAL(fp), PARAMETER :: MISSING = -999.99999999e+0_fp  ! Missing data value
+    REAL(f8), PARAMETER :: TIME_EPS = 1.0d-9               ! Hours, for roundoff at boundaries
     REAL(fp), PARAMETER :: TINY    = 1.e-36_fp            ! arbitary small # to
                                                           !  avoid faulty output
     ! Expand from 4 to 5 for Fast-JX
@@ -1630,9 +1665,6 @@ CONTAINS
     ODAER     => State_Chm%Phot%ODAER       ! Aerosol optical depth
     ODMDUST   => State_Chm%Phot%ODMDUST     ! Dust optical depth
 
-    ! Update from kyu (03/2015):
-    CHEMSTEP = ( MOD(GET_ELAPSED_SEC(), GET_TS_DIAG() ) == ( GET_TS_DIAG() / 2))
-
     ! Get date & time values
     YEAR   = GET_YEAR()
     MONTH  = GET_MONTH()
@@ -1650,31 +1682,25 @@ CONTAINS
        LINTERP=.TRUE.
     ENDIF
 
+    ! Snap the diagnostic midpoint forward to a reachable dynamics tick.
+    ! Equal diagnostic and dynamics steps sample on every tick.
+    DIAG_STEP = GET_TS_DIAG()
+    DYN_STEP  = GET_TS_DYN()
+    PHASE = MOD( ((DIAG_STEP / 2 + DYN_STEP - 1) / DYN_STEP) * DYN_STEP, DIAG_STEP )
+    IF ( MOD(GET_ELAPSED_SEC(), DIAG_STEP) == PHASE ) THEN
+       WINDOW = DIAG_STEP
+    ELSE IF ( HOUR == 0 .AND. MINUTE == 0 ) THEN
+       ! Flush observations from the old day before its file is closed.
+       WINDOW = MODULO(GET_ELAPSED_SEC() - PHASE, DIAG_STEP)
+    ELSE
+       RETURN
+    ENDIF
+    PTAUE = GET_TAU0( MONTH, DAY, YEAR, HOUR, MINUTE, 0 )
+    ! The first window cannot sample observations from before the restart.
+    PTAUS = PTAUE - MIN(WINDOW, GET_ELAPSED_SEC()) / 3600d0
+
     ! Loop over all the locations that have not yet been found
     DO M = PPOINT, NPOINTS
-
-       ! Starting & end times of transport timestep
-       PTAUE = GET_TAU0( MONTH, DAY, YEAR, HOUR, MINUTE, 0 )
-       ! Modification from kyu (eam, 03/2015)
-       !PTAUS = PTAUE - ( GET_TS_DIAG() / 3600e+0_fp )
-       ! If we just finished a chemistry timestep, write out one full
-       ! diagnostic timestep's worth of data
-       IF ( CHEMSTEP ) THEN
-          PTAUS = PTAUE - ( GET_TS_DIAG() / 3600d0 )
-          ! Otherwise write out only half a timestep's worth of data
-       ELSE
-          ! Flush the last timestep to the output file (bmy, 3/28/19)
-          ! NOTE: Luke Schiferl pointed out we should test against
-          ! 86400 seconds instead of GET_TS_DIAG*1440.  GET_TS_DIAG
-          ! by now is already in seconds and 1440 is minutes/day,
-          ! so there's a mismatch.  This caused planeflight data
-          ! for the last timestep of a day not to be written out.
-          IF (MOD(GET_ELAPSED_SEC(), 86400) == 0) THEN
-             PTAUS = PTAUE - ( GET_TS_DIAG() / (2.0 * 3600d0) )
-          ELSE
-             EXIT
-          ENDIF
-       ENDIF
 
        ! Initialize VARI to missing value for this point
        DO V = 1, NPVAR
@@ -1684,10 +1710,10 @@ CONTAINS
        !==============================================================
        ! We haven't found the first plane point yet...
        !==============================================================
-       IF ( PTAU(M) < PTAUS ) THEN
+       IF ( PTAU(M) < PTAUS - TIME_EPS ) THEN
 
           ! Write all missing values to disk for point #M
-          CALL WRITE_VARS_TO_FILE( Input_Opt, State_Grid, State_Met, M, VARI )
+          CALL WRITE_VARS_TO_FILE( Input_Opt, State_Grid, M, VARI, 0, 0, 0 )
 
           ! Increment pointer
           PPOINT = PPOINT + 1
@@ -1697,7 +1723,7 @@ CONTAINS
        !==============================================================
        ! Ensure that a model comparison is made for this point
        ! (skim, 7/24/13)
-       ELSE IF ( PTAU(M) > PTAUE ) THEN
+       ELSE IF ( PTAU(M) > PTAUE + TIME_EPS ) THEN
 
           ! Exit this loop and the subroutine
           EXIT
@@ -1712,7 +1738,8 @@ CONTAINS
 100       FORMAT( '     - PLANEFLIGHT: Archived ',a7,1x,i8.8,1x,i4.4 )
 
           ! Return grid box indices for the chemistry region
-          CALL TEST_VALID( M, I, J, L, Input_Opt, State_Grid, State_Met, RC )
+          CALL TEST_VALID( M, I, J, L, State_Grid, State_Met, RC )
+          IF ( RC /= GC_SUCCESS ) RETURN
 
           ! If this is a surface observation, force L=1
           !
@@ -2311,7 +2338,7 @@ CONTAINS
           Spc => NULL()
 
           ! Write data for the Mth plane point out to disk
-          CALL WRITE_VARS_TO_FILE( Input_Opt, State_Grid, State_Met, M, VARI )
+          CALL WRITE_VARS_TO_FILE( Input_Opt, State_Grid, M, VARI, I, J, L )
 
           ! Increment the record pointer
           PPOINT = PPOINT + 1
@@ -2335,24 +2362,22 @@ CONTAINS
 !
 ! !IROUTINE: test_valid
 !
-! !DESCRIPTION: Subroutine TEST\_VALID tests to see if we are w/in the
-!  tropopause, which is where chemistry is done.
+! !DESCRIPTION: Return the grid indices for a Planeflight observation.
 !\\
 !\\
 ! !INTERFACE:
 !
-  SUBROUTINE TEST_VALID( IND, I, J, L, Input_Opt, State_Grid, State_Met, RC )
+  SUBROUTINE TEST_VALID( IND, I, J, L, State_Grid, State_Met, RC )
 !
 ! !USES:
 !
-    USE Input_Opt_Mod,      ONLY : OptInput
+    USE ErrCode_Mod,        ONLY : GC_SUCCESS, GC_Error
     USE State_Grid_Mod,     ONLY : GrdState
     USE State_Met_Mod,      ONLY : MetState
 !
 ! !INPUT PARAMETERS:
 !
     INTEGER,        INTENT(IN ) :: IND         ! # of the flight track point
-    TYPE(OptInput), INTENT(IN ) :: Input_Opt   ! Input Options object
     TYPE(GrdState), INTENT(IN ) :: State_Grid  ! Grid State object
     TYPE(MetState), INTENT(IN ) :: State_Met   ! Meteorology State object
 !
@@ -2374,14 +2399,13 @@ CONTAINS
 ! !LOCAL VARIABLES:
 !
     INTEGER :: IL
-    LOGICAL :: FOUND
+    CHARACTER(LEN=255) :: errMsg
 
     !=================================================================
     ! TEST_VALID begins here!
     !=================================================================
 
-    ! We have not found a valid point
-    FOUND = .FALSE.
+    RC = GC_SUCCESS
 
     ! Get I corresponding to PLONGTD(IND)
     I = INT( ( PLONGTD(IND) + 180e+0_fp - &
@@ -2394,18 +2418,27 @@ CONTAINS
     J = INT( ( PLATTD(IND) +  90e+0_fp - &
       ( State_Grid%YMinOffset * State_Grid%DY ) ) / State_Grid%DY + 1.5e+0_fp )
 
-    ! Get L corresponding to PRESS(IND)
-    L = 1
-    DO IL = 1, State_Grid%NZ
-       IF ( State_Met%PEDGE(I,J,IL) <= PPRESS(IND) .AND..NOT. FOUND ) THEN
-          L     = IL-1
-          FOUND =.TRUE.
-          EXIT
+    IF ( I < 1 .OR. I > State_Grid%NX .OR. J < 1 .OR. J > State_Grid%NY ) THEN
+       WRITE( errMsg, '(a,i0)' ) 'Invalid Planeflight horizontal index at point ', IND
+       CALL GC_Error( errMsg, RC, 'TEST_VALID (planeflight_mod.F90)' )
+       RETURN
+    ENDIF
+
+    ! An exact internal interface belongs to the lower layer.
+    ! Pressures below the surface are assigned to level 1.
+    ! Match the single-precision pressure read at the model lid.
+    IF ( PPRESS(IND) < REAL(State_Met%PEDGE(I,J,State_Grid%NZ+1),4) ) THEN
+       WRITE( errMsg, '(a,i0)' ) 'Planeflight pressure above model top at point ', IND
+       CALL GC_Error( errMsg, RC, 'TEST_VALID (planeflight_mod.F90)' )
+       RETURN
+    ENDIF
+    L = State_Grid%NZ
+    DO IL = 1, State_Grid%NZ - 1
+       IF ( State_Met%PEDGE(I,J,IL+1) <= PPRESS(IND) ) THEN
+          L = IL
+          RETURN
        ENDIF
     ENDDO
-
-    ! Error check: L must be 1 or higher
-    IF ( L == 0 ) L = 1
 
   END SUBROUTINE TEST_VALID
 !EOC
@@ -2422,24 +2455,22 @@ CONTAINS
 !\\
 ! !INTERFACE:
 !
-  SUBROUTINE WRITE_VARS_TO_FILE( Input_Opt, State_Grid, State_Met, IND, VARI )
+  SUBROUTINE WRITE_VARS_TO_FILE( Input_Opt, State_Grid, IND, VARI, II, JJ, LL )
 !
 ! !USES:
 !
     USE FILE_MOD,       ONLY : IOERROR
-    USE GC_GRID_MOD,    ONLY : GET_IJ
     USE Input_Opt_Mod,  ONLY : OptInput
     USE State_Grid_Mod, ONLY : GrdState
-    USE State_Met_Mod,  ONLY : MetState
     USE TIME_MOD
 !
 ! !INPUT PARAMETERS:
 !
     TYPE(OptInput), INTENT(IN) :: Input_Opt     ! Input options
     TYPE(GrdState), INTENT(IN) :: State_Grid    ! Grid State object
-    TYPE(MetState), INTENT(IN) :: State_Met     ! Meteorology State object
     INTEGER,        INTENT(IN) :: IND           ! # of the flight track point
     REAL(fp),       INTENT(IN) :: VARI(NPVAR)   ! Values to print to file
+    INTEGER,        INTENT(IN) :: II, JJ, LL    ! Sampled indices, or zero if missing
 !
 ! !REVISION HISTORY:
 !  08 Jul 2002 - M. Evans - Initial version
@@ -2450,9 +2481,7 @@ CONTAINS
 !
 ! !LOCAL VARIABLES:
 !
-    LOGICAL, SAVE :: FIRST = .TRUE.
     INTEGER       :: I, IOS
-    INTEGER       :: IIJJ(2), II, JJ, L, LL
     REAL*4        :: LON_TMP, LAT_TMP
 
     !=================================================================
@@ -2471,18 +2500,6 @@ CONTAINS
             PRINT*, ' Outside nested domain, skipping record ', IND
        RETURN
     ENDIF
-
-    ! Get Lat, Lon, and Pressure indicies (ajt, 5/26/13)
-    IIJJ = GET_IJ( LON_TMP, LAT_TMP, State_Grid )
-    II = IIJJ(1)
-    JJ = IIJJ(2)
-    LL = 0
-    IF ( PPRESS(IND) .GT. State_Met%PEDGE(II,JJ,1) ) LL = 1
-    DO L = 1, State_Grid%NZ
-       IF ( ( PPRESS(IND) .LT. State_Met%PEDGE(II,JJ,L)   ) .AND. &
-            ( PPRESS(IND) .GT. State_Met%PEDGE(II,JJ,L+1) ) ) LL = L
-    ENDDO
-    IF (LL .EQ. 0) LL = State_Grid%NZ
 
     ! Write data to file
     WRITE( IU_PLANE, 110, IOSTAT=IOS )                            &

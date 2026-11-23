@@ -862,6 +862,15 @@ CONTAINS
     ErrMsg = ''
     ThisLoc = ' -> at Set_Aer (in module GeosCore/photolysis_mod.F90)'
 
+#ifdef FASTJX
+    ! The legacy FAST-JX table cannot carry the dedicated WB/PB/DB records.
+    IF ( Input_Opt%LBRC .AND. TRIM(Input_Opt%CloudJ_BrC_Optics) == 'DEDICATED' ) THEN
+       ErrMsg = 'Dedicated BrC photolysis optics require Cloud-J. Use organic with FAST-JX.'
+       CALL GC_Error( ErrMsg, RC, ThisLoc )
+       RETURN
+    ENDIF
+#endif
+
     CALL BUILD_BRC_CLOUDJ_MAP( Input_Opt%LBRC,                         &
                                Input_Opt%CloudJ_BrC_Optics, NAA,      &
                                TITLAA, AerMap, RC, ErrMsg )
@@ -877,10 +886,8 @@ CONTAINS
 #else
           WRITE(6,'(a)') 'Cloud-J BrC optics: organic-equivalence records'
 #endif
+#ifndef FASTJX
        ELSE
-#ifdef FASTJX
-          WRITE(6,'(a)') 'FAST-JX BrC optics: dedicated records 64-74'
-#else
           WRITE(6,'(a)') 'Cloud-J BrC optics: dedicated records 64-74'
 #endif
        ENDIF

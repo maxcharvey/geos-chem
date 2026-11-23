@@ -37,7 +37,7 @@ MODULE CMN_FJX_MOD
 
   INTEGER, PARAMETER :: X_    = 123    ! Max # X-section data in FJX_spec.dat
 
-  INTEGER, PARAMETER :: A_    = 63     ! # aerosol/cloud Mie sets (+7 for BrC entries 57-63)
+  INTEGER, PARAMETER :: A_    = 63     ! Maximum number of legacy aerosol/cloud Mie sets
 
 #ifdef MODEL_GEOS
 !!!INTEGER, PARAMETER :: N_ = 601

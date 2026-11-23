@@ -120,9 +120,11 @@ METDIR:   ${RUNDIR_MET_DIR}
 * SPHU     $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC     QV        1900-2100/1-12/1-31/*           EFY xyz 1  * -  1 1
 * TMPU     $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC     T         1900-2100/1-12/1-31/*           EFY xyz 1  * -  1 1
 
-* PS_NEXTDAY   $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC PS        1900-2100/1-12/1-31/1/+1day     EFY xy  1  * -  1 1
-* SPHU_NEXTDAY $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC QV        1900-2100/1-12/1-31/1/+1day     EFY xyz 1  * -  1 1
-* TMPU_NEXTDAY $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC T         1900-2100/1-12/1-31/1/+1day     EFY xyz 1  * -  1 1
+# With a day-only shift, the wildcard uses midnight for the exact
+# next-day lookup even when the model starts at another whole hour.
+* PS_NEXTDAY   $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC PS        1900-2100/1-12/1-31/*/+1day     EFY xy  1  * -  1 1
+* SPHU_NEXTDAY $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC QV        1900-2100/1-12/1-31/*/+1day     EFY xyz 1  * -  1 1
+* TMPU_NEXTDAY $METDIR/$YYYY/$MM/$MET.$YYYY$MM$DD.I3.$RES.$NC T         1900-2100/1-12/1-31/*/+1day     EFY xyz 1  * -  1 1
 
 #==============================================================================
 # --- Fields for lightning emissions (Extension 103) ---

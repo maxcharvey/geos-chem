@@ -3540,8 +3540,9 @@ VerboseOnCores:              root       # Accepted values: root all
 # with respect to CO in the GFAS_CLIMATOLOGY data.
 #==============================================================================
 (((GFAS
-112 GFAS_CO_3D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire_3d     2003-2100/1-12/1-31/0 EFY xyz kg/m2/s * 75       1 1
-112 GFAS_CO_2D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
+# Read the single daily record from the dated file at any restart hour.
+112 GFAS_CO_3D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire_3d     2003-2100/1-12/1-31/0 RFY xyz kg/m2/s * 75       1 1
+112 GFAS_CO_2D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire        2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
 112 GFAS_ACR_2D   -                                                       -             -                     -   -   -       * 350/75   1 1
 112 GFAS_ACTA_2D  -                                                       -             -                     -   -   -       * 351/75   1 1
 112 GFAS_C2H2_2D  -                                                       -             -                     -   -   -       * 352/75   1 1
@@ -3565,27 +3566,27 @@ VerboseOnCores:              root       # Accepted values: root all
 (((GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_SOAP_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 )))GFAS_BRC_HARMONIZED_SENSITIVITY
-112 GFAS_ACET_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c3h6ofire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_ALD2_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h4ofire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_ALK4_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc hialkanesfire 2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_BCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 70/75    1 1
-112 GFAS_BCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 71/75    1 1
-112 GFAS_BENZ_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c6h6fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_C2H4_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h4fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_C2H6_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h6fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_C3H8_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c3h8fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_CH2O_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ch2ofire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_MOH_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ch3ohfire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_CH4_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ch4fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_DMS_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h6sfire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_ISOP_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c5h8fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_NH3_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc nh3fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_NO_2D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc noxfire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
+112 GFAS_ACET_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c3h6ofire     2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_ALD2_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h4ofire     2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_ALK4_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc hialkanesfire 2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_BCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 70/75    1 1
+112 GFAS_BCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire        2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 71/75    1 1
+112 GFAS_BENZ_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c6h6fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_C2H4_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h4fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_C2H6_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h6fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_C3H8_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c3h8fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_CH2O_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ch2ofire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_MOH_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ch3ohfire     2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_CH4_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ch4fire       2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_DMS_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c2h6sfire     2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_ISOP_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c5h8fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_NH3_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc nh3fire       2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_NO_2D    $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc noxfire       2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
 # Ordinary GFAS remains unchanged when the controlled BrC proxy is off.
 (((.not.GFAS_BRC_HARMONIZED_SENSITIVITY
-112 GFAS_OCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 72/75    1 1
+112 GFAS_OCPI_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 72/75    1 1
 112 GFAS_FOCPI_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
-112 GFAS_OCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 73/75    1 1
+112 GFAS_OCPO_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire        2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 73/75    1 1
 112 GFAS_FOCPO_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_FSOAP_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
 112 GFAS_DBRCPOA_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
@@ -3595,23 +3596,23 @@ VerboseOnCores:              root       # Accepted values: root all
 # Preserve 0.5 residual OC + 0.375 NPBRC + 0.125 PBRC carbon closure.
 # GFAS is already mass-based: do not apply FINN molecule/MW factor 287.
 (((GFAS_BRC_HARMONIZED_SENSITIVITY
-112 GFAS_FOCPI_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 72/75/282 1 1
+112 GFAS_FOCPI_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 RFY xy kg/m2/s * 72/75/282 1 1
 112 GFAS_OCPI_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
-112 GFAS_FOCPO_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 73/75/282 1 1
+112 GFAS_FOCPO_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 RFY xy kg/m2/s * 73/75/282 1 1
 112 GFAS_OCPO_2D 0 - 2000-2100/1-12/1-31/0 C xy kg/m2/s * - 1 1
-112 GFAS_FSOAP_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/286 1 1
-112 GFAS_DBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/285 1 1
-112 GFAS_NPBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/283 1 1
-112 GFAS_PBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 EFY xy kg/m2/s * 75/284 1 1
+112 GFAS_FSOAP_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc cofire 2003-2100/1-12/1-31/0 RFY xy kg/m2/s * 75/286 1 1
+112 GFAS_DBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc bcfire 2003-2100/1-12/1-31/0 RFY xy kg/m2/s * 75/285 1 1
+112 GFAS_NPBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 RFY xy kg/m2/s * 75/283 1 1
+112 GFAS_PBRCPOA_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc ocfire 2003-2100/1-12/1-31/0 RFY xy kg/m2/s * 75/284 1 1
 )))GFAS_BRC_HARMONIZED_SENSITIVITY
 112 GFAS_POG1_2D  -                                                       -             -                     -   -   -       * 74/76/75 1 1
 112 GFAS_POG2_2D  -                                                       -             -                     -   -   -       * 74/77/75 1 1
-112 GFAS_pFe_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc so2fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75/66    1 1
-112 GFAS_PRPE1_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc hialkenesfire 2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_PRPE2_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c3h6fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_SO2_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc so2fire       2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_TOLU_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c7h8fire      2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
-112 GFAS_XYLE_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c8h10fire     2003-2100/1-12/1-31/0 EFY xy  kg/m2/s * 75       1 1
+112 GFAS_pFe_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc so2fire       2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75/66    1 1
+112 GFAS_PRPE1_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc hialkenesfire 2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_PRPE2_2D $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c3h6fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_SO2_2D   $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc so2fire       2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_TOLU_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c7h8fire      2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
+112 GFAS_XYLE_2D  $ROOT/GFAS/v2026-06/$YYYY/$MM/GFAS-smoke-$YYYY$MM$DD.nc c8h10fire     2003-2100/1-12/1-31/0 RFY xy  kg/m2/s * 75       1 1
 )))GFAS
 
 )))EMISSIONS

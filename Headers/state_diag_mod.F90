@@ -17943,22 +17943,22 @@ CONTAINS
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAP2FSOAS' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from FSOAP to FSOAS'
+       IF ( isDesc    ) Desc  = 'Precursor mass transferred from FSOAP to FSOAS per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXFSOAS2BRC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from FSOAS to BRCSOA'
+       IF ( isDesc    ) Desc  = 'Organic matter removed from FSOAS to form BRCSOA per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXBRC2WTC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from BRCSOA to SWTC'
+       IF ( isDesc    ) Desc  = 'Carbon mass transferred from BRCSOA to SWTC per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
     ELSE IF ( TRIM( Name_AllCaps ) == 'BRCFLUXNPBRC2WTC' ) THEN
-       IF ( isDesc    ) Desc  = 'Mass flux from NPBRCPOA to PWTC'
+       IF ( isDesc    ) Desc  = 'Carbon mass transferred from NPBRCPOA to PWTC per chemistry step'
        IF ( isUnits   ) Units = 'kg'
        IF ( isRank    ) Rank  =  3
 
